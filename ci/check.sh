@@ -7,13 +7,17 @@ AREA=${1:-all}
 MODULES=${2:-}
 want() { [ "$AREA" = all ] || [ "$AREA" = "$1" ]; }
 t0=$(date +%s)
+# Pick a JDK per area: core services target Java 25, Flink 2.x jobs Java 21 (both installed by the devcontainer).
+use_jdk() { local d; d=$(ls -d /usr/local/sdkman/candidates/java/"$1"* 2>/dev/null | head -1); [ -n "$d" ] && export JAVA_HOME=$d PATH=$d/bin:$PATH; return 0; }
 
 if want core; then
+  use_jdk 25
   pl=${MODULES:+-pl $MODULES -am}
   mvn -q -B -ntp -f services/core/pom.xml $pl verify
   echo "✓ core"
 fi
 if want flink; then
+  use_jdk 21
   mvn -q -B -ntp -f analytics/flink-jobs/pom.xml verify
   echo "✓ flink"
 fi

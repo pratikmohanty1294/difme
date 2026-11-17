@@ -2,15 +2,24 @@
 # routing, path rewrites, JWT verification (Keycloak), rate limits and timeouts are Gateway API / Envoy Gateway policy.
 
 # ── External API: api.difme.local ─────────────────────────────────────────────────────────────────────────────
+# Rate limits differ per API, so each API is its own route with its own policy.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
-metadata: { name: public-api, namespace: ingress-system }
+metadata: { name: public-payments, namespace: ingress-system }
 spec:
   parentRefs: [{ name: difme-edge, sectionName: https }]
   hostnames: [api.difme.local]
   rules:
     - matches: [{ path: { type: PathPrefix, value: /v1/payments } }, { path: { type: PathPrefix, value: /v1/transfers } }]
       backendRefs: [{ name: quarkus-cmd-svc, namespace: core-platform, port: 8080 }]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: public-accounts, namespace: ingress-system }
+spec:
+  parentRefs: [{ name: difme-edge, sectionName: https }]
+  hostnames: [api.difme.local]
+  rules:
     - matches: [{ path: { type: PathPrefix, value: /v1/accounts } }]
       backendRefs: [{ name: quarkus-qry-svc, namespace: core-platform, port: 8081 }]
 ---
@@ -18,30 +27,40 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata: { name: public-api-jwt, namespace: ingress-system }
 spec:
-  targetRefs: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, name: public-api }]
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: public-payments }
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: public-accounts }
   jwt:
     providers:
       - name: keycloak
         issuer: https://id.difme.local/realms/difme
         remoteJWKS: { uri: http://keycloak.security.svc:8080/realms/difme/protocol/openid-connect/certs }
 ---
+# Payments: no gateway retries (idempotency is by key; retries stay explicit at the client).
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
-metadata: { name: public-api-limits, namespace: ingress-system }
+metadata: { name: public-payments-limits, namespace: ingress-system }
 spec:
-  targetRefs: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, name: public-api }]
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: public-payments }
   rateLimit:
     type: Local
-    local:
-      rules:
-        - clientSelectors: [{ path: { type: PathPrefix, value: /v1/payments } }]
-          limit: { requests: 100, unit: Second }
-        - clientSelectors: [{ path: { type: PathPrefix, value: /v1/accounts } }]
-          limit: { requests: 500, unit: Second }
+    local: { rules: [{ limit: { requests: 100, unit: Second } }] }
   timeout: { http: { requestTimeout: 10s } }
-  retry: { numRetries: 0 }        # payments are idempotent by key, but retries stay explicit at the client
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata: { name: public-accounts-limits, namespace: ingress-system }
+spec:
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: public-accounts }
+  rateLimit:
+    type: Local
+    local: { rules: [{ limit: { requests: 500, unit: Second } }] }
+  timeout: { http: { requestTimeout: 10s } }
 ---
 # ── Back-office API: ops.difme.local/api (JWT) ───────────────────────────────────────────────────────────────
+# One match per rule: a prefix rewrite needs exactly one PathPrefix match (Gateway API validation).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata: { name: back-office-api, namespace: ingress-system }
@@ -52,33 +71,39 @@ spec:
     - matches: [{ path: { type: PathPrefix, value: /api/process } }]
       filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: / } } }]
       backendRefs: [{ name: process-gateway, namespace: process, port: 8088 }]
-    - matches:
-        - { path: { type: PathPrefix, value: /api/settlements } }
-        - { path: { type: PathPrefix, value: /api/audit } }
-        - { path: { type: PathPrefix, value: /api/analytics } }
-      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: /v1 } } }]
+    - matches: [{ path: { type: PathPrefix, value: /api/settlements } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: /v1/settlements } } }]
+      backendRefs: [{ name: quarkus-qry-svc, namespace: core-platform, port: 8081 }]
+    - matches: [{ path: { type: PathPrefix, value: /api/audit } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: /v1/audit } } }]
+      backendRefs: [{ name: quarkus-qry-svc, namespace: core-platform, port: 8081 }]
+    - matches: [{ path: { type: PathPrefix, value: /api/analytics } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: /v1/analytics } } }]
       backendRefs: [{ name: quarkus-qry-svc, namespace: core-platform, port: 8081 }]
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata: { name: back-office-jwt, namespace: ingress-system }
 spec:
-  targetRefs: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, name: back-office-api }]
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: back-office-api }
   jwt:
     providers:
       - name: keycloak
         issuer: https://id.difme.local/realms/difme
         remoteJWKS: { uri: http://keycloak.security.svc:8080/realms/difme/protocol/openid-connect/certs }
 ---
+# Long timeout: the settlements live stream uses server-sent events.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata: { name: back-office-limits, namespace: ingress-system }
 spec:
-  targetRefs: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, name: back-office-api }]
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: back-office-api }
   rateLimit:
     type: Local
     local: { rules: [{ limit: { requests: 50, unit: Second } }] }
-  timeout: { http: { requestTimeout: 3600s } }   # settlements live stream (server-sent events)
+  timeout: { http: { requestTimeout: 3600s } }
 ---
 # Feature-flag evaluation (OFREP) for the browser: not sensitive, no auth.
 apiVersion: gateway.networking.k8s.io/v1

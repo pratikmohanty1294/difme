@@ -9,28 +9,31 @@ permissions: { contents: read, packages: write, id-token: write, attestations: w
 
 jobs:
   core:
+    # ADR-012 hybrid runtimes: native images for light I/O-bound services, JVM + AOT cache for hot paths.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { module: cmd-svc,            fdb: "true" }
-          - { module: qry-svc,            fdb: "false" }
-          - { module: saga-orchestrator,  fdb: "false" }
-          - { module: consistency-router, fdb: "false" }
-          - { module: rate-limiter,       fdb: "false" }
-          - { module: projection-svc,     fdb: "false" }
-          - { module: rehydration-svc,    fdb: "false" }
-          - { module: replay-engine,      fdb: "false" }
-          - { module: process-gateway,    fdb: "false" }
+          - { module: cmd-svc,            fdb: "true",  native: false }
+          - { module: qry-svc,            fdb: "false", native: false }
+          - { module: saga-orchestrator,  fdb: "false", native: false }
+          - { module: rehydration-svc,    fdb: "false", native: false }
+          - { module: consistency-router, fdb: "false", native: true }
+          - { module: rate-limiter,       fdb: "false", native: true }
+          - { module: projection-svc,     fdb: "false", native: true }
+          - { module: replay-engine,      fdb: "false", native: true }
+          - { module: process-gateway,    fdb: "false", native: true }
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-${{ matrix.module }}
-      dockerfile: services/core/Dockerfile.jvm
+      dockerfile: ${{ matrix.native && 'services/core/Dockerfile.native' || 'services/core/Dockerfile.jvm' }}
       build-args: |
         MODULE=${{ matrix.module }}
         WITH_FDB=${{ matrix.fdb }}
       java: true
-      prebuild: mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
+      prebuild: >-
+        mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
+        ${{ matrix.native && '-Dnative -Dquarkus.native.container-build=true -Dquarkus.native.builder-image=quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25' || '-Dquarkus.package.jar.aot.enabled=true' }}
 
   backoffice:
     strategy:

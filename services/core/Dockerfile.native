@@ -1,0 +1,10 @@
+# Native-image runtime (ADR-012) for the light services: ~25-50 MB RSS, ~50 ms startup.
+# The binary is built by Mandrel (GPLv2+CE) in the image pipeline's prebuild step.
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends zlib1g ca-certificates \
+ && rm -rf /var/lib/apt/lists/* && useradd -u 1001 -r app
+ARG MODULE
+WORKDIR /app
+COPY --chown=1001 services/core/${MODULE}/target/*-runner /app/application
+USER 1001
+ENTRYPOINT ["/app/application", "-Dquarkus.http.host=0.0.0.0", "-Xmx64m"]

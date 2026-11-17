@@ -14,22 +14,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { module: cmd-svc,            fdb: "true",  native: false }
-          - { module: qry-svc,            fdb: "false", native: false }
-          - { module: saga-orchestrator,  fdb: "false", native: false }
-          - { module: rehydration-svc,    fdb: "false", native: false }
-          - { module: consistency-router, fdb: "false", native: true }
-          - { module: rate-limiter,       fdb: "false", native: true }
-          - { module: projection-svc,     fdb: "false", native: true }
-          - { module: replay-engine,      fdb: "false", native: true }
-          - { module: process-gateway,    fdb: "false", native: false }   # Temporal SDK shaded Netty is not native-image clean
+          - { module: cmd-svc,            native: false }
+          - { module: qry-svc,            native: false }
+          - { module: saga-orchestrator,  native: false }
+          - { module: rehydration-svc,    native: false }
+          - { module: consistency-router, native: true }
+          - { module: rate-limiter,       native: true }
+          - { module: projection-svc,     native: true }
+          - { module: replay-engine,      native: true }
+          - { module: process-gateway,    native: false }   # Temporal SDK shaded Netty is not native-image clean
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-${{ matrix.module }}
       dockerfile: ${{ matrix.native && 'services/core/Dockerfile.native' || 'services/core/Dockerfile.jvm' }}
       build-args: |
         MODULE=${{ matrix.module }}
-        WITH_FDB=${{ matrix.fdb }}
       java: true
       prebuild: >-
         mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests

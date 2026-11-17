@@ -1,14 +1,6 @@
 # Generic runtime image for every Quarkus module (fast-jar layout). Built by .github/workflows/_image.yml.
-FROM eclipse-temurin:25-jre AS fdb
-ARG FDB_VERSION=7.3.63
-ADD https://github.com/apple/foundationdb/releases/download/${FDB_VERSION}/foundationdb-clients_${FDB_VERSION}-1_amd64.deb /tmp/fdb-clients.deb
-
 FROM eclipse-temurin:25-jre
 ARG MODULE
-ARG WITH_FDB=false
-# FoundationDB native client only where the module uses it (cmd-svc idempotency store).
-RUN --mount=type=bind,from=fdb,source=/tmp,target=/fdb \
-    if [ "$WITH_FDB" = "true" ]; then dpkg -i /fdb/fdb-clients.deb && rm -rf /var/lib/apt/lists/*; fi
 WORKDIR /deployments
 # Whole fast-jar layout, including the AOT cache (app.aot) when the build generated one.
 COPY --chown=185 services/core/${MODULE}/target/quarkus-app/ ./

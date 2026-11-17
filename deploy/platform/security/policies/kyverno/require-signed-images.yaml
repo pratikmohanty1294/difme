@@ -1,4 +1,5 @@
-# PDF §11.2 — every DIFME image must be cosign-signed by the reusable image pipeline and carry SLSA provenance.
+# PDF §11.2 — every DIFME image must be cosign-signed by the reusable image pipeline and carry SLSA provenance + SBOM.
+# Kyverno is the single admission engine (ADR-015: Gatekeeper and the Sigstore policy-controller were removed).
 # The signing identity is the reusable workflow itself, so a build from any other workflow is rejected.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy

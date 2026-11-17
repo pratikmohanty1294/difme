@@ -56,13 +56,13 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 5.5 | Event broker (Kafka API) | **Apache Kafka 4 (KRaft)** via Strimzi — OSI replacement | `deploy/platform/streaming/` |
 | 5.5 | Debezium (CloudEvents), Flink, Apicurio, Airbyte, KEDA | Same, with **Apache SeaTunnel** instead of Airbyte (ELv2, ADR-009) | `deploy/platform/streaming/` |
 | 5.5 | Streaming SQL views | **RisingWave** — OSI replacement | `deploy/platform/streaming/` |
-| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | Same, with **SeaweedFS** instead of MinIO and an **Apache Polaris** catalog (ADR-005) | `deploy/platform/lakehouse/`, `analytics/` |
-| 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | Same | `deploy/platform/ml-platform/`, `ml/` |
-| 5.8 | SPIFFE/SPIRE, Cilium, OPA Gatekeeper, Kyverno, Sigstore, OpenTelemetry, Alloy, DataHub + OpenLineage | Same | `deploy/platform/security/`, `deploy/platform/governance/` |
+| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | SeaweedFS + Polaris (ADR-005); Spark covered by Flink + dbt (ADR-015) | `deploy/platform/lakehouse/`, `analytics/` |
+| 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | Same except PostgresML (covered by MLflow + ONNX, ADR-015) | `deploy/platform/ml-platform/`, `ml/` |
+| 5.8 | SPIFFE/SPIRE, Cilium, OPA Gatekeeper, Kyverno, Sigstore, OpenTelemetry, Alloy, DataHub + OpenLineage | Same, with **Kyverno as the single admission engine** (Gatekeeper and policy-controller removed, ADR-015) | `deploy/platform/security/`, `deploy/platform/governance/` |
 | 5.8 | Secrets management | **OpenBao** — OSI replacement | `deploy/platform/security/` |
 | 5.8 | Just-in-time access | **Warpgate** — OSI replacement | `deploy/platform/security/` |
 | 5.9 | React 18 shell + Module Federation, Settlements (TanStack Query), Compliance (SvelteKit), Analytics (Angular 17 + ECharts), Zustand, Turborepo + pnpm, Tailwind tokens, Storybook, Bundlesize | Same design on **React 19 / Svelte 5 / Angular 20 + Module Federation 2.0 (Rspack)** (ADR-005) | `backoffice/` |
-| 5.9 | Kong + APISIX | Same (Kong external, APISIX back-office) | `deploy/platform/api-gateway/` |
+| 5.9 | Kong + APISIX | **Envoy Gateway** routes + JWT (Keycloak) + rate limits (ADR-015) | `deploy/platform/api-gateway/` |
 | 5.10 | OpenAPI 4.0 | **OpenAPI 3.1** — 4.0 is unreleased | `api/openapi/` |
 | 5.10 | AsyncAPI 3, CloudEvents 1.0, GraphQL SDL, proto3 + Buf, Apicurio, Swagger UI, AsyncAPI Studio | Same | `api/` |
 | 6.1 | Temporal OSS | Same — persistence on **YugabyteDB YSQL** | `deploy/platform/temporal/` |
@@ -71,8 +71,8 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 8 | TigerBeetle | Same | `deploy/platform/database-tier/tigerbeetle/` |
 | 8 | Settlements DB (serializable, multi-region) | **YugabyteDB** (serializable, geo-partitioned tablespaces) — OSI replacement | `deploy/platform/database-tier/yugabytedb/` |
 | 8 | YugabyteDB | Same | `deploy/platform/database-tier/yugabytedb/` |
-| 8 | Audit log store | **Apache Cassandra 5** — OSI replacement | `deploy/platform/database-tier/cassandra/` |
-| 8 | FoundationDB | Same | `deploy/platform/database-tier/foundationdb/` |
+| 8 | Audit log store | **Iceberg Day-0 archive** + YugabyteDB outbox (ADR-015) | `deploy/platform/database-tier/cassandra/` |
+| 8 | FoundationDB | **YugabyteDB** serializable unique keys (ADR-015) | `deploy/platform/database-tier/foundationdb/` |
 | 8 | L2 cache + CRDT rate limits | **Valkey** (CRDT PN-counter implemented in Lua) — OSI replacement | `deploy/platform/cache-tier/` |
 | 8 | Weaviate | Same | `deploy/platform/ml-platform/` |
 | 9 | UUIDv7 idempotency at every layer, inbox/outbox | Same | `services/core/common/` |

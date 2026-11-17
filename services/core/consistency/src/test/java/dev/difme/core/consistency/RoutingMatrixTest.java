@@ -13,7 +13,7 @@ class RoutingMatrixTest {
     @Test
     void matchesPdfSection14() {
         assertEquals(Backend.TIGERBEETLE, RoutingMatrix.route(Consistency.STRICT));
-        assertEquals(Backend.FOUNDATIONDB, RoutingMatrix.route(Consistency.LINEARIZABLE));
+        assertEquals(Backend.YUGABYTE_SERIALIZABLE, RoutingMatrix.route(Consistency.LINEARIZABLE));
         assertEquals(Backend.YUGABYTE_FOLLOWER, RoutingMatrix.route(Consistency.EVENTUAL));
     }
 

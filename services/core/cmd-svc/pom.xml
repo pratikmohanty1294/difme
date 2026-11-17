@@ -20,7 +20,6 @@
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer-registry-prometheus</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-opentelemetry</artifactId></dependency>
     <dependency><groupId>com.tigerbeetle</groupId><artifactId>tigerbeetle-java</artifactId></dependency>
-    <dependency><groupId>org.foundationdb</groupId><artifactId>fdb-java</artifactId></dependency>
     <dependency><groupId>io.temporal</groupId><artifactId>temporal-sdk</artifactId></dependency>
     <dependency><groupId>dev.openfeature</groupId><artifactId>sdk</artifactId></dependency>
     <dependency><groupId>dev.openfeature.contrib.providers</groupId><artifactId>flagd</artifactId></dependency>

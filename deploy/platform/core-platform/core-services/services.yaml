@@ -7,7 +7,7 @@ kind: ConfigMap
 metadata: { name: difme-services }
 data:
   services.yaml: |
-    - { name: quarkus-cmd-svc,     port: 8080, image: difme-cmd-svc,            team: payments,   metric: payment-processing, cpu: 100m, mem: 320Mi, fdb: true }
+    - { name: quarkus-cmd-svc,     port: 8080, image: difme-cmd-svc,            team: payments,   metric: payment-processing, cpu: 100m, mem: 320Mi }
     - { name: quarkus-qry-svc,     port: 8081, image: difme-qry-svc,            team: payments,   metric: account-query,      cpu: 50m,  mem: 256Mi }
     - { name: saga-orchestrator,   port: 8082, image: difme-saga-orchestrator,  team: payments,   metric: settlement-saga,    cpu: 50m,  mem: 224Mi }
     - { name: consistency-router,  port: 8083, image: difme-consistency-router, team: platform,   metric: payment-processing, cpu: 10m,  mem: 48Mi }

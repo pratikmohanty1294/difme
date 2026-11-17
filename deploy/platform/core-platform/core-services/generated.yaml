@@ -36,8 +36,6 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
-        - name: FDB_CLUSTER_FILE
-          value: /var/dynamic-conf/cluster-file
         readinessProbe:
           httpGet:
             path: /q/health/ready
@@ -54,13 +52,6 @@ spec:
             memory: 320Mi
           limits:
             memory: 320Mi
-        volumeMounts:
-        - name: fdb
-          mountPath: /var/dynamic-conf
-      volumes:
-      - name: fdb
-        configMap:
-          name: difme-fdb-config
 ---
 apiVersion: v1
 kind: Service

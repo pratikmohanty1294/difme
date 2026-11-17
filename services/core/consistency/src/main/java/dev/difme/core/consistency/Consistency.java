@@ -6,8 +6,8 @@ public enum Consistency {
     SERIALIZABLE,    // YugabyteDB serializable — cross-bank settlement (ADR-001)
     EVENTUAL,        // YugabyteDB follower read — KYC / profile
     CRDT,            // Valkey PN-counter — rate limits
-    LINEARIZABLE,    // FoundationDB — idempotency keys, sequence numbers, locks
-    APPEND_ONLY,     // Cassandra quorum — audit log
+    LINEARIZABLE,    // YugabyteDB serializable unique keys — idempotency keys, sequences, locks (ADR-015)
+    APPEND_ONLY,     // Iceberg Day-0 archive — audit log (ADR-015)
     SNAPSHOT,        // Iceberg — historical analytics
     DURABLE,         // Temporal — workflow state
     BEST_EFFORT,     // Valkey — session / UI state

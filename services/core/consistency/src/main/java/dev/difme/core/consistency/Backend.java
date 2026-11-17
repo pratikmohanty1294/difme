@@ -7,8 +7,6 @@ public enum Backend {
     YUGABYTE_FOLLOWER("follower"),
     YUGABYTE_ONPREM("onprem"),
     VALKEY("valkey"),
-    FOUNDATIONDB("fdb"),
-    CASSANDRA("audit"),
     ICEBERG("trino"),
     TEMPORAL("temporal");
 

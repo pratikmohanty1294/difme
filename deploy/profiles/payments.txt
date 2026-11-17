@@ -3,12 +3,9 @@ valkey
 tigerbeetle
 yugabytedb
 db-init
-fdb-operator
-foundationdb
 temporal
 flagd
 core-services
-kong
 strimzi
 kafka
 apicurio

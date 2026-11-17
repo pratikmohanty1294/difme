@@ -14,10 +14,6 @@ catalogs:
     fs.native-s3.enabled=true
     s3.endpoint=http://seaweedfs-s3:8333
     s3.path-style-access=true
-  audit: |
-    connector.name=cassandra
-    cassandra.contact-points=difme-audit-dc1-service.database-tier.svc
-    cassandra.load-policy.dc-aware.local-dc=dc1
   events: |
     connector.name=kafka
     kafka.nodes=difme-kafka-bootstrap.streaming.svc:9092

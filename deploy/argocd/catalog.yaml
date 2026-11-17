@@ -17,8 +17,6 @@ components:
   - { name: gateway-config,    ns: ingress-system,  kind: path, profile: base, wave: -4, pdf: "4.3" }
   - { name: external-dns,      ns: ingress-system,  kind: helm, profile: base, wave: -6, pdf: "4.2", repo: https://kubernetes-sigs.github.io/external-dns, chart: external-dns, version: 1.16.0 }
   - { name: kyverno,           ns: security,        kind: helm, profile: base, wave: -8, pdf: "5.8", repo: https://kyverno.github.io/kyverno, chart: kyverno, version: 3.3.7 }
-  - { name: gatekeeper,        ns: security,        kind: helm, profile: base, wave: -8, pdf: "5.8", repo: https://open-policy-agent.github.io/gatekeeper/charts, chart: gatekeeper, version: 3.18.2 }
-  - { name: policy-controller, ns: security,        kind: helm, profile: base, wave: -7, pdf: "11.2", repo: https://sigstore.github.io/helm-charts, chart: policy-controller, version: 0.10.0 }
   - { name: policies,          ns: security,        kind: path, profile: base, wave: -5, pdf: "11.3" }
   - { name: fleet-bundles,     ns: kube-system,     kind: path, profile: base, wave: -5, pdf: "4.1" }
 
@@ -40,16 +38,11 @@ components:
   - { name: tigerbeetle,       ns: database-tier,   kind: path, profile: core, wave: -2, pdf: "8" }
   - { name: yugabytedb,        ns: database-tier,   kind: helm, profile: core, wave: -2, pdf: "8", repo: https://charts.yugabyte.com, chart: yugabyte, version: 2.25.1 }
   - { name: db-init,           ns: database-tier,   kind: path, profile: core, wave: -1, pdf: "8" }
-  - { name: fdb-operator,      ns: database-tier,   kind: path, profile: core, wave: -3, pdf: "8" }
-  - { name: foundationdb,      ns: database-tier,   kind: path, profile: core, wave: -1, pdf: "8" }
   - { name: temporal,          ns: temporal,        kind: helm, profile: core, wave: 0,  pdf: "6.1", repo: https://go.temporal.io/helm-charts, chart: temporal, version: 0.62.0 }
   - { name: flagd,             ns: core-platform,   kind: path, profile: core, wave: 0,  pdf: "6.3" }
   - { name: core-services,     ns: core-platform,   kind: path, profile: core, wave: 1,  pdf: "5.3" }
-  - { name: kong,              ns: ingress-system,  kind: helm, profile: core, wave: 0,  pdf: "5.10", repo: https://charts.konghq.com, chart: kong, version: 2.47.0 }
 
   # ── Audit / extra data stores (profile: data) ──────────────────────────────
-  - { name: k8ssandra-operator, ns: database-tier,  kind: helm, profile: data, wave: -3, pdf: "8", repo: https://helm.k8ssandra.io/stable, chart: k8ssandra-operator, version: 1.21.1 }
-  - { name: cassandra,         ns: database-tier,   kind: path, profile: data, wave: -1, pdf: "8" }
 
   # ── Layer 2 · Hub (profile: hub) ───────────────────────────────────────────
   - { name: quinn-hub,         ns: quinn-hub,       kind: path, profile: hub, wave: 1, pdf: "5.2" }
@@ -72,7 +65,6 @@ components:
   - { name: seaweedfs,         ns: lakehouse,       kind: path, profile: lakehouse, wave: -2, pdf: "5.6" }
   - { name: polaris,           ns: lakehouse,       kind: path, profile: lakehouse, wave: -1, pdf: "5.6" }
   - { name: trino,             ns: lakehouse,       kind: helm, profile: lakehouse, wave: 0,  pdf: "5.6", repo: https://trinodb.github.io/charts, chart: trino, version: 1.37.0 }
-  - { name: spark-operator,    ns: lakehouse,       kind: helm, profile: lakehouse, wave: -1, pdf: "5.6", repo: https://kubeflow.github.io/spark-operator, chart: spark-operator, version: 2.1.1 }
   - { name: starrocks,         ns: lakehouse,       kind: helm, profile: lakehouse, wave: 0,  pdf: "5.6", repo: https://starrocks.github.io/starrocks-kubernetes-operator, chart: kube-starrocks, version: 1.10.1 }
   - { name: superset,          ns: lakehouse,       kind: helm, profile: lakehouse, wave: 1,  pdf: "5.6", repo: https://apache.github.io/superset, chart: superset, version: 0.14.2 }
   - { name: analytics-jobs,    ns: lakehouse,       kind: path, profile: lakehouse, wave: 2,  pdf: "5.6" }
@@ -82,7 +74,6 @@ components:
   - { name: feast,             ns: ml-platform,     kind: path, profile: ml, wave: 0, pdf: "5.7" }
   - { name: mlflow,            ns: ml-platform,     kind: helm, profile: ml, wave: 0, pdf: "5.7", repo: https://community-charts.github.io/helm-charts, chart: mlflow, version: 0.17.2 }
   - { name: weaviate,          ns: ml-platform,     kind: helm, profile: ml, wave: 0, pdf: "5.7", repo: https://weaviate.github.io/weaviate-helm, chart: weaviate, version: 17.4.4 }
-  - { name: postgresml,        ns: ml-platform,     kind: path, profile: ml, wave: 0, pdf: "5.7" }
   - { name: onnx-serving,      ns: ml-platform,     kind: path, profile: ml, wave: 1, pdf: "5.7" }
 
   # ── Layers 9–10 · Observability + FinOps (profile: observability) ──────────
@@ -103,7 +94,6 @@ components:
   - { name: process-gateway,   ns: process,         kind: path, profile: process, wave: 1,  pdf: "ADR-008" }
 
   # ── Back-office (profile: backoffice) ──────────────────────────────────────
-  - { name: apisix,            ns: back-office-ui,  kind: helm, profile: backoffice, wave: 0, pdf: "5.9", repo: https://charts.apiseven.com, chart: apisix, version: 2.10.0 }
   - { name: backoffice-web,    ns: back-office-ui,  kind: path, profile: backoffice, wave: 1, pdf: "5.9" }
 
   # ── CI / supply chain / backup (profile: platform-ops) ─────────────────────

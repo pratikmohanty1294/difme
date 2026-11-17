@@ -2,7 +2,6 @@
 seaweedfs
 polaris
 trino
-spark-operator
 starrocks
 superset
 analytics-jobs

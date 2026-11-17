@@ -8,7 +8,5 @@ envoy-gateway
 gateway-config
 external-dns
 kyverno
-gatekeeper
-policy-controller
 policies
 fleet-bundles

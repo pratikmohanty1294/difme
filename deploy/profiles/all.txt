@@ -14,14 +14,9 @@ valkey
 tigerbeetle
 yugabytedb
 db-init
-fdb-operator
-foundationdb
 temporal
 flagd
 core-services
-kong
-k8ssandra-operator
-cassandra
 quinn-hub
 strimzi
 kafka
@@ -38,7 +33,6 @@ seatunnel
 seaweedfs
 polaris
 trino
-spark-operator
 starrocks
 superset
 analytics-jobs
@@ -46,7 +40,6 @@ datahub
 feast
 mlflow
 weaviate
-postgresml
 onnx-serving
 victoria-metrics
 loki
@@ -61,7 +54,6 @@ formio
 fluxnova
 process-models
 process-gateway
-apisix
 backoffice-web
 tekton
 harbor

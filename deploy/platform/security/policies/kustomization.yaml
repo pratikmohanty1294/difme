@@ -3,7 +3,4 @@ resources:
   - kyverno/require-labels-and-limits.yaml
   - kyverno/mutate-defaults.yaml
   - kyverno/generate-default-deny.yaml
-  - kyverno/clone-fdb-cluster-file.yaml
-  - gatekeeper/templates.yaml
-  - gatekeeper/constraints.yaml
-  - sigstore/cluster-image-policy.yaml
+  - kyverno/registries-and-secrets.yaml

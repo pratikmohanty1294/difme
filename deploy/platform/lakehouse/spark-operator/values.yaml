@@ -1,2 +1,0 @@
-spark: { jobNamespaces: [lakehouse] }
-controller: { resources: { requests: { cpu: 50m, memory: 128Mi } } }

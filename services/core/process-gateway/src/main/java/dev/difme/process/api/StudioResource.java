@@ -59,7 +59,7 @@ public class StudioResource {
     }
 
     @POST @Path("/studio/deploy")
-    public Map<String, Object> deploy(@HeaderParam("X-Userinfo") String userinfo, DeployRequest req) throws Exception {
+    public Map<String, Object> deploy(@HeaderParam("Authorization") String userinfo, DeployRequest req) throws Exception {
         Caller.from(userinfo).require("process-designers");
         return deployer.deploy(req.name(), req.files());
     }
@@ -75,7 +75,7 @@ public class StudioResource {
     }
 
     @PUT @Path("/studio/forms")
-    public Response saveForm(@HeaderParam("X-Userinfo") String userinfo, Map<String, Object> form) {
+    public Response saveForm(@HeaderParam("Authorization") String userinfo, Map<String, Object> form) {
         Caller.from(userinfo).require("process-designers");
         String path = String.valueOf(form.get("path"));
         if (!path.matches("[a-z0-9-]{2,64}")) return Response.status(422).entity(Map.of("detail", "invalid path")).build();
@@ -87,7 +87,7 @@ public class StudioResource {
     }
 
     @GET @Path("/tasks")
-    public List<TaskView> tasks(@HeaderParam("X-Userinfo") String userinfo, @QueryParam("groups") String requested) {
+    public List<TaskView> tasks(@HeaderParam("Authorization") String userinfo, @QueryParam("groups") String requested) {
         Caller caller = Caller.from(userinfo);
         List<String> groups = new ArrayList<>(caller.groups());
         if (requested != null && !requested.isBlank()) groups.retainAll(List.of(requested.split(",")));

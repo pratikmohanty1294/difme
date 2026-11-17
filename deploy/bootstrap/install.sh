@@ -11,6 +11,8 @@ helm upgrade --install cilium cilium/cilium -n kube-system --version 1.17.3 \
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.14.11/manifests/install.yaml
 kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
+# ADR-015: Keycloak is the identity provider; Argo CD's bundled Dex is redundant.
+kubectl -n argocd scale deploy argocd-dex-server --replicas=0
 # Kustomize dirs pull shared files (flags, Lua scripts, dashboards) from elsewhere in the repo.
 kubectl -n argocd patch configmap argocd-cm --type merge --patch-file deploy/bootstrap/argocd-cm-patch.yaml
 # Server-side diff (controller-defaulted fields aren't drift) and generous repo/Helm timeouts so large chart

@@ -1,5 +1,5 @@
 ---------------------------- MODULE Idempotency ----------------------------
-(* PDF §9 — FoundationDB linearizable dedup of UUIDv7 idempotency keys (24h TTL). *)
+(* PDF §9 — linearizable dedup of UUIDv7 idempotency keys (24h TTL); YugabyteDB per ADR-015. *)
 EXTENDS Integers
 
 CONSTANTS Keys, TTL, MaxTime

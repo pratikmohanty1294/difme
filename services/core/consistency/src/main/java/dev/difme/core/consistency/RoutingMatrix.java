@@ -12,8 +12,8 @@ public final class RoutingMatrix {
         ROUTES.put(Consistency.SERIALIZABLE, Backend.YUGABYTE_SERIALIZABLE);
         ROUTES.put(Consistency.EVENTUAL, Backend.YUGABYTE_FOLLOWER);
         ROUTES.put(Consistency.CRDT, Backend.VALKEY);
-        ROUTES.put(Consistency.LINEARIZABLE, Backend.FOUNDATIONDB);
-        ROUTES.put(Consistency.APPEND_ONLY, Backend.CASSANDRA);
+        ROUTES.put(Consistency.LINEARIZABLE, Backend.YUGABYTE_SERIALIZABLE);
+        ROUTES.put(Consistency.APPEND_ONLY, Backend.ICEBERG);
         ROUTES.put(Consistency.SNAPSHOT, Backend.ICEBERG);
         ROUTES.put(Consistency.DURABLE, Backend.TEMPORAL);
         ROUTES.put(Consistency.BEST_EFFORT, Backend.VALKEY);

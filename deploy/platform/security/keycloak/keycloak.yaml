@@ -25,7 +25,6 @@ spec:
             - { name: KC_METRICS_ENABLED, value: "true" }
             - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin }
             - { name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: keycloak, key: admin-password } } }
-            - { name: APISIX_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: keycloak, key: apisix-client-secret } } }
             - { name: JAVA_OPTS_KC_HEAP, value: "-Xms256m -Xmx512m" }
           ports: [{ name: http, containerPort: 8080 }, { name: mgmt, containerPort: 9000 }]
           readinessProbe: { httpGet: { path: /health/ready, port: 9000 }, initialDelaySeconds: 30 }

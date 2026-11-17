@@ -134,3 +134,21 @@ PDF §4.5 lists nine overlapping tools. Each capability is covered once:
 | Contract + generated tests from OpenAPI / GraphQL specs | **Schemathesis** | LLM-based test generation (paid API; non-deterministic) |
 | ISO 8583 / financial message simulation | **jPOS** | MSGSIM / FINSIM |
 Unit tests stay in each stack's native runner (JUnit 5, Vitest, Rust `cargo test`). Fewer tools mean less CI time, fewer images and less RAM (ADR-012).
+
+## ADR-015 — Remove redundant components (owner-approved 2026-11-17)
+| Removed | Covered by | Saving |
+|---|---|---|
+| OPA Gatekeeper, Sigstore policy-controller | **Kyverno** (validate/mutate/generate + signed images, SLSA and SBOM attestations); the 2 Gatekeeper constraints were ported (`restrict-registries`, `no-plaintext-secrets`) | 2 controllers and their webhooks |
+| Kong, APISIX | **Envoy Gateway**: Gateway API routes, URL rewrites, JWT verification against Keycloak (SecurityPolicy), rate limits and timeouts (BackendTrafficPolicy). One proxy hop instead of two. | 2 proxies; supersedes the "keep Kong + APISIX" row of ADR-005 |
+| FoundationDB (+ operator) | **YugabyteDB** serializable unique-key table `core.idempotency_key` (same contract as `specs/tla/Idempotency.tla`); LINEARIZABLE → YugabyteDB | about 1 GB, plus the cluster-file plumbing |
+| Cassandra (+ k8ssandra operator) | **Iceberg** Day-0 archive (audit history, time travel) + YugabyteDB outbox for recent events; APPEND_ONLY → Iceberg | about 2 GB |
+| Spark operator | Flink (batch + streaming) and dbt on Trino | 1–2 GB when running |
+| PostgresML | MLflow + ONNX serving | about 1 GB |
+| Argo CD's bundled Dex | Keycloak | 1 pod |
+
+Kept on purpose:
+- **Temporal + Fluxnova:** system orchestration vs business processes.
+- **RisingWave + Flink:** serving SQL views vs CEP and sinks.
+- **Trino + StarRocks:** federated SQL vs OLAP.
+- **Loki/Tempo/Pyroscope:** logs, traces, profiles.
+- **Harbor/Tekton/Fleet/external-dns:** the owner had no preference.

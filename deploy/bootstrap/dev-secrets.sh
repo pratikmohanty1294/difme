@@ -43,10 +43,8 @@ secret temporal      temporal-db password="$YB"
 secret harbor        harbor-db password="$YB"
 secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"
-APISIX_OIDC=$(rand 32)
-secret security      keycloak admin-password="$(rand)" apisix-client-secret="$APISIX_OIDC"
+secret security      keycloak admin-password="$(rand)"
 secret security      postgres-docdb password="$PG_DOCDB"
-secret back-office-ui apisix-oidc client-secret="$APISIX_OIDC"
 POLARIS_CRED="root:$(rand)"
 for n in streaming lakehouse; do
   secret $n polaris-client credential="$POLARIS_CRED"

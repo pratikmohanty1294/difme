@@ -30,3 +30,13 @@
 ### High Argo CD CPU (300–900m bursts)
 - **Root cause:** watching high-churn objects it doesn't manage (policy reports, Gatekeeper status, Cilium endpoints, leases, events).
 - **Fix:** `resource.exclusions`, `ignoreResourceUpdatesEnabled`, 300 s reconcile. Result: 4–6m.
+
+### Deleted a PostSync hook Job by hand: the app never re-ran it
+- **Root cause:** the sync operation was still "waiting for completion of hook" for the deleted Job, so a new sync request queued behind it.
+- **Fix:** remove `.operation`, null `.status.operationState`, then request a sync.
+- **Prevention:** to re-run a hook, request a sync; don't delete the Job.
+
+### Envoy Gateway schema rules (found by server dry run)
+- A `ReplacePrefixMatch` URL rewrite needs exactly **one** PathPrefix match per rule.
+- `ReplacePrefixMatch` replaces the whole matched prefix: `/api/settlements` → `/v1/settlements`, not `/v1`.
+- `BackendTrafficPolicy` local rate-limit `clientSelectors` take headers/CIDRs, not paths. For per-API limits, use one HTTPRoute per API with its own policy.

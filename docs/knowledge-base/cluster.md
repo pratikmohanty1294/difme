@@ -56,3 +56,9 @@
 ### db-init: `/sql/init.sql: No such file`
 - **Root cause:** the Job never mounted its ConfigMap. Caught only at runtime, because a dry run doesn't execute containers.
 - **Prevention:** check `volumes`/`volumeMounts` whenever a configMapGenerator is added.
+
+### YugabyteDB: "Write to tablet rejected … insufficient disk space"
+- **Symptom:** db-init failed, and so did every role/database creation behind it (Temporal: `role "temporal" does not exist`).
+- **Root cause:** the Codespace's 32 GB persistent disk was 92% full. 14 GB of it was container image layers inside the k3d node, which are re-fetchable and already stored a second time in the registry caches. Real volume data was 1.2 GB.
+- **Fix:** `make cluster` bind-mounts the node's containerd store on the large ephemeral disk (`/tmp`, 118 GB). PVs and registry caches stay persistent; after a Codespace stop, layers re-pull from the local caches.
+- **Prevention:** `df -h /` belongs in every "why is X failing" check; databases refuse writes well before 100%.

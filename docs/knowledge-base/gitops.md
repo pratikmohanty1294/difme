@@ -49,3 +49,8 @@
 ### Withdrawn `bitnami/kubectl`, round two
 - VictoriaMetrics k8s-stack (`victoria-metrics-operator.crds.cleanup.image`) and Velero (`kubectl.image`) render it in hook Jobs. Both now use `registry.k8s.io/kubectl:v1.32.3`.
 - The CI guard catches these, so any new chart that runs kubectl hooks needs the same override.
+
+### Kyverno `kyverno-clean-reports`: `exec: "/bin/bash": not found`
+- **Root cause:** after swapping the withdrawn `bitnami/kubectl` for `registry.k8s.io/kubectl` (distroless, no shell), the chart's legacy report-migration job could no longer run its bash script.
+- **Fix:** `policyReportsCleanup.enabled: false`. It only migrates reports from old Kyverno releases, which a fresh install doesn't have. `webhooksCleanup` calls kubectl directly and keeps working.
+- **Prevention:** when replacing a chart's helper image, check whether its jobs use a shell (`command: [/bin/bash, …]`).

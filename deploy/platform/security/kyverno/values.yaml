@@ -9,4 +9,6 @@ cleanupController: { enabled: true }
 reportsController: { enabled: true }
 # Hook jobs: official Kubernetes kubectl image (the chart default was withdrawn from Docker Hub; found live).
 webhooksCleanup: { image: { registry: registry.k8s.io, repository: kubectl, tag: v1.32.3 } }
-policyReportsCleanup: { image: { registry: registry.k8s.io, repository: kubectl, tag: v1.32.3 } }
+# Disabled: a migration helper for upgrades from old Kyverno releases that runs /bin/bash, which the official
+# (distroless) kubectl image does not have. Fresh installs have no legacy reports to clean (found live).
+policyReportsCleanup: { enabled: false }

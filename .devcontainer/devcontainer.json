@@ -10,7 +10,8 @@
     "ghcr.io/devcontainers/features/rust:1": {},
     "ghcr.io/devcontainers/features/node:1": { "version": "22", "pnpmVersion": "9" },
     "ghcr.io/devcontainers/features/python:1": { "version": "3.12" },
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "forwardPorts": [8080, 8081, 3000, 3001, 8233, 9090, 4443],

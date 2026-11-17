@@ -1,0 +1,10 @@
+# Argo CD settings (verified on the live cluster, 2026-11-17).
+data:
+  # Kustomize dirs pull shared files (flags, Lua scripts, dashboards) from elsewhere in the repo.
+  kustomize.buildOptions: --load-restrictor LoadRestrictionsNone
+  # Annotation tracking: Cilium copies pod labels onto CiliumIdentity objects, which confuses label tracking.
+  application.resourceTrackingMethod: annotation
+  resource.exclusions: |
+    - apiGroups: [cilium.io]
+      kinds: [CiliumIdentity]
+      clusters: ["*"]

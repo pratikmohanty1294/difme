@@ -25,10 +25,8 @@ IGNORE = {
         {"group": "admissionregistration.k8s.io", "kind": "MutatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle", ".webhooks[]?.objectSelector", ".webhooks[]?.namespaceSelector"]},
         {"group": "admissionregistration.k8s.io", "kind": "ValidatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle", ".webhooks[]?.objectSelector", ".webhooks[]?.namespaceSelector"]},
     ],
-    "policies": [
-        {"group": "kyverno.io", "kind": "ClusterPolicy", "managedFieldsManagers": ["kyverno"], "jqPathExpressions": [".spec.rules[]?.skipBackgroundRequests", ".spec.admission", ".spec.emitWarning"]},
-        {"group": "constraints.gatekeeper.sh", "kind": "*", "managedFieldsManagers": ["gatekeeper"]},
-    ],
+    # No ignore rules for "policies": with RespectIgnoreDifferences, Argo CD re-applied the OLD live .spec.rules that
+    # Kyverno's webhook touches, silently dropping changes (found live). Server-side diff already handles defaults.
     "envoy-gateway": [
         {"group": "rbac.authorization.k8s.io", "kind": "ClusterRole", "jqPathExpressions": [".rules"]},
         {"group": "rbac.authorization.k8s.io", "kind": "ClusterRoleBinding", "jqPathExpressions": [".subjects"]},

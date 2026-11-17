@@ -22,26 +22,12 @@ spec:
     syncOptions:
     - CreateNamespace=true
     - ServerSideApply=true
-    - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
         duration: 10s
         factor: 2
         maxDuration: 3m
-  ignoreDifferences:
-  - group: kyverno.io
-    kind: ClusterPolicy
-    managedFieldsManagers:
-    - kyverno
-    jqPathExpressions:
-    - .spec.rules[]?.skipBackgroundRequests
-    - .spec.admission
-    - .spec.emitWarning
-  - group: constraints.gatekeeper.sh
-    kind: '*'
-    managedFieldsManagers:
-    - gatekeeper
   source:
     repoURL: https://github.com/pratikmohanty1294/difme.git
     targetRevision: main

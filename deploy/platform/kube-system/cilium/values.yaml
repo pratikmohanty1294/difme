@@ -5,7 +5,12 @@ k8sServicePort: 6443
 routingMode: tunnel
 tunnelProtocol: vxlan
 loadBalancer: { algorithm: maglev }
-bpf: { masquerade: true }
+bpf:
+  masquerade: true
+  # Kubernetes-in-Docker (k3d in Codespaces) can't use eBPF host routing: pods could not reach the API service.
+  # Verified on the first live run (2026-11-17). Bare-metal / VM overlays set this to false for full eBPF routing.
+  hostLegacyRouting: true
+socketLB: { hostNamespaceOnly: true }
 encryption: { enabled: true, type: wireguard }
 hubble:
   enabled: true

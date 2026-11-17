@@ -72,3 +72,9 @@
 ### Long jobs died with the SSH session
 - **Root cause:** `gh codespace ssh` drops after long idle periods, killing foreground `make` runs.
 - **Fix:** start long jobs with `nohup … &` in the Codespace and poll the log instead.
+
+### Non-root pods: `exec: "/coredns": stat /coredns: permission denied`
+- **Symptom:** CoreDNS and Hubble crash-looped, while root pods (Cilium) ran fine. This appeared after moving the containerd store to `/tmp`.
+- **Root cause:** Codespaces' `/tmp` carries a default ACL, so new directories come out `drwxr-xrw-+` (no traverse for others), and non-root containers can't reach their image layers.
+- **Fix:** `make cluster` recreates the image directory, clears ACLs (`setfacl -R -b -k`) and sets `chmod 755` before k3d starts.
+- **Prevention:** a `+` in `ls -ld` means an ACL is in play; check it whenever a bind mount comes from a new host path.

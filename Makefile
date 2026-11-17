@@ -27,7 +27,10 @@ registries:      ## Persistent pull-through image caches (survive `make destroy`
 cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (images via local caches)
 	@# Image layers (re-fetchable, ~14 GB) go to the large ephemeral disk; volumes and registry caches stay on the
 	@# persistent disk. After a Codespace stop the layers re-pull from the local caches (knowledge-base/cluster.md).
-	mkdir -p $(IMAGE_DISK)/containerd
+	@# Codespaces' /tmp has a default ACL that drops "x" for others; non-root containers then can't reach their layers.
+	rm -rf $(IMAGE_DISK) && mkdir -p $(IMAGE_DISK)/containerd
+	setfacl -R -b -k $(IMAGE_DISK) 2>/dev/null || true
+	chmod -R 755 $(IMAGE_DISK)
 	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml \
 	  --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:* \
 	  --volume $(CURDIR)/deploy/bootstrap/kubelet-difme.conf:/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/50-difme.conf@server:* \

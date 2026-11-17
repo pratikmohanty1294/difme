@@ -45,8 +45,8 @@ jobs:
           load: true
           tags: ${{ env.IMAGE }}:scan
       - name: Trivy — CRITICAL vulnerabilities block promotion
-        uses: aquasecurity/trivy-action@0.30.0
-        with: { image-ref: "${{ env.IMAGE }}:scan", severity: CRITICAL, ignore-unfixed: true, exit-code: "1", format: table }
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.59.1             image --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress "${IMAGE}:scan"
       - name: Push
         id: push
         uses: docker/build-push-action@v6

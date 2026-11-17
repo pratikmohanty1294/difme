@@ -1,4 +1,5 @@
-# PDF §11.2 — every DIFME-built image must be cosign-signed (keyless, CI OIDC) and carry SLSA provenance.
+# PDF §11.2 — every DIFME image must be cosign-signed by the reusable image pipeline and carry SLSA provenance.
+# The signing identity is the reusable workflow itself, so a build from any other workflow is rejected.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata: { name: require-signed-images }
@@ -13,7 +14,7 @@ spec:
           attestors:
             - entries:
                 - keyless:
-                    subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/*"
+                    subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
                     issuer: "https://token.actions.githubusercontent.com"
                     rekor: { url: https://rekor.sigstore.dev }
           attestations:
@@ -21,5 +22,11 @@ spec:
               attestors:
                 - entries:
                     - keyless:
-                        subject: "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@*"
+                        subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
+                        issuer: "https://token.actions.githubusercontent.com"
+            - type: https://spdx.dev/Document/v2.3
+              attestors:
+                - entries:
+                    - keyless:
+                        subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
                         issuer: "https://token.actions.githubusercontent.com"

@@ -51,3 +51,26 @@ The PDF tiers old broker segments to object storage. Apache Kafka has the KIP-40
 
 ## ADR-007 — Backups (decided 2026-11-17)
 **Decision (owner):** keep Velero for cluster backup to SeaweedFS S3. The vendor word in its S3 plugin is accepted as a technical identifier.
+
+## ADR-008 — Dynamic forms and business-process engine (owner-approved 2026-11-17)
+These are additions to the PDF requested by the owner.
+
+| Concern | Decision | Licence | Notes |
+|---|---|---|---|
+| Dynamic forms with user-defined metadata | **formio** open-source server **v4.11.0** + **formio.js v5.7.0** builder/renderer, **vendored** into `vendor/formio/` at pinned tags | OSL-3.0 (server), MIT (js) | The hosted SaaS was rejected (paid after trial). The source lives in this repo, is built into our own signed images, and is updated with `ci/vendor-sync.sh`. OSL-3.0 requires publishing modifications when deployed, which this public repo satisfies. |
+| formio database | **FerretDB 2.7** on **PostgreSQL + DocumentDB extension** | Apache-2.0 / PostgreSQL / MIT | MongoDB Community is SSPL (not OSI). FerretDB speaks the MongoDB wire protocol. formio's own test suite runs against it in CI to catch gaps. |
+| Business processes, human tasks, business rules | **Fluxnova 3.1.1** (FINOS fork of the Camunda 7 CE engine): BPMN 2.0, DMN, CMMN 1.1 | Apache-2.0 | CMMN is deprecated upstream and kept for backward compatibility only. Persistence is on PostgreSQL (officially supported). |
+| Responsibility split (owner design) | **Fluxnova** owns business configuration and rules as DMN (limits, thresholds, eligibility, routing), **form-field constraints and dependencies** (required/visible/allowed values/ranges, cross-field rules) and human-centric BPMN. **Temporal** owns all orchestration between processes and services. Technical config and kill switches stay in flagd and GitOps. | — | Each formio form's metadata pins `decisionKey` + `decisionVersion`. A `form-rules` endpoint evaluates the DMN (debounced, cached by input hash) while the user types, and the same DMN is re-evaluated authoritatively on submit. |
+| Temporal vs Fluxnova | **Both, split by purpose.** Temporal runs system sagas (payments, transfers; TLA+-verified). Fluxnova runs business processes: approvals, KYC/onboarding, disputes, and DMN rules editable by operations. | — | A Fluxnova external-task worker (`services/process/temporal-bridge`) can start Temporal workflows. |
+| Process UI | **Process Studio** back-office micro-frontend: in-browser BPMN/DMN modelling with the **Apache KIE standalone editors**, a Fluxnova properties panel (assignee, formKey, decisionRef, external-task topic), deploy to engine, task inbox rendering formio forms, process monitoring. Fluxnova Cockpit/Tasklist/Admin are deployed for operations. | Apache-2.0 | bpmn-js/dmn-js were rejected because their licence requires a visible watermark (rule: open source with no limitations). |
+
+## ADR-009 — Rule: open source and free with no limitations (owner, 2026-11-17)
+Every component must be OSI-approved **and** free to use with no limitations: no watermark or attribution-display duties, no BSL/SSPL/ELv2/source-available licences, no usage-capped free tiers or paid feature gates. Copyleft (GPL/AGPL/OSL/MPL) is allowed; it imposes sharing obligations, not usage limits.
+
+Applying the rule:
+| Component | Problem | Replacement |
+|---|---|---|
+| bpmn-js / dmn-js | Watermark required | Apache KIE BPMN/DMN standalone editors (Apache-2.0) |
+| Airbyte (PDF §5.5) | Platform under Elastic License v2 | **Apache SeaTunnel** (Apache-2.0): 100+ connectors incl. CDC, Zeta engine or Flink, web UI |
+
+Unavoidable platform quota: GitHub Codespaces' free hours (Actions is unlimited for public repositories). No free hosting removes this.

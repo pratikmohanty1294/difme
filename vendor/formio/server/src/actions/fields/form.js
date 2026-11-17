@@ -1,0 +1,225 @@
+'use strict';
+
+const _ = require('lodash');
+
+module.exports = (router) => {
+  /**
+   * Perform hierarchial submissions of sub-forms.
+   */
+  const submitSubForms = function (
+    component,
+    data,
+    validation,
+    req,
+    res,
+    path,
+    fullPath,
+    parentHidden,
+    next,
+  ) {
+    // Only submit subforms after validation has occurred.
+    if (!validation) {
+      return next();
+    }
+
+    // Get the submission object.
+    let subSubmission = _.get(data, component.key, {});
+    const id = subSubmission._id ? subSubmission._id.toString() : null;
+    subSubmission = _.cloneDeep(_.get(req, `resources.${id}`, subSubmission));
+
+    // if there isn't a sub-submission or the sub-submission has an _id, don't submit.
+    // Should be submitted from the frontend.
+    if (
+      (req.method === 'POST' && subSubmission._id) ||
+      (req.method === 'PUT' && !subSubmission._id) ||
+      (req.method === 'PUT' && subSubmission._id && _.isEmpty(subSubmission.data))
+    ) {
+      return next();
+    }
+
+    const isConditionallyHidden = () => {
+      const matches = (hiddenPath) =>
+        hiddenPath === path ||
+        _.startsWith(path, `${hiddenPath}.`) ||
+        _.startsWith(path, `${hiddenPath}[`) ||
+        _.startsWith(fullPath, `${hiddenPath}.`);
+      if (Array.isArray(req.nextgenHidden)) {
+        return _.some(req.nextgenHidden, matches);
+      }
+      const submission = req.body;
+      return _.some(
+        submission?.scope?.conditionals || [],
+        (condComp) => condComp.conditionallyHidden && matches(condComp.path),
+      );
+    };
+    // GOTCHA(G-FOS03)
+    // Only execute if the component should save reference and conditions do not apply.
+    const savesInline = component.hasOwnProperty('reference') && !component.reference;
+    // A hidden layout parent hides us too, and it never shows up in our data path (FIO-9879).
+    const hiddenByJson = Boolean(component.hidden) || parentHidden;
+    // clearOnHide defaults to true, so only an explicit false keeps a hidden child's data.
+    const clearedWhileHidden = hiddenByJson && component.clearOnHide !== false;
+    if (savesInline || isConditionallyHidden() || clearedWhileHidden) {
+      return next();
+    }
+
+    let url = '/form/:formId/submission';
+    if (['PUT', 'PATCH'].includes(req.method)) {
+      url += '/:submissionId';
+    }
+    const childRes = router.formio.util.createSubResponse((err) => {
+      if (childRes.statusCode > 299) {
+        // Add the parent path to the details path.
+        if (err && err.details && err.details.length) {
+          _.each(err.details, (details) => {
+            if (details.path) {
+              // The nextgen validator reports instance paths, which carry no
+              // `.data.` envelope; the classic one reports data paths.
+              const separator = router.formio.util.isNextgenValidatorEnabled(router.formio.hook)
+                ? '.'
+                : '.data.';
+              details.path = router.formio.util.subformErrorPath(path, details.path, separator);
+            }
+          });
+        }
+
+        return res.headersSent ? next() : res.status(childRes.statusCode).json(err);
+      }
+    });
+    const childReq = router.formio.util.createSubRequest(req);
+    if (!childReq) {
+      return res.headersSent ? next() : res.status(400).json('Too many recursive requests.');
+    }
+    childReq.body = subSubmission;
+    childReq.submission = subSubmission;
+
+    // Make sure to pass along the submission state to the subforms.
+    if (req.body.state) {
+      childReq.body.state = req.body.state;
+    }
+
+    childReq.params.formId = component.form;
+    if (subSubmission._id) {
+      childReq.params.submissionId = subSubmission._id;
+    }
+
+    // Make the child request.
+    const method = req.method === 'POST' ? 'post' : 'put';
+
+    if (req.method === 'PATCH') {
+      childReq.subPatch = true;
+    }
+
+    router.resourcejs[url][method](childReq, childRes, function (err) {
+      if (err) {
+        return next(err);
+      }
+
+      if (!req.query.dryrun) {
+        if (childRes.resource && childRes.resource.item && childRes.resource.item._id) {
+          // Set resources to return full submission on response
+          if (!req.resources) {
+            req.resources = {};
+          }
+          const childId = childRes.resource.item._id;
+          req.resources[childId.toString()] = childRes.resource.item;
+          // Set child submission to { _id } to save only the reference.
+          // Coerce to ObjectId: sub-responses can stringify ids, and bare `{_id}` shells
+          // must join via equality-match `$lookup` (FIO-12058 / FIO-12093).
+          _.set(data, component.key, {
+            _id: router.formio.util.ObjectId(childId),
+          });
+        }
+      }
+      next();
+    });
+  };
+
+  /*
+   * Set parent submission id in externalIds of child form component's submission
+   */
+  const setChildFormParenthood = async function (component, data, validation, req, res, path) {
+    const log = req.log.child({ module: 'formio:form:childFormParenthood' });
+    if (
+      res.resource &&
+      res.resource.item &&
+      res.resource.item.data &&
+      (!component.hasOwnProperty('reference') || component.reference)
+    ) {
+      // Get child form component's value
+      const compValue = _.get(res.resource.item.data, path);
+
+      // Fetch the child form's submission
+      if (compValue && compValue._id) {
+        const submissionModel = req.submissionModel || router.formio.resources.submission.model;
+        try {
+          const submission = await submissionModel
+            .findOne({ _id: compValue._id, deleted: { $eq: null } })
+            .exec();
+          if (!submission) {
+            return log.debug('No subform found to update external ids.');
+          }
+
+          // Update the submission's externalIds.
+          let found = false;
+          submission.externalIds = submission.externalIds || [];
+          _.each(submission.externalIds, function (externalId) {
+            if (externalId.type === 'parent') {
+              found = true;
+            }
+          });
+          if (!found) {
+            submission.externalIds.push({
+              type: 'parent',
+              id: res.resource.item._id,
+            });
+
+            await submissionModel.updateOne(
+              {
+                _id: submission._id,
+              },
+              { $set: { externalIds: submission.externalIds } },
+            );
+          }
+        } catch (err) {
+          return log.error(err);
+        }
+      }
+    }
+    return;
+  };
+
+  return async (
+    component,
+    data,
+    handler,
+    action,
+    { validation, path, fullPath, parentHidden, req, res },
+  ) => {
+    switch (handler) {
+      case 'beforePut':
+      case 'beforePost':
+        return new Promise((resolve, reject) => {
+          submitSubForms(
+            component,
+            data,
+            validation,
+            req,
+            res,
+            path,
+            fullPath,
+            parentHidden,
+            (err) => {
+              if (err) {
+                return reject(err);
+              }
+              return resolve();
+            },
+          );
+        });
+      case 'afterPut':
+      case 'afterPost':
+        return await setChildFormParenthood(component, data, validation, req, res, path);
+    }
+  };
+};

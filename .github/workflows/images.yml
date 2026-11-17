@@ -1,0 +1,39 @@
+# Builds every DIFME image on change. Each leg calls the reusable _image pipeline.
+name: images
+on:
+  push:
+    branches: [main]
+    paths: ["services/**", "vendor/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml"]
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write, attestations: write }
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { module: cmd-svc,            fdb: "true" }
+          - { module: qry-svc,            fdb: "false" }
+          - { module: saga-orchestrator,  fdb: "false" }
+          - { module: consistency-router, fdb: "false" }
+          - { module: rate-limiter,       fdb: "false" }
+          - { module: projection-svc,     fdb: "false" }
+          - { module: rehydration-svc,    fdb: "false" }
+          - { module: replay-engine,      fdb: "false" }
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-${{ matrix.module }}
+      dockerfile: services/core/Dockerfile.jvm
+      build-args: |
+        MODULE=${{ matrix.module }}
+        WITH_FDB=${{ matrix.fdb }}
+      java: true
+      prebuild: mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
+
+  formio:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-formio
+      context: vendor/formio/server
+      dockerfile: deploy/images/formio/Dockerfile

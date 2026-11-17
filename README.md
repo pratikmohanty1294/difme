@@ -53,7 +53,7 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 5.3 | quarkus-cmd-svc, qry-svc, saga-orchestrator, consistency-router, rate-limiter, rehydration-svc | Same, on **Java 25 LTS** (ADR-005) | `services/core/` |
 | 5.4 | Hibernate 6 + Panache, outbox, MyBatis, Caffeine L1, Redisson JCache L2 | Same (L2 on Valkey) | `services/core/` |
 | 5.5 | Event broker (Kafka API) | **Apache Kafka 4 (KRaft)** via Strimzi — OSI replacement | `deploy/platform/streaming/` |
-| 5.5 | Debezium (CloudEvents), Flink, Apicurio, Airbyte, KEDA | Same | `deploy/platform/streaming/` |
+| 5.5 | Debezium (CloudEvents), Flink, Apicurio, Airbyte, KEDA | Same, with **Apache SeaTunnel** instead of Airbyte (ELv2, ADR-009) | `deploy/platform/streaming/` |
 | 5.5 | Streaming SQL views | **RisingWave** — OSI replacement | `deploy/platform/streaming/` |
 | 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | Same, with **SeaweedFS** instead of MinIO and an **Apache Polaris** catalog (ADR-005) | `deploy/platform/lakehouse/`, `analytics/` |
 | 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | Same | `deploy/platform/ml-platform/`, `ml/` |

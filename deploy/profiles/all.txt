@@ -30,7 +30,7 @@ flink-operator
 flink-jobs
 keda
 keda-scalers
-airbyte
+seatunnel
 seaweedfs
 polaris
 trino

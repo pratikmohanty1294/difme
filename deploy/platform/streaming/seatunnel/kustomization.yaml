@@ -1,0 +1,4 @@
+resources: [seatunnel.yaml]
+configMapGenerator:
+  - name: seatunnel-jobs
+    files: [external-accounts.conf=../../../../analytics/seatunnel/external-accounts.conf]

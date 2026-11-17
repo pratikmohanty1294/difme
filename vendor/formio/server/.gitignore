@@ -1,0 +1,13 @@
+.DS_Store
+.dccache
+.vscode
+.idea
+bower_components
+node_modules
+!App.tsx
+npm-debug.log
+portal/node_modules
+portal/dist
+coverage
+.nyc_output
+src/vm/bundles

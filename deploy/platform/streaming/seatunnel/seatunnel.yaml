@@ -1,0 +1,25 @@
+# PDF §5.5 external data ingestion → Apache SeaTunnel (ADR-009). Zeta engine, single node in the Codespace.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: seatunnel, labels: { app: seatunnel } }
+spec:
+  serviceName: seatunnel
+  replicas: 1
+  selector: { matchLabels: { app: seatunnel } }
+  template:
+    metadata: { labels: { app: seatunnel, difme/team: data, business.metric: data-ingestion } }
+    spec:
+      containers:
+        - name: zeta
+          image: apache/seatunnel:3.1.0
+          command: [/opt/seatunnel/bin/seatunnel-cluster.sh]
+          env: [{ name: JAVA_OPTS, value: "-Xms512m -Xmx768m" }]
+          ports: [{ name: hazelcast, containerPort: 5801 }, { name: rest, containerPort: 8080 }]
+          volumeMounts: [{ name: jobs, mountPath: /opt/seatunnel/jobs }]
+          resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1280Mi } }
+      volumes: [{ name: jobs, configMap: { name: seatunnel-jobs } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: seatunnel }
+spec: { selector: { app: seatunnel }, ports: [{ name: hazelcast, port: 5801 }, { name: rest, port: 8080 }] }

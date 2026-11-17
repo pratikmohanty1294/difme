@@ -1,0 +1,12 @@
+{
+  "formio-server": {
+    "upstream": "https://github.com/formio/formio",
+    "tag": "v4.11.0",
+    "commit": "8b9fe9a29dfcd452f1ab7385b8921b06b70eb6dc"
+  },
+  "formio-js": {
+    "upstream": "https://github.com/formio/formio.js",
+    "tag": "v5.7.0",
+    "commit": "514fad43ec21df8d1319cbaa5aa6fc1ccefa8f31"
+  }
+}

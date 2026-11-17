@@ -16,7 +16,9 @@ kubectl -n argocd patch configmap argocd-cm --type merge --patch-file deploy/boo
 # Server-side diff: fields defaulted by controllers/webhooks are not reported as drift.
 kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.diff.server.side":"true"}}'
 kubectl -n argocd rollout restart statefulset/argocd-application-controller deploy/argocd-repo-server >/dev/null
-kubectl apply -n argocd --server-side -f https://github.com/argoproj/argo-rollouts/releases/download/v1.8.2/install.yaml || true
+# Argo Rollouts lives in its own namespace: its RBAC binds the argo-rollouts/argo-rollouts service account (found live).
+kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n argo-rollouts --server-side -f https://github.com/argoproj/argo-rollouts/releases/download/v1.8.2/install.yaml
 
 sed "s#__REPO__#$REPO#g" deploy/argocd/project.yaml | kubectl apply -f -
 # The base profile is always on: infra layer 11 (namespaces, CRDs, policy, ingress).

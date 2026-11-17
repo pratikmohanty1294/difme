@@ -1,0 +1,6 @@
+{"type":"record","name":"FraudAlert","namespace":"dev.difme.events","fields":[
+ {"name":"paymentId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"layer","type":{"type":"enum","name":"FraudLayer","symbols":["L0_EDGE","L1_FEATURE","L2_VECTOR","L3_CEP"]}},
+ {"name":"action","type":{"type":"enum","name":"FraudAction","symbols":["SOFT_BLOCK","REVIEW_QUEUE","HARD_BLOCK"]}},
+ {"name":"score","type":"double"},
+ {"name":"rule","type":"string"}]}

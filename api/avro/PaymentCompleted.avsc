@@ -1,0 +1,4 @@
+{"type":"record","name":"PaymentCompleted","namespace":"dev.difme.events","fields":[
+ {"name":"paymentId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"workflowId","type":"string"},
+ {"name":"ledgerTransferId","type":"string"}]}

@@ -1,0 +1,10 @@
+{"type":"record","name":"PaymentInitiated","namespace":"dev.difme.events","fields":[
+ {"name":"paymentId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"idempotencyKey","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"debitAccountId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"creditAccountId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"amountMinor","type":"long"},
+ {"name":"currency","type":"string"},
+ {"name":"channel","type":{"type":"enum","name":"Channel","symbols":["MOBILE","NFC_POS","WEB","BACK_OFFICE"]}},
+ {"name":"edgeFraudScore","type":["null","double"],"default":null},
+ {"name":"targetBank","type":["null","string"],"default":null}]}

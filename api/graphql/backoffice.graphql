@@ -1,0 +1,23 @@
+# PDF §5.10 — back-office query API exposed via APISIX. Field deprecations are tracked by graphql-inspector in CI.
+scalar UUID
+scalar DateTime
+scalar Long
+
+type Query {
+  payment(id: UUID!): Payment
+  payments(filter: PaymentFilter, first: Int = 50, after: String): PaymentConnection!
+  settlementPositions(bankPair: String): [SettlementPosition!]!
+  auditTrail(entityId: UUID!, asOf: DateTime): [AuditEntry!]!   # Iceberg time-travel via Trino
+  fraudAlerts(since: DateTime!): [FraudAlert!]!
+  costPerTransaction(paymentType: String): Float                # OpenCost
+}
+
+input PaymentFilter { status: PaymentStatus, channel: String, from: DateTime, to: DateTime }
+enum PaymentStatus { ACCEPTED DEBITED SETTLEMENT_RESERVED NOTIFIED CREDITED COMPLETED COMPENSATED REJECTED }
+
+type Payment { id: UUID!, status: PaymentStatus!, amountMinor: Long!, currency: String!, channel: String!, workflowId: String, createdAt: DateTime! }
+type PaymentEdge { node: Payment!, cursor: String! }
+type PaymentConnection { edges: [PaymentEdge!]!, hasNextPage: Boolean! }
+type SettlementPosition { bankPair: String!, reservedMinor: Long!, releasedMinor: Long!, lagMs: Float! }
+type AuditEntry { eventId: UUID!, type: String!, at: DateTime!, actor: String, payload: String! }
+type FraudAlert { paymentId: UUID!, layer: String!, action: String!, score: Float!, rule: String! }

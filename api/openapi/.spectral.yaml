@@ -1,0 +1,12 @@
+extends: ["spectral:oas"]
+rules:
+  difme-idempotency-key-on-post:
+    description: Every POST must declare the Idempotency-Key header (PDF §9)
+    given: "$.paths[*].post"
+    severity: error
+    then: { field: parameters, function: truthy }
+  difme-no-float-money:
+    description: Money must be integer minor units
+    given: "$..properties[?(@property.match(/amount|Minor/))]"
+    severity: error
+    then: { field: type, function: pattern, functionOptions: { notMatch: "^number$" } }

@@ -1,0 +1,5 @@
+{"type":"record","name":"PaymentCompensated","namespace":"dev.difme.events","fields":[
+ {"name":"paymentId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"workflowId","type":"string"},
+ {"name":"failedStep","type":"string"},
+ {"name":"reason","type":"string"}]}

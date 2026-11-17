@@ -1,0 +1,8 @@
+{"type":"record","name":"LedgerTransferPosted","namespace":"dev.difme.events","fields":[
+ {"name":"transferId","type":"string"},
+ {"name":"debitAccountId","type":"string"},
+ {"name":"creditAccountId","type":"string"},
+ {"name":"amountMinor","type":"long"},
+ {"name":"ledger","type":"int"},
+ {"name":"code","type":"int"},
+ {"name":"pending","type":"boolean","default":false}]}

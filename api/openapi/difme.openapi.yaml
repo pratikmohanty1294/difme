@@ -1,0 +1,138 @@
+openapi: 3.1.0
+info:
+  title: DIFME Public API
+  version: 1.0.0
+  description: |
+    External REST surface behind Kong (PDF §5.10). Every mutating call requires an `Idempotency-Key`
+    header that must be a UUIDv7 (PDF §9); replays within 24h return the original response.
+servers: [{ url: https://api.difme.local }]
+security: [{ oauth2: [payments:write] }]
+paths:
+  /v1/payments:
+    post:
+      operationId: createPayment
+      summary: Initiate a payment (PDF §7.1)
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/TraceParent" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PaymentRequest" } } }
+      responses:
+        "202": { description: Accepted — saga started, content: { application/json: { schema: { $ref: "#/components/schemas/PaymentAccepted" } } } }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+        "422": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /v1/payments/{paymentId}:
+    get:
+      operationId: getPayment
+      security: [{ oauth2: [payments:read] }]
+      parameters: [{ name: paymentId, in: path, required: true, schema: { $ref: "#/components/schemas/Uuid7" } }]
+      responses:
+        "200": { description: Payment, content: { application/json: { schema: { $ref: "#/components/schemas/Payment" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/transfers:
+    post:
+      operationId: createTransfer
+      summary: Cross-bank transfer saga (PDF §7.2)
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/TraceParent" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TransferRequest" } } }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/PaymentAccepted" } } } }
+        "409": { $ref: "#/components/responses/IdempotencyConflict" }
+  /v1/accounts/{accountId}:
+    get:
+      operationId: getAccount
+      security: [{ oauth2: [accounts:read] }]
+      parameters: [{ name: accountId, in: path, required: true, schema: { $ref: "#/components/schemas/Uuid7" } }]
+      responses:
+        "200": { description: Account projection (eventual, follower read), content: { application/json: { schema: { $ref: "#/components/schemas/Account" } } } }
+  /v1/accounts/{accountId}/balance:
+    get:
+      operationId: getBalance
+      security: [{ oauth2: [accounts:read] }]
+      parameters: [{ name: accountId, in: path, required: true, schema: { $ref: "#/components/schemas/Uuid7" } }]
+      responses:
+        "200": { description: Ledger balance (strict, from TigerBeetle), content: { application/json: { schema: { $ref: "#/components/schemas/Balance" } } } }
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows: { clientCredentials: { tokenUrl: https://idp.difme.local/oauth2/token, scopes: { payments:write: create payments, payments:read: read payments, accounts:read: read accounts } } }
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { $ref: "#/components/schemas/Uuid7" }
+    TraceParent:
+      name: traceparent
+      in: header
+      required: false
+      schema: { type: string, pattern: "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$" }
+  schemas:
+    Uuid7:
+      type: string
+      format: uuid
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    Money:
+      type: object
+      required: [amountMinor, currency]
+      properties:
+        amountMinor: { type: integer, format: int64, minimum: 1, description: Amount in minor units (no floats in money) }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+    PaymentRequest:
+      type: object
+      required: [debitAccountId, creditAccountId, amount, channel]
+      properties:
+        debitAccountId: { $ref: "#/components/schemas/Uuid7" }
+        creditAccountId: { $ref: "#/components/schemas/Uuid7" }
+        amount: { $ref: "#/components/schemas/Money" }
+        channel: { type: string, enum: [MOBILE, NFC_POS, WEB, BACK_OFFICE] }
+        edgeFraudScore: { type: number, minimum: 0, maximum: 1 }
+        attestationToken: { type: string, contentEncoding: base64, description: EAT (RFC 8392) evidence from the device TEE }
+        crdtDelta: { type: string, contentEncoding: base64 }
+    TransferRequest:
+      allOf:
+        - $ref: "#/components/schemas/PaymentRequest"
+        - type: object
+          required: [targetBank]
+          properties:
+            targetBank: { type: string, description: Destination bank identifier }
+            beneficiaryReference: { type: string, maxLength: 140 }
+    PaymentAccepted:
+      type: object
+      required: [paymentId, workflowId, status]
+      properties:
+        paymentId: { $ref: "#/components/schemas/Uuid7" }
+        workflowId: { type: string }
+        status: { type: string, enum: [ACCEPTED, DUPLICATE] }
+    Payment:
+      type: object
+      required: [paymentId, status, amount]
+      properties:
+        paymentId: { $ref: "#/components/schemas/Uuid7" }
+        status: { type: string, enum: [ACCEPTED, DEBITED, SETTLEMENT_RESERVED, NOTIFIED, CREDITED, COMPLETED, COMPENSATED, REJECTED] }
+        amount: { $ref: "#/components/schemas/Money" }
+        createdAt: { type: string, format: date-time }
+    Account:
+      type: object
+      properties:
+        accountId: { $ref: "#/components/schemas/Uuid7" }
+        holderName: { type: string }
+        kycStatus: { type: string, enum: [PENDING, VERIFIED, REJECTED] }
+        region: { type: string }
+    Balance:
+      type: object
+      properties:
+        accountId: { $ref: "#/components/schemas/Uuid7" }
+        postedMinor: { type: integer, format: int64 }
+        pendingMinor: { type: integer, format: int64 }
+        currency: { type: string }
+    Problem:
+      type: object
+      description: RFC 9457 problem details
+      properties: { type: { type: string }, title: { type: string }, status: { type: integer }, detail: { type: string }, traceId: { type: string } }
+  responses:
+    Problem: { description: Error, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    IdempotencyConflict: { description: Same Idempotency-Key reused with a different body, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }

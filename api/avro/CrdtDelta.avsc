@@ -1,0 +1,5 @@
+{"type":"record","name":"CrdtDelta","namespace":"dev.difme.events","fields":[
+ {"name":"clientId","type":"string"},
+ {"name":"vectorClock","type":{"type":"map","values":"long"}},
+ {"name":"changes","type":"bytes"},
+ {"name":"lastCommittedOffset","type":"long"}]}

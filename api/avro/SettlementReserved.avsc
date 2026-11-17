@@ -1,0 +1,6 @@
+{"type":"record","name":"SettlementReserved","namespace":"dev.difme.events","fields":[
+ {"name":"reservationId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"paymentId","type":{"type":"string","logicalType":"uuid"}},
+ {"name":"bankPair","type":"string"},
+ {"name":"amountMinor","type":"long"},
+ {"name":"status","type":{"type":"enum","name":"ReservationStatus","symbols":["RESERVED","RELEASED","COMPENSATED"]}}]}

@@ -1,0 +1,64 @@
+asyncapi: 3.0.0
+info:
+  title: DIFME Event Contracts
+  version: 1.0.0
+  description: |
+    Kafka topics (PDF §5.5) carrying CloudEvents 1.0 (binary mode, Avro data, schemas in Apicurio).
+    Every event carries `traceparent` and `event_timestamp` extensions; `event_timestamp` is the
+    "official now" for deterministic replay (PDF §9).
+defaultContentType: application/cloudevents+avro
+servers:
+  codespace: { host: "difme-kafka-bootstrap.streaming.svc:9092", protocol: kafka }
+channels:
+  paymentsEvents:
+    address: payments.events.v1
+    messages:
+      PaymentInitiated: { $ref: "#/components/messages/PaymentInitiated" }
+      PaymentCompleted: { $ref: "#/components/messages/PaymentCompleted" }
+      PaymentCompensated: { $ref: "#/components/messages/PaymentCompensated" }
+  ledgerCdc:
+    address: ledger.cdc.v1
+    messages: { LedgerTransferPosted: { $ref: "#/components/messages/LedgerTransferPosted" } }
+  settlementsCdc:
+    address: settlements.cdc.v1
+    messages: { SettlementReserved: { $ref: "#/components/messages/SettlementReserved" } }
+  edgeTelemetry:
+    address: edge.telemetry.v1
+    messages: { EdgeFraudScore: { $ref: "#/components/messages/EdgeFraudScore" } }
+  fraudAlerts:
+    address: fraud.alerts.v1
+    messages: { FraudAlert: { $ref: "#/components/messages/FraudAlert" } }
+  crdtDeltas:
+    address: crdt.deltas.v1
+    messages: { CrdtDelta: { $ref: "#/components/messages/CrdtDelta" } }
+operations:
+  publishPaymentEvents: { action: send, channel: { $ref: "#/channels/paymentsEvents" } }
+  consumePaymentEvents: { action: receive, channel: { $ref: "#/channels/paymentsEvents" } }
+  consumeLedgerCdc: { action: receive, channel: { $ref: "#/channels/ledgerCdc" } }
+  consumeSettlementsCdc: { action: receive, channel: { $ref: "#/channels/settlementsCdc" } }
+  publishEdgeTelemetry: { action: send, channel: { $ref: "#/channels/edgeTelemetry" } }
+  publishFraudAlerts: { action: send, channel: { $ref: "#/channels/fraudAlerts" } }
+  consumeCrdtDeltas: { action: receive, channel: { $ref: "#/channels/crdtDeltas" } }
+components:
+  messageTraits:
+    cloudEvent:
+      headers:
+        type: object
+        required: [ce_specversion, ce_id, ce_source, ce_type, ce_time, ce_traceparent, ce_eventtimestamp]
+        properties:
+          ce_specversion: { type: string, const: "1.0" }
+          ce_id: { type: string, description: UUIDv7 — also the consumer inbox key }
+          ce_source: { type: string }
+          ce_type: { type: string }
+          ce_time: { type: string, format: date-time }
+          ce_traceparent: { type: string }
+          ce_eventtimestamp: { type: string, format: date-time }
+  messages:
+    PaymentInitiated:   { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/PaymentInitiated.avsc" } } }
+    PaymentCompleted:   { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/PaymentCompleted.avsc" } } }
+    PaymentCompensated: { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/PaymentCompensated.avsc" } } }
+    LedgerTransferPosted: { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/LedgerTransferPosted.avsc" } } }
+    SettlementReserved: { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/SettlementReserved.avsc" } } }
+    EdgeFraudScore:     { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/EdgeFraudScore.avsc" } } }
+    FraudAlert:         { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/FraudAlert.avsc" } } }
+    CrdtDelta:          { traits: [{ $ref: "#/components/messageTraits/cloudEvent" }], payload: { schemaFormat: "application/vnd.apache.avro;version=1.9.0", schema: { $ref: "../avro/CrdtDelta.avsc" } } }

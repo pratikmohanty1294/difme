@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+// PDF §5.2 — gRPC bridge: Quinn hub → Quarkus core (h2c, streaming RPCs).
+package difme.payments.v1;
+
+option java_multiple_files = true;
+option java_package = "dev.difme.grpc.payments.v1";
+
+service PaymentCommandService {
+  rpc SubmitPayment(PaymentCommand) returns (PaymentAck);
+  // Device reconnect: stream CRDT deltas up, receive replayed events down (PDF §7.3).
+  rpc Rehydrate(stream CrdtDelta) returns (stream RehydrationEvent);
+}
+
+message Money {
+  int64 amount_minor = 1;
+  string currency = 2;
+}
+
+message PaymentCommand {
+  string idempotency_key = 1;   // UUIDv7
+  string trace_id = 2;
+  string debit_account_id = 3;
+  string credit_account_id = 4;
+  Money amount = 5;
+  Channel channel = 6;
+  double edge_fraud_score = 7;
+  bytes attestation_token = 8;  // EAT, RFC 8392
+  bytes crdt_delta = 9;
+  string target_bank = 10;
+  int64 client_timestamp_ms = 11;
+}
+
+enum Channel {
+  CHANNEL_UNSPECIFIED = 0;
+  CHANNEL_MOBILE = 1;
+  CHANNEL_NFC_POS = 2;
+  CHANNEL_WEB = 3;
+  CHANNEL_BACK_OFFICE = 4;
+}
+
+message PaymentAck {
+  string payment_id = 1;        // UUIDv7
+  string workflow_id = 2;
+  Status status = 3;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_ACCEPTED = 1;
+    STATUS_DUPLICATE = 2;
+    STATUS_REJECTED_FRAUD = 3;
+    STATUS_REJECTED_RATE_LIMIT = 4;
+  }
+}
+
+message CrdtDelta {
+  string client_id = 1;
+  map<string, uint64> vector_clock = 2;
+  bytes automerge_changes = 3;
+  int64 last_committed_offset = 4;
+}
+
+message RehydrationEvent {
+  string event_id = 1;          // UUIDv7, CloudEvents id
+  int64 offset = 2;
+  bytes cloudevent = 3;         // binary-mode CloudEvent
+  bool snapshot_complete = 4;
+}

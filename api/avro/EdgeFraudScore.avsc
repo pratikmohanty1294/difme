@@ -1,0 +1,7 @@
+{"type":"record","name":"EdgeFraudScore","namespace":"dev.difme.events","fields":[
+ {"name":"deviceId","type":"string"},
+ {"name":"paymentId","type":["null",{"type":"string","logicalType":"uuid"}],"default":null},
+ {"name":"score","type":"double"},
+ {"name":"modelVersion","type":"string"},
+ {"name":"attested","type":"boolean"},
+ {"name":"inferenceMicros","type":"long"}]}

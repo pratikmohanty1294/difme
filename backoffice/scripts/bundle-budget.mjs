@@ -1,7 +1,7 @@
 // PDF §5.9 performance budget: each remote's INITIAL JavaScript ≤ 200 KB gzip (hard CI gate).
 // Lazy chunks (KIE editors, formio builder) are reported but not counted — see ADR-010.
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const LIMIT = 200 * 1024;
@@ -22,7 +22,10 @@ for (const [app, out] of Object.entries(apps)) {
   let initial = 0, deferred = 0;
   for (const f of walk(dir).filter((f) => f.endsWith(".js"))) {
     const gz = gzipSync(readFileSync(f)).length;
-    if (lazy.test(f) || /async|lazy/.test(f)) deferred += gz; else initial += gz;
+    // Lazy = Rspack async chunks (static/js/async/), Angular lazy chunks (chunk-*.js), or named lazy bundles.
+    const name = basename(f);
+    const isLazy = /[\/]async[\/]/.test(f) || /^chunk-/.test(name) || lazy.test(name);
+    if (isLazy) deferred += gz; else initial += gz;
   }
   const ok = initial <= LIMIT;
   failed ||= !ok;

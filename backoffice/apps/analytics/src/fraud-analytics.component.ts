@@ -1,11 +1,16 @@
 // PDF §5.9 Analytics UI: StarRocks OLAP fraud dashboards (via qry-svc) rendered with ECharts.
 import { ChangeDetectionStrategy, Component, ElementRef, effect, input, signal, viewChild } from "@angular/core";
-import * as echarts from "echarts/core";
-import { BarChart, LineChart } from "echarts/charts";
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
+import type { ECharts } from "echarts/core";
 
-echarts.use([BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+/** ECharts is loaded on first render so it stays out of the initial bundle (PDF §5.9 budget). */
+async function loadCharts() {
+  const [core, charts, components, renderers] = await Promise.all([
+    import("echarts/core"), import("echarts/charts"), import("echarts/components"), import("echarts/renderers"),
+  ]);
+  core.use([charts.BarChart, charts.LineChart, components.GridComponent, components.TooltipComponent,
+    components.LegendComponent, renderers.CanvasRenderer]);
+  return core;
+}
 
 type FraudDay = { day: string; alerts: number; hardBlocks: number; falsePositives: number; costPerTxnUsd: number };
 
@@ -43,7 +48,7 @@ export class FraudAnalyticsComponent {
   readonly days = signal<FraudDay[]>([]);
   readonly error = signal<string | null>(null);
   private readonly chartEl = viewChild.required<ElementRef<HTMLDivElement>>("chart");
-  private chart?: echarts.ECharts;
+  private chart?: ECharts;
 
   constructor() {
     effect(() => {
@@ -56,6 +61,8 @@ export class FraudAnalyticsComponent {
     effect(() => {
       const d = this.days();
       const el = this.chartEl().nativeElement;
+      if (d.length === 0) return;
+      loadCharts().then((echarts) => {
       this.chart ??= echarts.init(el);
       this.chart.setOption({
         tooltip: { trigger: "axis" },
@@ -67,6 +74,7 @@ export class FraudAnalyticsComponent {
           { name: "Hard blocks", type: "bar", data: d.map((x) => x.hardBlocks) },
           { name: "False positives", type: "line", data: d.map((x) => x.falsePositives) },
         ],
+      });
       });
     });
   }

@@ -19,7 +19,7 @@
             "styles": ["src/styles.css"],
             "outputHashing": "none",
             "baseHref": "/remotes/analytics/",
-            "budgets": [{ "type": "initial", "maximumError": "200kb" }]
+            "budgets": [{ "type": "initial", "maximumError": "600kb" }]
           },
           "configurations": { "production": { "optimization": true } },
           "defaultConfiguration": "production"

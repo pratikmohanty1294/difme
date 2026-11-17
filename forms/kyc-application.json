@@ -1,0 +1,28 @@
+{
+  "title": "KYC application",
+  "name": "kycApplication",
+  "path": "kyc-application",
+  "type": "form",
+  "display": "form",
+  "properties": {
+    "decisionKey": "kyc-form-rules",
+    "decisionVersion": "1",
+    "processKey": "kyc-onboarding",
+    "owner": "compliance"
+  },
+  "components": [
+    { "type": "select", "key": "accountType", "label": "Account type", "input": true, "validate": { "required": true },
+      "data": { "values": [ { "label": "Individual", "value": "INDIVIDUAL" }, { "label": "Business", "value": "BUSINESS" } ] } },
+    { "type": "textfield", "key": "fullName", "label": "Full / legal name", "input": true, "validate": { "required": true, "maxLength": 140 } },
+    { "type": "textfield", "key": "country", "label": "Country (ISO-3166 alpha-2)", "input": true, "validate": { "required": true, "pattern": "^[A-Z]{2}$" } },
+    { "type": "select", "key": "countryRisk", "label": "Country risk", "input": true,
+      "data": { "values": [ { "label": "Low", "value": "LOW" }, { "label": "Medium", "value": "MEDIUM" }, { "label": "High", "value": "HIGH" } ] } },
+    { "type": "checkbox", "key": "pep", "label": "Politically exposed person", "input": true },
+    { "type": "textarea", "key": "pepDetails", "label": "PEP details", "input": true },
+    { "type": "datetime", "key": "dateOfBirth", "label": "Date of birth", "input": true, "enableTime": false },
+    { "type": "textfield", "key": "companyRegistrationNumber", "label": "Company registration number", "input": true },
+    { "type": "textfield", "key": "taxId", "label": "Tax identifier", "input": true },
+    { "type": "number", "key": "expectedMonthlyVolume", "label": "Expected monthly volume", "input": true },
+    { "type": "button", "key": "submit", "label": "Submit", "action": "submit" }
+  ]
+}

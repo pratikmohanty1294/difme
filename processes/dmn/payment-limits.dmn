@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Business config owned by operations: daily payment limits (minor units). -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="payment-limits-definitions" name="Payment limits"
+             namespace="https://difme.local/rules">
+  <decision id="payment-limits" name="Daily payment limit">
+    <decisionTable id="payment-limits-table" hitPolicy="UNIQUE">
+      <input id="in-channel" label="Channel">
+        <inputExpression id="ie-channel" typeRef="string"><text>channel</text></inputExpression>
+      </input>
+      <input id="in-kyc" label="Risk level">
+        <inputExpression id="ie-kyc" typeRef="string"><text>riskLevel</text></inputExpression>
+      </input>
+      <output id="o-limit" label="Daily limit (minor)" name="dailyLimitMinor" typeRef="long" />
+      <rule id="pl1"><inputEntry id="pl1-1"><text>"NFC_POS"</text></inputEntry><inputEntry id="pl1-2"><text></text></inputEntry><outputEntry id="pl1-o"><text>500000</text></outputEntry></rule>
+      <rule id="pl2"><inputEntry id="pl2-1"><text>not("NFC_POS")</text></inputEntry><inputEntry id="pl2-2"><text>"LOW"</text></inputEntry><outputEntry id="pl2-o"><text>20000000</text></outputEntry></rule>
+      <rule id="pl3"><inputEntry id="pl3-1"><text>not("NFC_POS")</text></inputEntry><inputEntry id="pl3-2"><text>"MEDIUM"</text></inputEntry><outputEntry id="pl3-o"><text>5000000</text></outputEntry></rule>
+      <rule id="pl4"><inputEntry id="pl4-1"><text>not("NFC_POS")</text></inputEntry><inputEntry id="pl4-2"><text>"HIGH"</text></inputEntry><outputEntry id="pl4-o"><text>1000000</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>

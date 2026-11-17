@@ -1,0 +1,40 @@
+# ADR-008 — PostgreSQL 17 + DocumentDB extension (MIT). Backs FerretDB (formio) and Fluxnova (database: fluxnova).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgres-docdb, labels: { app: postgres-docdb } }
+spec:
+  serviceName: postgres-docdb
+  replicas: 1
+  selector: { matchLabels: { app: postgres-docdb } }
+  template:
+    metadata: { labels: { app: postgres-docdb } }
+    spec:
+      containers:
+        - name: postgres
+          image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+          env:
+            - { name: POSTGRES_USER, value: difme }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: postgres-docdb, key: password } } }
+            - { name: POSTGRES_DB, value: postgres }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ containerPort: 5432 }]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
+      volumes: [{ name: init, configMap: { name: postgres-docdb-init } }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 4Gi } } }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: postgres-docdb-init }
+data:
+  10-fluxnova.sql: |
+    CREATE DATABASE fluxnova;
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres-docdb }
+spec: { selector: { app: postgres-docdb }, ports: [{ port: 5432 }] }

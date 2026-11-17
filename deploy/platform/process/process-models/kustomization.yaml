@@ -1,0 +1,9 @@
+resources: [deploy-job.yaml]
+configMapGenerator:
+  - name: process-models
+    files:
+      - kyc-onboarding.bpmn=../../../../processes/bpmn/kyc-onboarding.bpmn
+      - kyc-risk.dmn=../../../../processes/dmn/kyc-risk.dmn
+      - kyc-form-rules.dmn=../../../../processes/dmn/kyc-form-rules.dmn
+      - payment-limits.dmn=../../../../processes/dmn/payment-limits.dmn
+      - dispute-case.cmmn=../../../../processes/cmmn/dispute-case.cmmn

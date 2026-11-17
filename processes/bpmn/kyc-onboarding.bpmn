@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:fluxnova="http://fluxnova.finos.org/schema/1.0/bpmn"
+                  id="kyc-onboarding-definitions" targetNamespace="https://difme.local/processes">
+  <bpmn:message id="msg-account-provisioned" name="account-provisioned" />
+  <bpmn:process id="kyc-onboarding" name="KYC onboarding" isExecutable="true" fluxnova:historyTimeToLive="P30D">
+    <bpmn:startEvent id="start" name="Application submitted" fluxnova:formKey="formio:kyc-application">
+      <bpmn:outgoing>f1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:businessRuleTask id="assess-risk" name="Assess KYC risk" fluxnova:decisionRef="kyc-risk"
+                           fluxnova:resultVariable="riskLevel" fluxnova:mapDecisionResult="singleEntry">
+      <bpmn:incoming>f1</bpmn:incoming>
+      <bpmn:outgoing>f2</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="risk-gw" name="Risk?" default="f-low">
+      <bpmn:incoming>f2</bpmn:incoming>
+      <bpmn:outgoing>f-high</bpmn:outgoing>
+      <bpmn:outgoing>f-low</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="compliance-review" name="Compliance review" fluxnova:candidateGroups="compliance"
+                   fluxnova:formKey="formio:kyc-review">
+      <bpmn:incoming>f-high</bpmn:incoming>
+      <bpmn:outgoing>f3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="approved-gw" name="Approved?" default="f-rejected">
+      <bpmn:incoming>f3</bpmn:incoming>
+      <bpmn:outgoing>f-approved</bpmn:outgoing>
+      <bpmn:outgoing>f-rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="provision-account" name="Provision account (Temporal)" fluxnova:type="external"
+                      fluxnova:topic="temporal:AccountProvisioningWorkflow">
+      <bpmn:incoming>f-low</bpmn:incoming>
+      <bpmn:incoming>f-approved</bpmn:incoming>
+      <bpmn:outgoing>f4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateCatchEvent id="wait-provisioned" name="Account provisioned">
+      <bpmn:incoming>f4</bpmn:incoming>
+      <bpmn:outgoing>f5</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="msg-account-provisioned" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="onboarded" name="Onboarded">
+      <bpmn:incoming>f5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="rejected" name="Rejected">
+      <bpmn:incoming>f-rejected</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="assess-risk" />
+    <bpmn:sequenceFlow id="f2" sourceRef="assess-risk" targetRef="risk-gw" />
+    <bpmn:sequenceFlow id="f-high" name="HIGH" sourceRef="risk-gw" targetRef="compliance-review">
+      <bpmn:conditionExpression>${riskLevel == 'HIGH'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-low" name="LOW / MEDIUM" sourceRef="risk-gw" targetRef="provision-account" />
+    <bpmn:sequenceFlow id="f3" sourceRef="compliance-review" targetRef="approved-gw" />
+    <bpmn:sequenceFlow id="f-approved" name="yes" sourceRef="approved-gw" targetRef="provision-account">
+      <bpmn:conditionExpression>${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-rejected" name="no" sourceRef="approved-gw" targetRef="rejected" />
+    <bpmn:sequenceFlow id="f4" sourceRef="provision-account" targetRef="wait-provisioned" />
+    <bpmn:sequenceFlow id="f5" sourceRef="wait-provisioned" targetRef="onboarded" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="kyc-diagram">
+    <bpmndi:BPMNPlane id="kyc-plane" bpmnElement="kyc-onboarding">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start"><dc:Bounds x="80" y="182" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="assess-risk_di" bpmnElement="assess-risk"><dc:Bounds x="170" y="160" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="risk-gw_di" bpmnElement="risk-gw" isMarkerVisible="true"><dc:Bounds x="330" y="175" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="compliance-review_di" bpmnElement="compliance-review"><dc:Bounds x="430" y="40" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="approved-gw_di" bpmnElement="approved-gw" isMarkerVisible="true"><dc:Bounds x="590" y="55" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="provision-account_di" bpmnElement="provision-account"><dc:Bounds x="690" y="160" width="120" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="wait-provisioned_di" bpmnElement="wait-provisioned"><dc:Bounds x="862" y="182" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="onboarded_di" bpmnElement="onboarded"><dc:Bounds x="952" y="182" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="rejected_di" bpmnElement="rejected"><dc:Bounds x="697" y="62" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="f1_di" bpmnElement="f1"><di:waypoint x="116" y="200" /><di:waypoint x="170" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f2_di" bpmnElement="f2"><di:waypoint x="280" y="200" /><di:waypoint x="330" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f-high_di" bpmnElement="f-high"><di:waypoint x="355" y="175" /><di:waypoint x="355" y="80" /><di:waypoint x="430" y="80" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f-low_di" bpmnElement="f-low"><di:waypoint x="380" y="200" /><di:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f3_di" bpmnElement="f3"><di:waypoint x="540" y="80" /><di:waypoint x="590" y="80" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f-approved_di" bpmnElement="f-approved"><di:waypoint x="615" y="105" /><di:waypoint x="615" y="180" /><di:waypoint x="690" y="180" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f-rejected_di" bpmnElement="f-rejected"><di:waypoint x="640" y="80" /><di:waypoint x="697" y="80" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f4_di" bpmnElement="f4"><di:waypoint x="810" y="200" /><di:waypoint x="862" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f5_di" bpmnElement="f5"><di:waypoint x="898" y="200" /><di:waypoint x="952" y="200" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

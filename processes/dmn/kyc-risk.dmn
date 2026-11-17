@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="kyc-risk-definitions" name="KYC risk"
+             namespace="https://difme.local/rules">
+  <decision id="kyc-risk" name="KYC risk level">
+    <decisionTable id="kyc-risk-table" hitPolicy="FIRST">
+      <input id="in-pep" label="Politically exposed person">
+        <inputExpression id="ie-pep" typeRef="boolean"><text>pep</text></inputExpression>
+      </input>
+      <input id="in-country" label="Country risk">
+        <inputExpression id="ie-country" typeRef="string"><text>countryRisk</text></inputExpression>
+      </input>
+      <input id="in-volume" label="Expected monthly volume (minor units)">
+        <inputExpression id="ie-volume" typeRef="long"><text>expectedMonthlyVolumeMinor</text></inputExpression>
+      </input>
+      <output id="out-risk" label="Risk level" name="riskLevel" typeRef="string" />
+      <rule id="r1"><description>PEPs always need review</description>
+        <inputEntry id="r1-1"><text>true</text></inputEntry><inputEntry id="r1-2"><text></text></inputEntry><inputEntry id="r1-3"><text></text></inputEntry>
+        <outputEntry id="r1-o"><text>"HIGH"</text></outputEntry></rule>
+      <rule id="r2"><description>High-risk jurisdiction</description>
+        <inputEntry id="r2-1"><text></text></inputEntry><inputEntry id="r2-2"><text>"HIGH"</text></inputEntry><inputEntry id="r2-3"><text></text></inputEntry>
+        <outputEntry id="r2-o"><text>"HIGH"</text></outputEntry></rule>
+      <rule id="r3"><description>Large expected volume</description>
+        <inputEntry id="r3-1"><text></text></inputEntry><inputEntry id="r3-2"><text></text></inputEntry><inputEntry id="r3-3"><text>&gt; 50000000</text></inputEntry>
+        <outputEntry id="r3-o"><text>"HIGH"</text></outputEntry></rule>
+      <rule id="r4">
+        <inputEntry id="r4-1"><text></text></inputEntry><inputEntry id="r4-2"><text>"MEDIUM"</text></inputEntry><inputEntry id="r4-3"><text></text></inputEntry>
+        <outputEntry id="r4-o"><text>"MEDIUM"</text></outputEntry></rule>
+      <rule id="r5">
+        <inputEntry id="r5-1"><text></text></inputEntry><inputEntry id="r5-2"><text></text></inputEntry><inputEntry id="r5-3"><text>[10000000..50000000]</text></inputEntry>
+        <outputEntry id="r5-o"><text>"MEDIUM"</text></outputEntry></rule>
+      <rule id="r6">
+        <inputEntry id="r6-1"><text></text></inputEntry><inputEntry id="r6-2"><text></text></inputEntry><inputEntry id="r6-3"><text></text></inputEntry>
+        <outputEntry id="r6-o"><text>"LOW"</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>

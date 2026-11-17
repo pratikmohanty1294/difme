@@ -1,0 +1,4 @@
+resources: [fluxnova.yaml]
+configMapGenerator:
+  - name: fluxnova-config
+    files: [application.yml]

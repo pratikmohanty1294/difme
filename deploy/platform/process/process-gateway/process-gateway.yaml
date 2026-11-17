@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: process-gateway, labels: { app: process-gateway } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: process-gateway } }
+  template:
+    metadata: { labels: { app: process-gateway, difme/team: process, business.metric: business-process } }
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/pratikmohanty1294/difme-process-gateway:0.1.0
+          env:
+            - { name: FLUXNOVA_USER, value: admin }
+            - { name: FLUXNOVA_PASSWORD, valueFrom: { secretKeyRef: { name: fluxnova, key: admin-password } } }
+            - { name: FORMIO_API_KEY, valueFrom: { secretKeyRef: { name: formio, key: api-key } } }
+          ports: [{ containerPort: 8088 }]
+          readinessProbe: { httpGet: { path: /q/health/ready, port: 8088 } }
+          resources: { requests: { cpu: 50m, memory: 192Mi }, limits: { memory: 384Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: process-gateway }
+spec: { selector: { app: process-gateway }, ports: [{ port: 8088 }] }

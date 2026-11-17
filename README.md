@@ -32,6 +32,7 @@ A free Codespace has up to 4 cores and 16 GB of RAM, so run 1–2 profiles at a 
 | 11 | Infrastructure | always | `deploy/bootstrap/`, `policies/` |
 | — | AI / ML plane | `ml` | `deploy/platform/ml-platform/`, `ml/` |
 | — | Back-Office UI | `backoffice` | `backoffice/` |
+| — | Forms + business processes (ADR-008) | `process` | `vendor/formio/`, `processes/`, `forms/`, `services/core/process-gateway/` |
 
 ## Coverage matrix — every component in the PDF
 

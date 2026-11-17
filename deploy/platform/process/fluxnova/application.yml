@@ -1,0 +1,21 @@
+# Loaded via SPRING_CONFIG_ADDITIONAL_LOCATION (ADR-008). Secrets come from env.
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres-docdb.database-tier.svc:5432/fluxnova
+    driver-class-name: org.postgresql.Driver
+fluxnova:
+  bpm:
+    admin-user:
+      id: admin
+      password: ${FLUXNOVA_ADMIN_PASSWORD}
+    database:
+      schema-update: true
+    generic-properties:
+      properties:
+        enforceHistoryTimeToLive: false
+        historyTimeToLive: P30D
+    run:
+      example:
+        enabled: false
+      auth:
+        enabled: true          # basic auth on the REST API; process-gateway uses its own user

@@ -11,9 +11,10 @@ help:            ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n",$$1,$$2}'
 	@echo "  Profiles: $$(ls deploy/profiles | sed 's/.txt//' | tr '\n' ' ')"
 
-cluster:         ## Create the k3d cluster with Cilium (kube-proxy replacement) and Argo CD
+cluster:         ## Create the k3d cluster: Cilium (kube-proxy replacement), Argo CD, dev secrets
 	k3d cluster create --config deploy/bootstrap/k3d.yaml
 	bash deploy/bootstrap/install.sh $(REPO)
+	bash deploy/bootstrap/dev-secrets.sh
 
 destroy:         ## Delete the cluster
 	k3d cluster delete $(CLUSTER)

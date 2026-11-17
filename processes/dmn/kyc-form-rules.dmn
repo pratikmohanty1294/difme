@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Form-field constraints and dependencies for forms/kyc-application.json (ADR-008).
+     COLLECT: every matching rule contributes one field rule. Later rules for the same field override earlier ones. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="kyc-form-rules-definitions" name="KYC form rules"
+             namespace="https://difme.local/rules">
+  <decision id="kyc-form-rules" name="KYC application field rules">
+    <decisionTable id="kyc-form-rules-table" hitPolicy="COLLECT">
+      <input id="in-type" label="Account type">
+        <inputExpression id="ie-type" typeRef="string"><text>accountType</text></inputExpression>
+      </input>
+      <input id="in-country" label="Country">
+        <inputExpression id="ie-country" typeRef="string"><text>country</text></inputExpression>
+      </input>
+      <input id="in-pep" label="PEP">
+        <inputExpression id="ie-pep" typeRef="boolean"><text>pep</text></inputExpression>
+      </input>
+      <output id="o-field" label="Field" name="field" typeRef="string" />
+      <output id="o-required" label="Required" name="required" typeRef="boolean" />
+      <output id="o-visible" label="Visible" name="visible" typeRef="boolean" />
+      <output id="o-min" label="Min" name="min" typeRef="double" />
+      <output id="o-max" label="Max" name="max" typeRef="double" />
+      <rule id="fr1"><description>Volume bounds always apply</description>
+        <inputEntry id="fr1-1"><text></text></inputEntry><inputEntry id="fr1-2"><text></text></inputEntry><inputEntry id="fr1-3"><text></text></inputEntry>
+        <outputEntry id="fr1-a"><text>"expectedMonthlyVolume"</text></outputEntry><outputEntry id="fr1-b"><text>true</text></outputEntry><outputEntry id="fr1-c"><text>true</text></outputEntry><outputEntry id="fr1-d"><text>0</text></outputEntry><outputEntry id="fr1-e"><text>1000000000</text></outputEntry></rule>
+      <rule id="fr2"><description>Individuals: date of birth required</description>
+        <inputEntry id="fr2-1"><text>"INDIVIDUAL"</text></inputEntry><inputEntry id="fr2-2"><text></text></inputEntry><inputEntry id="fr2-3"><text></text></inputEntry>
+        <outputEntry id="fr2-a"><text>"dateOfBirth"</text></outputEntry><outputEntry id="fr2-b"><text>true</text></outputEntry><outputEntry id="fr2-c"><text>true</text></outputEntry><outputEntry id="fr2-d"><text></text></outputEntry><outputEntry id="fr2-e"><text></text></outputEntry></rule>
+      <rule id="fr3"><description>Businesses: registration number required, date of birth hidden</description>
+        <inputEntry id="fr3-1"><text>"BUSINESS"</text></inputEntry><inputEntry id="fr3-2"><text></text></inputEntry><inputEntry id="fr3-3"><text></text></inputEntry>
+        <outputEntry id="fr3-a"><text>"companyRegistrationNumber"</text></outputEntry><outputEntry id="fr3-b"><text>true</text></outputEntry><outputEntry id="fr3-c"><text>true</text></outputEntry><outputEntry id="fr3-d"><text></text></outputEntry><outputEntry id="fr3-e"><text></text></outputEntry></rule>
+      <rule id="fr4">
+        <inputEntry id="fr4-1"><text>"BUSINESS"</text></inputEntry><inputEntry id="fr4-2"><text></text></inputEntry><inputEntry id="fr4-3"><text></text></inputEntry>
+        <outputEntry id="fr4-a"><text>"dateOfBirth"</text></outputEntry><outputEntry id="fr4-b"><text>false</text></outputEntry><outputEntry id="fr4-c"><text>false</text></outputEntry><outputEntry id="fr4-d"><text></text></outputEntry><outputEntry id="fr4-e"><text></text></outputEntry></rule>
+      <rule id="fr5"><description>Tax id required for India</description>
+        <inputEntry id="fr5-1"><text></text></inputEntry><inputEntry id="fr5-2"><text>"IN"</text></inputEntry><inputEntry id="fr5-3"><text></text></inputEntry>
+        <outputEntry id="fr5-a"><text>"taxId"</text></outputEntry><outputEntry id="fr5-b"><text>true</text></outputEntry><outputEntry id="fr5-c"><text>true</text></outputEntry><outputEntry id="fr5-d"><text></text></outputEntry><outputEntry id="fr5-e"><text></text></outputEntry></rule>
+      <rule id="fr6"><description>PEP details only shown and required for PEPs</description>
+        <inputEntry id="fr6-1"><text></text></inputEntry><inputEntry id="fr6-2"><text></text></inputEntry><inputEntry id="fr6-3"><text>true</text></inputEntry>
+        <outputEntry id="fr6-a"><text>"pepDetails"</text></outputEntry><outputEntry id="fr6-b"><text>true</text></outputEntry><outputEntry id="fr6-c"><text>true</text></outputEntry><outputEntry id="fr6-d"><text></text></outputEntry><outputEntry id="fr6-e"><text></text></outputEntry></rule>
+      <rule id="fr7">
+        <inputEntry id="fr7-1"><text></text></inputEntry><inputEntry id="fr7-2"><text></text></inputEntry><inputEntry id="fr7-3"><text>false</text></inputEntry>
+        <outputEntry id="fr7-a"><text>"pepDetails"</text></outputEntry><outputEntry id="fr7-b"><text>false</text></outputEntry><outputEntry id="fr7-c"><text>false</text></outputEntry><outputEntry id="fr7-d"><text></text></outputEntry><outputEntry id="fr7-e"><text></text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>

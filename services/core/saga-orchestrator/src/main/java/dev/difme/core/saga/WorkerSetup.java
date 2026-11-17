@@ -1,5 +1,6 @@
 package dev.difme.core.saga;
 
+import dev.difme.core.common.process.AccountProvisioningWorkflow;
 import dev.difme.core.common.saga.PaymentWorkflow;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -24,6 +25,7 @@ public class WorkerSetup {
         WorkflowClient client = WorkflowClient.newInstance(stubs, WorkflowClientOptions.newBuilder().setNamespace(namespace).build());
         factory = WorkerFactory.newInstance(client);
         factory.newWorker(PaymentWorkflow.TASK_QUEUE).registerWorkflowImplementationTypes(PaymentWorkflowImpl.class);
+        factory.newWorker(AccountProvisioningWorkflow.TASK_QUEUE).registerWorkflowImplementationTypes(AccountProvisioningWorkflowImpl.class);
         factory.start();
     }
 

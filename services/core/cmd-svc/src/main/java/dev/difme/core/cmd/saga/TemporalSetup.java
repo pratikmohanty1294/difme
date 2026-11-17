@@ -1,5 +1,6 @@
 package dev.difme.core.cmd.saga;
 
+import dev.difme.core.common.process.AccountActivities;
 import dev.difme.core.common.saga.PaymentActivities;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -15,12 +16,13 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-/** Temporal client + activity worker (PDF §7.1 step 6: Temporal → Command Svc "execute step"). */
+/** Temporal client + activity workers (PDF §7.1 step 6; ADR-008 account provisioning). */
 @ApplicationScoped
 public class TemporalSetup {
     @ConfigProperty(name = "difme.temporal.target") String target;
     @ConfigProperty(name = "difme.temporal.namespace") String namespace;
     @Inject PaymentActivitiesImpl activities;
+    @Inject AccountActivitiesImpl accountActivities;
     private WorkerFactory factory;
 
     @Produces @Singleton
@@ -33,6 +35,7 @@ public class TemporalSetup {
     void start(@Observes StartupEvent ev, WorkflowClient client) {
         factory = WorkerFactory.newInstance(client);
         factory.newWorker(PaymentActivities.TASK_QUEUE).registerActivitiesImplementations(activities);
+        factory.newWorker(AccountActivities.TASK_QUEUE).registerActivitiesImplementations(accountActivities);
         factory.start();
     }
 

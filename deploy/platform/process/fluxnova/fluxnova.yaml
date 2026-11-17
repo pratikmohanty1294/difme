@@ -1,0 +1,29 @@
+# ADR-008 — Fluxnova 3.1.1 Run: engine + REST API + Cockpit / Tasklist / Admin web apps.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: fluxnova, labels: { app: fluxnova } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: fluxnova } }
+  template:
+    metadata: { labels: { app: fluxnova, difme/team: process, business.metric: business-process } }
+    spec:
+      containers:
+        - name: fluxnova
+          image: finos/fluxnova-bpm-platform:3.1.1
+          env:
+            - { name: SPRING_CONFIG_ADDITIONAL_LOCATION, value: "file:/difme/application.yml" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: difme }
+            - { name: SPRING_DATASOURCE_PASSWORD, valueFrom: { secretKeyRef: { name: postgres-docdb, key: password } } }
+            - { name: FLUXNOVA_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: fluxnova, key: admin-password } } }
+            - { name: JAVA_OPTS, value: "-Xms256m -Xmx640m" }
+          ports: [{ containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /engine-rest/version, port: 8080 }, initialDelaySeconds: 40, periodSeconds: 10 }
+          volumeMounts: [{ name: config, mountPath: /difme }]
+          resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 1Gi } }
+      volumes: [{ name: config, configMap: { name: fluxnova-config } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: fluxnova }
+spec: { selector: { app: fluxnova }, ports: [{ port: 8080 }] }

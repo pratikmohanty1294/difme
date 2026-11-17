@@ -1,0 +1,57 @@
+# ADR-008 — self-hosted formio API server, built from vendor/formio/server and signed by our pipeline.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: formio, labels: { app: formio } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: formio } }
+  template:
+    metadata: { labels: { app: formio, difme/team: process, business.metric: dynamic-forms } }
+    spec:
+      containers:
+        - name: formio
+          image: ghcr.io/pratikmohanty1294/difme-formio:0.1.0
+          env:
+            - { name: MONGO, valueFrom: { secretKeyRef: { name: formio, key: mongo-url } } }   # mongodb://…@ferretdb.forms.svc:27017/formio
+            - { name: JWT_SECRET, valueFrom: { secretKeyRef: { name: formio, key: jwt-secret } } }
+            - { name: API_KEYS, valueFrom: { secretKeyRef: { name: formio, key: api-keys } } }
+            - { name: ROOT_EMAIL, valueFrom: { secretKeyRef: { name: formio, key: root-email } } }
+            - { name: ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: formio, key: root-password } } }
+            - { name: PORT, value: "3001" }
+          ports: [{ containerPort: 3001 }]
+          readinessProbe: { httpGet: { path: /health, port: 3001 }, periodSeconds: 10 }
+          resources: { requests: { cpu: 50m, memory: 192Mi }, limits: { memory: 448Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: formio }
+spec: { selector: { app: formio }, ports: [{ port: 3001 }] }
+---
+# Imports the form definitions in forms/ (with their DMN metadata) into formio after each sync.
+apiVersion: batch/v1
+kind: Job
+metadata: { name: formio-import, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: import
+          image: curlimages/curl:8.12.1
+          env: [{ name: API_KEY, valueFrom: { secretKeyRef: { name: formio, key: api-key } } }]
+          command: [sh, -c]
+          args:
+            - |
+              for f in /forms/*.json; do
+                path=$(sed -n 's/.*"path": *"\([^"]*\)".*/\1/p' "$f" | head -1)
+                code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-token: $API_KEY" http://formio:3001/$path)
+                if [ "$code" = "200" ]; then
+                  id=$(curl -s -H "x-token: $API_KEY" http://formio:3001/$path | sed -n 's/.*"_id":"\([^"]*\)".*/\1/p' | head -1)
+                  curl -sf -X PUT -H "x-token: $API_KEY" -H 'Content-Type: application/json' --data @"$f" http://formio:3001/form/$id
+                else
+                  curl -sf -X POST -H "x-token: $API_KEY" -H 'Content-Type: application/json' --data @"$f" http://formio:3001/form
+                fi
+              done
+          volumeMounts: [{ name: forms, mountPath: /forms }]
+      volumes: [{ name: forms, configMap: { name: formio-forms } }]

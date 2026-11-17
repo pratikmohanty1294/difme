@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CMMN 1.1 dispute case (deprecated upstream; kept for compatibility). -->
+<cmmn:definitions xmlns:cmmn="http://www.omg.org/spec/CMMN/20151109/MODEL" id="dispute-definitions"
+                  targetNamespace="https://difme.local/cases">
+  <cmmn:case id="dispute-case" name="Payment dispute">
+    <cmmn:casePlanModel id="dispute-plan" name="Dispute">
+      <cmmn:planItem id="pi-investigate" definitionRef="investigate" />
+      <cmmn:planItem id="pi-decide" definitionRef="decide">
+        <cmmn:entryCriterion id="ec-decide" sentryRef="after-investigation" />
+      </cmmn:planItem>
+      <cmmn:planItem id="pi-resolved" definitionRef="resolved">
+        <cmmn:entryCriterion id="ec-resolved" sentryRef="after-decision" />
+      </cmmn:planItem>
+      <cmmn:sentry id="after-investigation">
+        <cmmn:planItemOnPart id="on-investigate" sourceRef="pi-investigate"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart>
+      </cmmn:sentry>
+      <cmmn:sentry id="after-decision">
+        <cmmn:planItemOnPart id="on-decide" sourceRef="pi-decide"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart>
+      </cmmn:sentry>
+      <cmmn:humanTask id="investigate" name="Investigate dispute" />
+      <cmmn:humanTask id="decide" name="Decide outcome" />
+      <cmmn:milestone id="resolved" name="Resolved" />
+    </cmmn:casePlanModel>
+  </cmmn:case>
+</cmmn:definitions>

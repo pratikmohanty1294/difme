@@ -50,6 +50,12 @@ pyroscope
 alloy
 dashboards
 opencost
+postgres-docdb
+ferretdb
+formio
+fluxnova
+process-models
+process-gateway
 apisix
 backoffice-web
 tekton

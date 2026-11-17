@@ -1,0 +1,6 @@
+resources: [formio.yaml]
+configMapGenerator:
+  - name: formio-forms
+    files:
+      - kyc-application.json=../../../../forms/kyc-application.json
+      - kyc-review.json=../../../../forms/kyc-review.json

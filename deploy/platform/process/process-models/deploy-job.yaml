@@ -1,0 +1,23 @@
+# Deploys processes/ to Fluxnova after each sync; unchanged models are skipped (deploy-changed-only).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: deploy-process-models, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: deploy
+          image: curlimages/curl:8.12.1
+          env: [{ name: AUTH, valueFrom: { secretKeyRef: { name: fluxnova, key: admin-basic } } }]   # user:password
+          command: [sh, -c]
+          args:
+            - |
+              set -e
+              args=""
+              for f in /models/*; do args="$args -F $(basename $f)=@$f"; done
+              curl -sf -u "$AUTH" http://fluxnova:8080/engine-rest/deployment/create \
+                -F deployment-name=difme-processes -F deploy-changed-only=true -F deployment-source=gitops $args
+          volumeMounts: [{ name: models, mountPath: /models }]
+      volumes: [{ name: models, configMap: { name: process-models } }]

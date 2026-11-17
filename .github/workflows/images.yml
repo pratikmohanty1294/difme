@@ -21,6 +21,7 @@ jobs:
           - { module: projection-svc,     fdb: "false" }
           - { module: rehydration-svc,    fdb: "false" }
           - { module: replay-engine,      fdb: "false" }
+          - { module: process-gateway,    fdb: "false" }
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-${{ matrix.module }}

@@ -89,6 +89,14 @@ components:
   - { name: dashboards,        ns: observability,   kind: path, profile: observability, wave: 2,  pdf: "10.4" }
   - { name: opencost,          ns: opencost,        kind: helm, profile: observability, wave: 1,  pdf: "16", repo: https://opencost.github.io/opencost-helm-chart, chart: opencost, version: 2.0.2 }
 
+  # ── Forms + business processes (profile: process, ADR-008) ────────────────
+  - { name: postgres-docdb,    ns: database-tier,   kind: path, profile: process, wave: -2, pdf: "ADR-008" }
+  - { name: ferretdb,          ns: forms,           kind: path, profile: process, wave: -1, pdf: "ADR-008" }
+  - { name: formio,            ns: forms,           kind: path, profile: process, wave: 0,  pdf: "ADR-008" }
+  - { name: fluxnova,          ns: process,         kind: path, profile: process, wave: 0,  pdf: "ADR-008" }
+  - { name: process-models,    ns: process,         kind: path, profile: process, wave: 1,  pdf: "ADR-008" }
+  - { name: process-gateway,   ns: process,         kind: path, profile: process, wave: 1,  pdf: "ADR-008" }
+
   # ── Back-office (profile: backoffice) ──────────────────────────────────────
   - { name: apisix,            ns: back-office-ui,  kind: helm, profile: backoffice, wave: 0, pdf: "5.9", repo: https://charts.apiseven.com, chart: apisix, version: 2.10.0 }
   - { name: backoffice-web,    ns: back-office-ui,  kind: path, profile: backoffice, wave: 1, pdf: "5.9" }

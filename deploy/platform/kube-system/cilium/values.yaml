@@ -10,7 +10,12 @@ bpf:
   # Kubernetes-in-Docker (k3d in Codespaces) can't use eBPF host routing: pods could not reach the API service.
   # Verified on the first live run (2026-11-17). Bare-metal / VM overlays set this to false for full eBPF routing.
   hostLegacyRouting: true
-socketLB: { hostNamespaceOnly: true }
+# Socket LB must hook the real cgroup root so host-network pods (MetalLB speaker, node agents) can reach ClusterIPs
+# inside Kubernetes-in-Docker (verified live 2026-11-17).
+socketLB: { hostNamespaceOnly: false }
+cgroup:
+  autoMount: { enabled: false }
+  hostRoot: /sys/fs/cgroup
 encryption: { enabled: true, type: wireguard }
 hubble:
   enabled: true

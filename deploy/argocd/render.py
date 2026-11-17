@@ -22,8 +22,8 @@ COMPOSITE = {
 
 IGNORE = {
     "policy-controller": [
-        {"group": "admissionregistration.k8s.io", "kind": "MutatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle"]},
-        {"group": "admissionregistration.k8s.io", "kind": "ValidatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle"]},
+        {"group": "admissionregistration.k8s.io", "kind": "MutatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle", ".webhooks[]?.objectSelector", ".webhooks[]?.namespaceSelector"]},
+        {"group": "admissionregistration.k8s.io", "kind": "ValidatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle", ".webhooks[]?.objectSelector", ".webhooks[]?.namespaceSelector"]},
     ],
     "policies": [
         {"group": "kyverno.io", "kind": "ClusterPolicy", "managedFieldsManagers": ["kyverno"], "jqPathExpressions": [".spec.rules[]?.skipBackgroundRequests", ".spec.admission", ".spec.emitWarning"]},

@@ -5,7 +5,7 @@ PROFILE ?= core
 REPO    ?= https://github.com/pratikmohanty1294/difme.git
 APPS     = $(shell cat deploy/profiles/$(PROFILE).txt 2>/dev/null | grep -v '^\#')
 
-.PHONY: help registries cluster destroy up down status ui verify test build tla lint check
+.PHONY: help registries prefetch cluster destroy up down status ui verify test build tla lint check
 AREA    ?= all
 MODULES ?=
 
@@ -31,7 +31,10 @@ cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (i
 destroy:         ## Delete the cluster
 	k3d cluster delete $(CLUSTER)
 
-up:              ## Enable a profile, e.g. make up PROFILE=streaming
+prefetch:        ## Pre-pull a profile's images (parallel, retried) so pods never wait on the network
+	bash ci/prefetch.sh $(PROFILE)
+
+up: prefetch     ## Enable a profile, e.g. make up PROFILE=streaming (images are prefetched first)
 	@for a in $(APPS); do echo "▶ $$a"; kubectl apply -f deploy/argocd/apps/$$a.yaml; done
 	@echo "Argo CD is syncing. Check with: make status"
 

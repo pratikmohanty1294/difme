@@ -24,7 +24,7 @@ class BulkFileJobTest {
                 "external_ref,debit_account,credit_account,amount_minor,currency,channel",
                 "R1,ACC1,ACC2,1000,INR,MOBILE",          // valid
                 "R2,ACC1,ACC2,-5,INR,MOBILE",            // schema
-                "R3,ACC999,ACC2,1000,INR,MOBILE",        // unknown debit account
+                "R3,ACC5000,ACC2,1000,INR,MOBILE",       // unknown debit account (store holds ACC0..ACC999)
                 "R1,ACC3,ACC4,1000,INR,MOBILE",          // duplicate ref in file
                 "R5,ACC13,ACC2,1000,INR,WEB",            // frozen account (live check)
                 "OLD1,ACC1,ACC2,1000,INR,MOBILE",        // processed in an earlier run

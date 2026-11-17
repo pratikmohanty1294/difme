@@ -104,3 +104,13 @@ Performance budget (PDF §5.9): each remote's **initial** JS must be ≤ 200 KB 
   - Run report → back-office.
 
 **Throughput caveat:** writing 33k rows/s *into YugabyteDB* needs a multi-node cluster. The single-node Codespace cluster can't sustain it. The 5-minute target is measured by a CI benchmark on a generated 10M-record file, and the measured figure is published rather than assumed.
+
+## ADR-012 — Efficiency rule and service runtimes (owner-approved 2026-11-17)
+**Rule:** everything must be extremely lightweight (low RAM/CPU/I/O) even with the whole platform running, while keeping maximum throughput and minimum latency. Numbers are measured in CI, not assumed.
+
+**Runtimes (hybrid):**
+| Services | Runtime | Why |
+|---|---|---|
+| rate-limiter, consistency-router, projection-svc, replay-engine, process-gateway | **Native image** (Mandrel, GPLv2+CE) | ~25–50 MB RSS, ~50 ms start; these are I/O-bound, so JIT peak speed matters little |
+| cmd-svc, qry-svc, saga-orchestrator, rehydration-svc | **JVM 25 + AOT cache** (JEP 483/514/515), compact object headers, tuned GC | Hot paths keep JIT peak throughput; JNI clients (TigerBeetle, FoundationDB) and Temporal are simpler on the JVM; the AOT cache removes most warm-up |
+Each service's RSS, startup and throughput are recorded by CI and compared against the previous build.

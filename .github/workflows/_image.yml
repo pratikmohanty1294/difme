@@ -73,5 +73,14 @@ jobs:
       - name: Cosign keyless signature
         run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"
       - name: SLSA provenance (Build L3 via reusable workflow)
+        id: provenance
         uses: actions/attest-build-provenance@v2
         with: { subject-name: "${{ env.IMAGE }}", subject-digest: "${{ steps.push.outputs.digest }}", push-to-registry: true }
+      # Kyverno verifyImages reads cosign-format attestations, not the Sigstore-bundle referrers written above
+      # (found by a server dry run on the live cluster). Publish both, signed by this same workflow identity.
+      - name: Cosign attestations for admission control (SLSA provenance + SPDX SBOM)
+        run: |
+          REF="${IMAGE}@${{ steps.push.outputs.digest }}"
+          jq -r '.dsseEnvelope.payload' "${{ steps.provenance.outputs.bundle-path }}" | base64 -d | jq '.predicate' > provenance.json
+          cosign attest --yes --type slsaprovenance1 --predicate provenance.json "$REF"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"

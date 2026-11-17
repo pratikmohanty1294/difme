@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [
     pluginReact(),
     pluginModuleFederation({
+      dts: false,
       name: "shell",
       shared: {
         react: { singleton: true, requiredVersion: "19.3.1" },

@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     pluginReact(),
     pluginModuleFederation({
+      dts: false,
       name: "process_studio",
       exposes: { "./App": "./src/App.tsx" },
       shared: {

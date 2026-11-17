@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [
     pluginSvelte(),
     pluginModuleFederation({
+      dts: false,
       name: "compliance",
       exposes: { "./mount": "./src/mount.ts" },
       shared: { "@difme/auth": { singleton: true }, zustand: { singleton: true } },

@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     pluginReact(),
     pluginModuleFederation({
+      dts: false,
       name: "form_builder",
       exposes: { "./App": "./src/App.tsx" },
       shared: {

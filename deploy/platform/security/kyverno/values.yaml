@@ -1,4 +1,9 @@
-admissionController: { replicas: 1 }
-backgroundController: { enabled: true }
+admissionController:
+  replicas: 1
+  # Generate rule (policies/kyverno/generate-default-deny.yaml) creates CiliumNetworkPolicies (found live 2026-11-17).
+  rbac: { clusterRole: { extraResources: [{ apiGroups: [cilium.io], resources: [ciliumnetworkpolicies], verbs: [get, list, watch] }] } }
+backgroundController:
+  enabled: true
+  rbac: { clusterRole: { extraResources: [{ apiGroups: [cilium.io], resources: [ciliumnetworkpolicies], verbs: [get, list, watch, create, update, patch, delete] }] } }
 cleanupController: { enabled: true }
 reportsController: { enabled: true }

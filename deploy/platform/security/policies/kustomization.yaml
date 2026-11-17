@@ -1,5 +1,4 @@
 resources:
-  - kyverno/rbac.yaml
   - kyverno/require-signed-images.yaml
   - kyverno/require-labels-and-limits.yaml
   - kyverno/mutate-defaults.yaml

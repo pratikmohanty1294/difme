@@ -15,7 +15,7 @@ bpf:
 socketLB: { hostNamespaceOnly: false }
 cgroup:
   autoMount: { enabled: false }
-  hostRoot: /sys/fs/cgroup
+  hostRoot: /run/cilium/cgroupv2   # mounted by deploy/bootstrap/k3d-entrypoint-cilium.sh
 encryption: { enabled: true, type: wireguard }
 hubble:
   enabled: true

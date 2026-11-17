@@ -38,7 +38,7 @@ components:
   - { name: valkey,            ns: cache-tier,      kind: path, profile: core, wave: -2, pdf: "8" }
   - { name: tigerbeetle,       ns: database-tier,   kind: path, profile: core, wave: -2, pdf: "8" }
   - { name: yugabytedb,        ns: database-tier,   kind: helm, profile: core, wave: -2, pdf: "8", repo: https://charts.yugabyte.com, chart: yugabyte, version: 2.25.1 }
-  - { name: fdb-operator,      ns: database-tier,   kind: helm, profile: core, wave: -3, pdf: "8", repo: https://foundationdb.github.io/fdb-kubernetes-operator, chart: fdb-operator, version: 2.3.0 }
+  - { name: fdb-operator,      ns: database-tier,   kind: path, profile: core, wave: -3, pdf: "8" }
   - { name: foundationdb,      ns: database-tier,   kind: path, profile: core, wave: -1, pdf: "8" }
   - { name: temporal,          ns: temporal,        kind: helm, profile: core, wave: 0,  pdf: "6.1", repo: https://go.temporal.io/helm-charts, chart: temporal, version: 0.62.0 }
   - { name: flagd,             ns: core-platform,   kind: path, profile: core, wave: 0,  pdf: "6.3" }

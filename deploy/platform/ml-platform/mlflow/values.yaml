@@ -1,5 +1,8 @@
 # PDF §5.7 — experiment tracking + model registry; artifacts on SeaweedFS, backend store on YugabyteDB.
-backendStore: { postgres: { enabled: true, host: yb-tservers.database-tier.svc, port: 5433, database: mlflow, user: mlflow } }
-artifactRoot: { s3: { enabled: true, bucket: mlflow, awsAccessKeyId: "", awsSecretAccessKey: "" } }
+backendStore:
+  postgres: { enabled: true, host: yb-tservers.database-tier.svc, port: 5433, database: mlflow, user: mlflow }
+  existingDatabaseSecret: { name: mlflow-db, usernameKey: username, passwordKey: password }
+artifactRoot: { s3: { enabled: true, bucket: mlflow } }   # S3 credentials come from the mlflow-s3 secret via extraSecretNamesForEnvFrom
 extraEnvVars: { MLFLOW_S3_ENDPOINT_URL: http://seaweedfs-s3.lakehouse.svc:8333 }
 resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
+extraSecretNamesForEnvFrom: [mlflow-s3]

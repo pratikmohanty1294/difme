@@ -28,14 +28,7 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
-  sources:
-  - repoURL: https://foundationdb.github.io/fdb-kubernetes-operator
-    chart: fdb-operator
-    targetRevision: 2.3.0
-    helm:
-      releaseName: fdb-operator
-      valueFiles:
-      - $values/deploy/platform/database-tier/fdb-operator/values.yaml
-  - repoURL: https://github.com/pratikmohanty1294/difme.git
+  source:
+    repoURL: https://github.com/pratikmohanty1294/difme.git
     targetRevision: main
-    ref: values
+    path: deploy/platform/database-tier/fdb-operator

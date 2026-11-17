@@ -85,7 +85,7 @@ jobs:
           fail=0
           while read name repo chart version ns; do
             if [[ "$repo" == *docker.io* ]]; then ref="oci://$repo/$chart"; else ref="$chart --repo $repo"; fi
-            helm template "$name" $ref --version "$version" -n "$ns" -f "deploy/platform/$ns/$name/values.yaml" > /dev/null 2>/tmp/err \
+            helm template "$name" $ref --version "$version" -n "$ns" --api-versions cert-manager.io/v1 --api-versions monitoring.coreos.com/v1 -f "deploy/platform/$ns/$name/values.yaml" > /dev/null 2>/tmp/err \
               && echo "✓ $name $version" || { echo "✗ $name $version: $(head -c 300 /tmp/err)"; fail=1; }
           done < /tmp/charts.txt
           exit $fail

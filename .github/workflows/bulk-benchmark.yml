@@ -47,11 +47,11 @@ jobs:
           ls -lh /tmp/bench.csv
       - name: Run bulk validation
         working-directory: analytics/flink-jobs
-        env: { MAVEN_OPTS: "-Xmx10g -XX:+UseParallelGC" }
         run: |
           start=$(date +%s)
-          mvn -B -ntp -q exec:java -Dexec.classpathScope=test -Dexec.mainClass=dev.difme.flink.bulk.BulkFileJob \
-            -Dexec.args="--local true --managed-memory 3g --parallelism 4 --input file:///tmp/bench.csv --out-dir file:///tmp/bench-out --valid-sink discard --dmn-file ../../processes/dmn/payment-limits.dmn --jdbc-url jdbc:postgresql://localhost:5432/difme --jdbc-user difme --jdbc-password bench --batch 1000"
+          # Separate JVM (exec:exec): Flink's embedded cluster can't deserialize user code inside Maven's classloader.
+          mvn -B -ntp -q exec:exec -Dexec.executable=java -Dexec.classpathScope=test \
+            -Dexec.args="-Xmx10g -XX:+UseParallelGC -cp %classpath dev.difme.flink.bulk.BulkFileJob --local true --managed-memory 3g --parallelism 4 --input file:///tmp/bench.csv --out-dir file:///tmp/bench-out --valid-sink discard --dmn-file ../../processes/dmn/payment-limits.dmn --jdbc-url jdbc:postgresql://localhost:5432/difme --jdbc-user difme --jdbc-password bench --batch 1000"
           end=$(date +%s)
           secs=$((end - start))
           report=$(cat /tmp/bench-out/report/*/* 2>/dev/null || find /tmp/bench-out/report -type f -exec cat {} +)

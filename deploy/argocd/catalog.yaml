@@ -60,7 +60,7 @@ components:
   - { name: debezium,          ns: streaming,       kind: path, profile: streaming, wave: 0,  pdf: "5.5" }
   - { name: risingwave-sql,    ns: streaming,       kind: path, profile: streaming, wave: 2,  pdf: "5.5" }
   - { name: risingwave,        ns: streaming,       kind: helm, profile: streaming, wave: 0,  pdf: "5.5", repo: https://risingwavelabs.github.io/helm-charts/, chart: risingwave, version: 0.2.27 }
-  - { name: flink-operator,    ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "5.5", repo: https://archive.apache.org/dist/flink/flink-kubernetes-operator-1.11.0/, chart: flink-kubernetes-operator, version: 1.11.0 }
+  - { name: flink-operator,    ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "5.5", repo: https://archive.apache.org/dist/flink/flink-kubernetes-operator-1.16.1/, chart: flink-kubernetes-operator, version: 1.16.1 }
   - { name: flink-jobs,        ns: streaming,       kind: path, profile: streaming, wave: 1,  pdf: "5.5" }
   - { name: keda,              ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "6.2", repo: https://kedacore.github.io/charts, chart: keda, version: 2.16.1 }
   - { name: keda-scalers,      ns: streaming,       kind: path, profile: streaming, wave: 2,  pdf: "6.2" }
@@ -73,6 +73,7 @@ components:
   - { name: spark-operator,    ns: lakehouse,       kind: helm, profile: lakehouse, wave: -1, pdf: "5.6", repo: https://kubeflow.github.io/spark-operator, chart: spark-operator, version: 2.1.1 }
   - { name: starrocks,         ns: lakehouse,       kind: helm, profile: lakehouse, wave: 0,  pdf: "5.6", repo: https://starrocks.github.io/starrocks-kubernetes-operator, chart: kube-starrocks, version: 1.10.1 }
   - { name: superset,          ns: lakehouse,       kind: helm, profile: lakehouse, wave: 1,  pdf: "5.6", repo: https://apache.github.io/superset, chart: superset, version: 0.14.2 }
+  - { name: analytics-jobs,    ns: lakehouse,       kind: path, profile: lakehouse, wave: 2,  pdf: "5.6" }
   - { name: datahub,           ns: governance,      kind: helm, profile: lakehouse-extra, wave: 1, pdf: "5.8", repo: https://helm.datahubproject.io, chart: datahub, version: 0.5.10 }
 
   # ── AI / ML plane (profile: ml) ────────────────────────────────────────────

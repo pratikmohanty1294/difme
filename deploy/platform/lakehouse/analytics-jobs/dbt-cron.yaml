@@ -1,0 +1,17 @@
+# dbt models (analytics/dbt) run every 15 minutes against Trino → Iceberg.
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: dbt-run }
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dbt
+              image: ghcr.io/pratikmohanty1294/difme-dbt:0.1.0
+              args: [build, --profiles-dir, /dbt, --project-dir, /dbt]
+              resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 512Mi } }

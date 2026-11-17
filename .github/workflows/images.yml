@@ -3,7 +3,7 @@ name: images
 on:
   push:
     branches: [main]
-    paths: ["services/**", "vendor/**", "backoffice/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml"]
+    paths: ["services/**", "vendor/**", "backoffice/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml"]
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write, attestations: write }
 
@@ -50,6 +50,21 @@ jobs:
       build-args: |
         APP=${{ matrix.app }}
         OUT=${{ matrix.out }}
+
+  flink-jobs:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-flink-jobs
+      dockerfile: analytics/flink-jobs/Dockerfile
+      java: true
+      prebuild: mvn -B -ntp -q -f analytics/flink-jobs/pom.xml package -DskipTests
+
+  dbt:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-dbt
+      context: analytics/dbt
+      dockerfile: analytics/dbt/Dockerfile
 
   formio:
     uses: ./.github/workflows/_image.yml

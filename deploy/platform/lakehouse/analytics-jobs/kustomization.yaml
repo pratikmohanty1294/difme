@@ -1,0 +1,4 @@
+resources: [dbt-cron.yaml, starrocks-setup.yaml]
+configMapGenerator:
+  - name: starrocks-sql
+    files: [catalog.sql=../../../../analytics/starrocks/catalog.sql]

@@ -6,7 +6,7 @@ info:
     Kafka topics (PDF §5.5) carrying CloudEvents 1.0 (binary mode, Avro data, schemas in Apicurio).
     Every event carries `traceparent` and `event_timestamp` extensions; `event_timestamp` is the
     "official now" for deterministic replay (PDF §9).
-defaultContentType: application/cloudevents+avro
+defaultContentType: application/json
 servers:
   codespace: { host: "difme-kafka-bootstrap.streaming.svc:9092", protocol: kafka }
 channels:

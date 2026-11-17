@@ -1,0 +1,16 @@
+name: dbt
+on:
+  push: { branches: [main], paths: ["analytics/dbt/**", ".github/workflows/dbt.yml"] }
+  pull_request: { paths: ["analytics/dbt/**"] }
+permissions: { contents: read }
+jobs:
+  parse:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install dbt-core==1.12.7 dbt-trino==1.12.0
+      - name: Compile models (no warehouse connection needed)
+        working-directory: analytics/dbt
+        run: dbt parse --profiles-dir .

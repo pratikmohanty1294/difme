@@ -91,7 +91,7 @@ public class BackofficeResource {
     public List<FraudDay> fraudDaily(@QueryParam("days") Integer days) throws Exception {
         int n = days == null ? 30 : Math.min(Math.max(days, 1), 365);
         try (Connection c = starrocks.getConnection(); PreparedStatement ps = c.prepareStatement(
-                "SELECT CAST(day AS CHAR), alerts, hard_blocks, false_positives, cost_per_txn_usd FROM difme.fraud_daily ORDER BY day DESC LIMIT ?")) {
+                "SELECT CAST(day AS CHAR), alerts, hard_blocks, false_positives, COALESCE(cost_per_txn_usd, 0) FROM iceberg.marts.fraud_daily ORDER BY day DESC LIMIT ?")) {
             ps.setInt(1, n);
             List<FraudDay> out = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {

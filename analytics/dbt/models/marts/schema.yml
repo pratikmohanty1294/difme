@@ -1,0 +1,6 @@
+version: 2
+models:
+  - name: fraud_daily
+    columns:
+      - { name: day, tests: [not_null, unique] }
+      - { name: alerts, tests: [not_null] }

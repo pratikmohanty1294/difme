@@ -39,6 +39,7 @@ trino
 spark-operator
 starrocks
 superset
+analytics-jobs
 datahub
 feast
 mlflow

@@ -1,0 +1,12 @@
+version: 2
+sources:
+  - name: events
+    database: iceberg
+    schema: events
+    tables:
+      - name: payment_events
+        description: Day-0 archive of payment CloudEvents (EventArchiveJob).
+        columns:
+          - { name: event_id, tests: [not_null, unique] }
+      - name: fraud_alerts
+        description: Archived fraud alerts from FraudCepJob and edge/server scoring.

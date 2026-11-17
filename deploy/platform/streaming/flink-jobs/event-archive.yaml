@@ -1,0 +1,25 @@
+# Day-0 event history → Iceberg (Polaris REST catalog on SeaweedFS). PDF §1.1 Edge→Lakehouse < 3 s.
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata: { name: event-archive }
+spec:
+  image: ghcr.io/pratikmohanty1294/difme-flink-jobs:0.1.0
+  flinkVersion: v2_2
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "1"
+    execution.checkpointing.dir: s3://flink/checkpoints/event-archive
+    s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333
+    s3.path.style.access: "true"
+  serviceAccount: flink
+  podTemplate:
+    spec:
+      containers:
+        - name: flink-main-container
+          env:
+            - { name: POLARIS_CREDENTIAL, valueFrom: { secretKeyRef: { name: polaris-client, key: credential } } }
+            - { name: AWS_ACCESS_KEY_ID, valueFrom: { secretKeyRef: { name: flink-s3, key: access-key } } }
+            - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: flink-s3, key: secret-key } } }
+            - { name: AWS_REGION, value: local }
+  jobManager: { resource: { memory: 768m, cpu: 0.2 } }
+  taskManager: { resource: { memory: 1024m, cpu: 0.3 } }
+  job: { jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar, entryClass: dev.difme.flink.archive.EventArchiveJob, parallelism: 1, upgradeMode: savepoint }

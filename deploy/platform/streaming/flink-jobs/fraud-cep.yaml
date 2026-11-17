@@ -1,19 +1,19 @@
-# PDF §7.4 L3 — Flink CEP fraud patterns (velocity + geo + amount) and FlinkML online features.
+# PDF §7.4 L3 — Flink CEP fraud patterns (velocity + large amount).
 apiVersion: flink.apache.org/v1beta1
 kind: FlinkDeployment
 metadata: { name: fraud-cep }
 spec:
   image: ghcr.io/pratikmohanty1294/difme-flink-jobs:0.1.0
-  flinkVersion: v1_20
+  flinkVersion: v2_2
   flinkConfiguration:
     taskmanager.numberOfTaskSlots: "1"
     execution.checkpointing.interval: "10s"
     execution.checkpointing.mode: EXACTLY_ONCE
     state.backend.type: rocksdb
-    state.checkpoints.dir: s3://flink/checkpoints/fraud-cep
+    execution.checkpointing.dir: s3://flink/checkpoints/fraud-cep
     s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333
     s3.path.style.access: "true"
   serviceAccount: flink
   jobManager: { resource: { memory: 768m, cpu: 0.2 } }
   taskManager: { resource: { memory: 1024m, cpu: 0.3 } }
-  job: { jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar, entryClass: dev.difme.flink.FraudCepJob, parallelism: 1, upgradeMode: savepoint }
+  job: { jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar, entryClass: dev.difme.flink.fraud.FraudCepJob, parallelism: 1, upgradeMode: savepoint }

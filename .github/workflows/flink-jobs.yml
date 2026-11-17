@@ -1,0 +1,14 @@
+name: flink-jobs
+on:
+  push: { branches: [main], paths: ["analytics/flink-jobs/**", "processes/dmn/**", ".github/workflows/flink-jobs.yml"] }
+  pull_request: { paths: ["analytics/flink-jobs/**", "processes/dmn/**"] }
+permissions: { contents: read }
+jobs:
+  build:
+    name: Build + tests (MiniCluster, embedded DMN)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - run: mvn -B -ntp -f analytics/flink-jobs/pom.xml verify

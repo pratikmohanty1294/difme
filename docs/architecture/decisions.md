@@ -92,7 +92,7 @@ Performance budget (PDF §5.9): each remote's **initial** JS must be ≤ 200 KB 
 **Requirement:** CSV, flat (fixed-width), JSON and Excel files of about 10M records, fully processed in **≤ 5 minutes** (≈ 33k records/s sustained, end to end). Every record is validated against linked records in the database and against DMN business rules.
 
 **Decision:** an **Apache Flink batch job** (operator already deployed) with:
-- **Parallel reading.** File splits for CSV/JSON/fixed-width. Excel goes through Apache POI's streaming reader to Parquet first, because Excel can't be split.
+- **Parallel reading.** File splits for CSV/JSON-lines/fixed-width; every record id is `sha256(file):byteOffset`. Excel goes through Apache POI's streaming reader (`ExcelToCsv`, constant memory) to CSV first, because Excel can't be split.
 - **Hybrid DB validation.**
   - Static reference data (account master, products, limits) is snapshotted into keyed in-memory state at job start, with one partitioned bulk scan.
   - Volatile checks (balances, duplicates, status) are **batched async lookups** (≈1,000 keys per `IN` query) against YugabyteDB follower replicas. There is never one query per record.

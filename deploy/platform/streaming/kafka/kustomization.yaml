@@ -1,1 +1,1 @@
-resources: [kafka.yaml, topics.yaml]
+resources: [kafka.yaml, topics.yaml, topics-bulk.yaml]

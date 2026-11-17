@@ -1,0 +1,13 @@
+# Trino → Iceberg (Polaris catalog). Credentials from env in-cluster; `dbt parse` in CI needs no connection.
+difme:
+  target: cluster
+  outputs:
+    cluster:
+      type: trino
+      method: none
+      host: "{{ env_var('TRINO_HOST', 'trino.lakehouse.svc') }}"
+      port: 8080
+      user: dbt
+      catalog: iceberg
+      schema: analytics
+      threads: 4

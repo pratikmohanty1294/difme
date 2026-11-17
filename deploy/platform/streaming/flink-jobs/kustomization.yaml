@@ -1,1 +1,1 @@
-resources: [fraud-cep.yaml, iceberg-sink.yaml]
+resources: [fraud-cep.yaml, event-archive.yaml, service-account.yaml]

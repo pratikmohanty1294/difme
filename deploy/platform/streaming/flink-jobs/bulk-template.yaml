@@ -1,0 +1,32 @@
+# ADR-011 — one FlinkDeployment per uploaded file (application mode, BATCH). Not applied by Argo CD:
+# the bulk upload API renders it with the file path and run id. Example for a manual run:
+#   sed 's#__INPUT__#s3://uploads/2026-11-17/payments.csv#; s#__RUN__#run-001#' bulk-template.yaml | kubectl apply -f -
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata: { name: bulk-__RUN__, namespace: streaming, labels: { difme/bulk-run: __RUN__ } }
+spec:
+  image: ghcr.io/pratikmohanty1294/difme-flink-jobs:0.1.0
+  flinkVersion: v2_2
+  mode: native
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "2"
+    execution.runtime-mode: BATCH
+    s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333
+    s3.path.style.access: "true"
+  serviceAccount: flink
+  podTemplate:
+    spec:
+      containers:
+        - name: flink-main-container
+          env:
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: bulk-db, key: password } } }
+  jobManager: { resource: { memory: 1024m, cpu: 0.5 } }
+  taskManager: { replicas: 2, resource: { memory: 3072m, cpu: 2 } }
+  job:
+    jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar
+    entryClass: dev.difme.flink.bulk.BulkFileJob
+    parallelism: 4
+    upgradeMode: stateless
+    args: ["--input", "__INPUT__", "--out-dir", "s3://bulk/__RUN__", "--valid-sink", "kafka",
+           "--jdbc-url", "jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme", "--jdbc-user", "difme_bulk",
+           "--jdbc-password", "${DB_PASSWORD}", "--batch", "1000", "--parallelism", "4"]

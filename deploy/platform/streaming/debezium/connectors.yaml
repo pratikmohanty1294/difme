@@ -22,13 +22,11 @@ spec:
     transforms.outbox.table.field.event.payload: payload
     transforms.outbox.route.by.field: aggregate_type
     transforms.outbox.route.topic.replacement: "${routedByValue}.events.v1"
-    transforms.outbox.table.fields.additional.placement: "trace_id:header:traceparent,event_timestamp:header:event_timestamp"
-    value.converter: io.debezium.converters.CloudEventsConverter
-    value.converter.serializer.type: avro
-    value.converter.data.serializer.type: avro
-    value.converter.avro.apicurio.registry.url: http://apicurio-registry:8080/apis/registry/v2
-    value.converter.extension.attributes.enable: true
-    value.converter.metadata.source: "value,id:header,type:header,traceparent:header"
+    # Binary-mode CloudEvents: ce_* attributes in Kafka headers, JSON domain payload as the value (api/asyncapi).
+    transforms.outbox.table.fields.additional.placement: "id:header:ce_id,type:header:ce_type,trace_id:header:traceparent,event_timestamp:header:ce_eventtimestamp"
+    transforms.outbox.table.expand.json.payload: false
+    value.converter: org.apache.kafka.connect.storage.StringConverter
+    header.converter: org.apache.kafka.connect.storage.StringConverter
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnector

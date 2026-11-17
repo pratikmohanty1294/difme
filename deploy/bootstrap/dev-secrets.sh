@@ -47,4 +47,10 @@ APISIX_OIDC=$(rand 32)
 secret security      keycloak admin-password="$(rand)" apisix-client-secret="$APISIX_OIDC"
 secret security      postgres-docdb password="$PG_DOCDB"
 secret back-office-ui apisix-oidc client-secret="$APISIX_OIDC"
+POLARIS_CRED="root:$(rand)"
+for n in streaming lakehouse; do
+  secret $n polaris-client credential="$POLARIS_CRED"
+  secret $n flink-s3 access-key="$S3_KEY" secret-key="$S3_SECRET"
+done
+secret streaming     bulk-db password="$YB"
 echo "Dev secrets ready. Read one with: kubectl -n <ns> get secret <name> -o jsonpath='{.data.<key>}' | base64 -d"

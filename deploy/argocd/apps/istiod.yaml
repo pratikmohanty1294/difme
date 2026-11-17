@@ -29,9 +29,9 @@ spec:
         factor: 2
         maxDuration: 3m
   sources:
-  - repoURL: https://istio-release.storage.googleapis.com/charts
+  - repoURL: https://blob.istio.io/istio-release/charts
     chart: istiod
-    targetRevision: 1.25.1
+    targetRevision: 1.32.0
     helm:
       releaseName: istiod
       valueFiles:

@@ -17,3 +17,6 @@ grafana:
   resources: { requests: { cpu: 50m, memory: 128Mi } }
 kube-state-metrics: { resources: { requests: { cpu: 10m, memory: 32Mi } } }
 prometheus-node-exporter: { resources: { requests: { cpu: 10m, memory: 32Mi } } }
+# bitnami/kubectl was withdrawn; the CRD cleanup hook uses the upstream kubectl image (knowledge-base/gitops.md).
+victoria-metrics-operator:
+  crds: { cleanup: { image: { repository: registry.k8s.io/kubectl, tag: v1.32.3 } } }

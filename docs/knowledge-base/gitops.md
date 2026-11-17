@@ -40,3 +40,12 @@
 - A `ReplacePrefixMatch` URL rewrite needs exactly **one** PathPrefix match per rule.
 - `ReplacePrefixMatch` replaces the whole matched prefix: `/api/settlements` → `/v1/settlements`, not `/v1`.
 - `BackendTrafficPolicy` local rate-limit `clientSelectors` take headers/CIDRs, not paths. For per-API limits, use one HTTPRoute per API with its own policy.
+
+### Istio charts: repo returns 403
+- **Root cause:** Istio moved its Helm repo from `istio-release.storage.googleapis.com/charts` to `https://blob.istio.io/istio-release/charts`. The old bucket returns 403, and `oci://gcr.io/istio-release/charts` fails too.
+- **Fix:** new repo, and bumped to 1.32.0.
+- **Prevention:** CI's "Helm charts resolve at pinned versions" gate caught it. When a repo fails, check the project's install docs before trying alternatives.
+
+### Withdrawn `bitnami/kubectl`, round two
+- VictoriaMetrics k8s-stack (`victoria-metrics-operator.crds.cleanup.image`) and Velero (`kubectl.image`) render it in hook Jobs. Both now use `registry.k8s.io/kubectl:v1.32.3`.
+- The CI guard catches these, so any new chart that runs kubectl hooks needs the same override.

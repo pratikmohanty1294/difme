@@ -22,7 +22,7 @@ jobs:
           - { module: rate-limiter,       fdb: "false", native: true }
           - { module: projection-svc,     fdb: "false", native: true }
           - { module: replay-engine,      fdb: "false", native: true }
-          - { module: process-gateway,    fdb: "false", native: true }
+          - { module: process-gateway,    fdb: "false", native: false }   # Temporal SDK shaded Netty is not native-image clean
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-${{ matrix.module }}

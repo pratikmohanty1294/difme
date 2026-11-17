@@ -111,6 +111,9 @@ Performance budget (PDF §5.9): each remote's **initial** JS must be ≤ 200 KB 
 **Runtimes (hybrid):**
 | Services | Runtime | Why |
 |---|---|---|
-| rate-limiter, consistency-router, projection-svc, replay-engine, process-gateway | **Native image** (Mandrel, GPLv2+CE) | ~25–50 MB RSS, ~50 ms start; these are I/O-bound, so JIT peak speed matters little |
-| cmd-svc, qry-svc, saga-orchestrator, rehydration-svc | **JVM 25 + AOT cache** (JEP 483/514/515), compact object headers, tuned GC | Hot paths keep JIT peak throughput; JNI clients (TigerBeetle, FoundationDB) and Temporal are simpler on the JVM; the AOT cache removes most warm-up |
+| rate-limiter, consistency-router, projection-svc, replay-engine | **Native image** (Mandrel, GPLv2+CE) | ~25–50 MB RSS, ~50 ms start; these are I/O-bound, so JIT peak speed matters little |
+| cmd-svc, qry-svc, saga-orchestrator, rehydration-svc, process-gateway | **JVM 25 + AOT cache** (JEP 483/514/515), compact object headers, tuned GC | Hot paths keep JIT peak throughput; JNI clients (TigerBeetle, FoundationDB) and Temporal are simpler on the JVM; the AOT cache removes most warm-up |
 Each service's RSS, startup and throughput are recorded by CI and compared against the previous build.
+
+**Measured (CI, 2026-11-17):** native images built for rate-limiter, consistency-router, projection-svc and replay-engine. process-gateway moved to JVM + AOT cache: the Temporal SDK's shaded gRPC/Netty fails native-image analysis (`ApplicationProtocolConfig` in the image heap). Revisit once the SDK ships native-image metadata.
+Bulk benchmark (ADR-011), 10M records with DB + DMN validation on a 4-vCPU runner: **855 s → 56 s (178,571 records/s)** after the JVM-shared account snapshot, memoised DMN, flat POJO records and per-partition counting.

@@ -49,7 +49,7 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 4.5 | Financial message / scenario simulators | **jPOS** ISO 8583 simulator + scenario runner | `tests/simulator/` |
 | 4.5 | Tekton | Tekton pipelines (on-cluster mirror of GitHub Actions) | `deploy/platform/tekton/` |
 | 4.6 | Cilium eBPF kube-proxy replacement, Hubble | Same (k3d with flannel disabled) | `deploy/platform/cilium/` |
-| 5.1 | Vue 3 + Rust (uniffi) app → **Tauri 2 mobile** (ADR-005), WasmEdge 0.14 + ONNX, automerge-rs CRDT, StrongBox/KeyMint/Blake3, HCE HostApduService, WorkManager | Same | `edge/` |
+| 5.1 | Vue 3 + Rust (uniffi) app → **Tauri 2 mobile** (ADR-005), **Wasmtime** WASI P2 components (ADR-016) + ONNX, automerge-rs CRDT, StrongBox/KeyMint/Blake3, HCE HostApduService, WorkManager | Same | `edge/` |
 | 5.2 | Quinn hub, session manager, telemetry relay, tonic gRPC bridge, live dashboard relay, rustls+SPIRE, Pyroscope Rust | Same | `services/hub/` |
 | 5.3 | quarkus-cmd-svc, qry-svc, saga-orchestrator, consistency-router, rate-limiter, rehydration-svc | Same, on **Java 25 LTS** (ADR-005) | `services/core/` |
 | 5.4 | Hibernate 6 + Panache, outbox, MyBatis, Caffeine L1, Redisson JCache L2 | Same (L2 on Valkey) | `services/core/` |
@@ -96,7 +96,7 @@ backoffice/      Turborepo micro-frontends
 config/          Feature flags, consistency profiles
 deploy/          Argo CD apps, Helm values, Kustomize overlays, profiles
 docs/            Architecture, decisions, runbooks
-edge/            Mobile app, Rust CRDT core, WasmEdge fraud model
+edge/            Mobile app, Rust CRDT core, Wasmtime plug-ins, ONNX fraud model
 infra/           Terraform modules (cloud scenario B/C)
 ml/              Fraud model training → ONNX, Feast definitions
 policies/        Kyverno, OPA Rego, Semgrep rules

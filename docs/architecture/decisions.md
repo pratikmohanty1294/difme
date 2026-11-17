@@ -152,3 +152,8 @@ Kept on purpose:
 - **Trino + StarRocks:** federated SQL vs OLAP.
 - **Loki/Tempo/Pyroscope:** logs, traces, profiles.
 - **Harbor/Tekton/Fleet/external-dns:** the owner had no preference.
+
+## ADR-016 — WASI Preview 2 plug-ins on Wasmtime; CRDT merge verified (owner-approved 2026-11-18)
+- **Promoted from PDF §17 (v2.0).** Sandboxed plug-in logic (fraud rules, limit checks) ships as WASI Preview 2 components. They run on **Wasmtime** (Bytecode Alliance, Apache-2.0), embedded in Rust in the Tauri edge app and the QUIC hub.
+- **Why not WasmEdge (the PDF's choice):** Wasmtime is the reference implementation of WASI Preview 2 and the component model, so it has the most complete support; WasmEdge's lags.
+- **Also promoted:** `specs/tla/CrdtMerge.tla` verifies offline edge spending as an escrow ("bounded counter") CRDT. The edge's automerge document carries this counter. A mutation test confirms the spec catches overspending.

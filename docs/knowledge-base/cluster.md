@@ -62,3 +62,13 @@
 - **Root cause:** the Codespace's 32 GB persistent disk was 92% full. 14 GB of it was container image layers inside the k3d node, which are re-fetchable and already stored a second time in the registry caches. Real volume data was 1.2 GB.
 - **Fix:** `make cluster` bind-mounts the node's containerd store on the large ephemeral disk (`/tmp`, 118 GB). PVs and registry caches stay persistent; after a Codespace stop, layers re-pull from the local caches.
 - **Prevention:** `df -h /` belongs in every "why is X failing" check; databases refuse writes well before 100%.
+
+### k3d create hung at "Starting node server-0"
+- **Symptom:** kubelet exited with `unknown flag: --max-parallel-image-pulls`.
+- **Root cause:** `maxParallelImagePulls` is a KubeletConfiguration field, not a flag. The setting was added after the last cluster creation, so it was never exercised.
+- **Fix:** a kubelet drop-in, `deploy/bootstrap/kubelet-difme.conf`, mounted into `/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/` (k3s ≥ 1.32).
+- **Prevention:** bootstrap changes aren't validated until a cluster is created; recreate after changing them.
+
+### Long jobs died with the SSH session
+- **Root cause:** `gh codespace ssh` drops after long idle periods, killing foreground `make` runs.
+- **Fix:** start long jobs with `nohup … &` in the Codespace and poll the log instead.

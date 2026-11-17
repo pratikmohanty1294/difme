@@ -30,6 +30,7 @@ cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (i
 	mkdir -p $(IMAGE_DISK)/containerd
 	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml \
 	  --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:* \
+	  --volume $(CURDIR)/deploy/bootstrap/kubelet-difme.conf:/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/50-difme.conf@server:* \
 	  --volume $(IMAGE_DISK)/containerd:/var/lib/rancher/k3s/agent/containerd@server:*
 	bash deploy/bootstrap/install.sh $(REPO)
 	bash deploy/bootstrap/dev-secrets.sh

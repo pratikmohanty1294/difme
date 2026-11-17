@@ -24,9 +24,8 @@ options:
       - { arg: --disable=servicelb,         nodeFilters: [server:*] }
       - { arg: --secrets-encryption,        nodeFilters: [server:*] }
       - { arg: --resolv-conf=/etc/difme/resolv.conf, nodeFilters: [server:*] }   # pods' upstream DNS (verified live)
-      # Network I/O: parallel image pulls capped at 3 so one 2 GB image can't block the rest or saturate the link.
-      - { arg: --kubelet-arg=serialize-image-pulls=false, nodeFilters: [server:*] }
-      - { arg: --kubelet-arg=max-parallel-image-pulls=3,  nodeFilters: [server:*] }
+      # Parallel image pulls (capped at 3) are set in deploy/bootstrap/kubelet-difme.conf, a kubelet drop-in mounted by
+      # `make cluster`: maxParallelImagePulls is a KubeletConfiguration field, not a kubelet flag (found live).
 # Pull-through image caches (created by `make registries`, kept across cluster rebuilds): a rebuilt cluster pulls
 # from local disk instead of re-downloading several GB (ADR-012).
 registries:

@@ -1,9 +1,13 @@
 # formio API server built from the vendored, pinned source (ADR-008). Context: vendor/formio/server.
-FROM node:22-bookworm-slim AS build
+# Upstream ships no lockfile at the tag; dependencies resolve at build time and the exact tree is captured
+# in the Syft SBOM attached to the image.
+FROM node:22-bookworm AS build
 WORKDIR /app
-COPY package.json yarn.lock* package-lock.json* ./
-RUN corepack enable && if [ -f yarn.lock ]; then yarn install --frozen-lockfile --production --ignore-scripts; else npm ci --omit=dev --ignore-scripts; fi
-COPY . .
+COPY package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+COPY src/ ./src/
+COPY config/ ./config/
+COPY *.js *.txt default-template.json ./
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production PORT=3001

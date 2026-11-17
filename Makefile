@@ -5,7 +5,12 @@ PROFILE ?= core
 REPO    ?= https://github.com/pratikmohanty1294/difme.git
 APPS     = $(shell cat deploy/profiles/$(PROFILE).txt 2>/dev/null | grep -v '^\#')
 
-.PHONY: help cluster destroy up down status ui verify test build tla lint
+.PHONY: help cluster destroy up down status ui verify test build tla lint check
+AREA    ?= all
+MODULES ?=
+
+check:           ## Fast pre-push checks for one area: make check AREA=core MODULES=cmd-svc
+	bash ci/check.sh $(AREA) $(MODULES)
 
 help:            ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n",$$1,$$2}'

@@ -15,6 +15,10 @@ WORKDIR /repo/backoffice
 RUN pnpm install --no-frozen-lockfile && pnpm turbo run build --filter "@difme/${APP}"
 
 FROM nginxinc/nginx-unprivileged:1.31.7-alpine
+# Pull fixed OS packages so the Trivy CRITICAL gate passes even when the base image lags behind Alpine fixes.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 ARG APP
 ARG OUT=dist
 COPY --from=build /repo/backoffice/apps/${APP}/${OUT}/ /usr/share/nginx/html/

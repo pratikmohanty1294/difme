@@ -4,7 +4,24 @@ data:
   kustomize.buildOptions: --load-restrictor LoadRestrictionsNone
   # Annotation tracking: Cilium copies pod labels onto CiliumIdentity objects, which confuses label tracking.
   application.resourceTrackingMethod: annotation
+  # ADR-012 efficiency: never watch high-churn objects that Argo CD doesn't manage. Their constant status updates were
+  # triggering ~300m CPU reconcile bursts every few seconds on the live cluster.
   resource.exclusions: |
     - apiGroups: [cilium.io]
-      kinds: [CiliumIdentity]
+      kinds: [CiliumIdentity, CiliumEndpoint, CiliumEndpointSlice, CiliumNode]
       clusters: ["*"]
+    - apiGroups: [wgpolicyk8s.io, reports.kyverno.io]
+      kinds: ["*"]
+      clusters: ["*"]
+    - apiGroups: [kyverno.io]
+      kinds: [UpdateRequest]
+      clusters: ["*"]
+    - apiGroups: [status.gatekeeper.sh]
+      kinds: ["*"]
+      clusters: ["*"]
+    - apiGroups: [coordination.k8s.io, discovery.k8s.io, events.k8s.io, ""]
+      kinds: [Lease, EndpointSlice, Event, Endpoints]
+      clusters: ["*"]
+  # Status-only changes on managed resources don't trigger a reconcile.
+  resource.ignoreResourceUpdatesEnabled: "true"
+  timeout.reconciliation: 300s

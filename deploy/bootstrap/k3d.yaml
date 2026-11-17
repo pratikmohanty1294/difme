@@ -11,6 +11,10 @@ ports:
   - port: 4443:4443/udp      # QUIC / WebTransport direct path to the Quinn hub
     nodeFilters: [loadbalancer]
 options:
+  # YugabyteDB, Kafka and Cassandra need high open-file limits; Docker's default (1024) fails YugabyteDB's preflight (found live).
+  runtime:
+    ulimits:
+      - { name: nofile, soft: 1048576, hard: 1048576 }
   k3s:
     extraArgs:
       # Cilium replaces flannel and kube-proxy (PDF §4.6). Traefik and ServiceLB are replaced by ingress-nginx and MetalLB.

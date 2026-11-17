@@ -1,0 +1,11 @@
+{
+  "oidc": { "authority": "https://id.difme.local/realms/difme", "clientId": "backoffice" },
+  "ofrepUrl": "/api/flags",
+  "remotes": [
+    { "id": "settlements", "label": "Settlements", "kind": "mf", "entry": "/remotes/settlements/mf-manifest.json", "module": "./App", "flag": "backoffice-module-settlements", "groups": ["settlements", "ops"] },
+    { "id": "compliance", "label": "Compliance & Audit", "kind": "mf-mount", "entry": "/remotes/compliance/mf-manifest.json", "module": "./mount", "flag": "backoffice-module-compliance", "groups": ["compliance", "audit"] },
+    { "id": "analytics", "label": "Analytics", "kind": "element", "entry": "/remotes/analytics/main.js", "tag": "difme-analytics", "flag": "backoffice-module-analytics", "groups": ["analytics", "ops"] },
+    { "id": "process-studio", "label": "Process Studio", "kind": "mf", "entry": "/remotes/process-studio/mf-manifest.json", "module": "./App", "groups": ["process-designers", "compliance", "ops"] },
+    { "id": "form-builder", "label": "Form Builder", "kind": "mf", "entry": "/remotes/form-builder/mf-manifest.json", "module": "./App", "groups": ["process-designers"] }
+  ]
+}

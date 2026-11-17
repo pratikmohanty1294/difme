@@ -1,0 +1,23 @@
+{
+  "name": "@difme/compliance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "rsbuild dev", "build": "rsbuild build", "typecheck": "svelte-check" },
+  "dependencies": {
+    "@difme/auth": "workspace:*",
+    "@difme/tokens": "workspace:*",
+    "svelte": "5.57.3",
+    "zustand": "5.1.0"
+  },
+  "devDependencies": {
+    "@module-federation/rsbuild-plugin": "2.9.3",
+    "@rsbuild/core": "2.3.3",
+    "@rsbuild/plugin-svelte": "2.0.1",
+    "@tailwindcss/postcss": "4.3.5",
+    "tailwindcss": "4.3.5",
+    "@tsconfig/svelte": "5.0.9",
+    "svelte-check": "4.7.8",
+    "typescript": "6.0.3"
+  }
+}

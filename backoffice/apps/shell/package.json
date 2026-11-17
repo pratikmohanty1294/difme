@@ -1,0 +1,28 @@
+{
+  "name": "@difme/shell",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "rsbuild dev", "build": "rsbuild build", "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@difme/auth": "workspace:*",
+    "@difme/tokens": "workspace:*",
+    "@difme/ui": "workspace:*",
+    "@module-federation/enhanced": "2.9.3",
+    "@openfeature/ofrep-web-provider": "0.4.3",
+    "@openfeature/web-sdk": "1.10.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zustand": "5.1.0"
+  },
+  "devDependencies": {
+    "@module-federation/rsbuild-plugin": "2.9.3",
+    "@rsbuild/core": "2.3.3",
+    "@rsbuild/plugin-react": "2.1.1",
+    "@tailwindcss/postcss": "4.3.5",
+    "tailwindcss": "4.3.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}

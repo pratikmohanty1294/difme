@@ -1,0 +1,17 @@
+/* Tailwind CSS 4 theme bound to the shared tokens. */
+@import "tailwindcss";
+@import "./tokens.css";
+@theme {
+  --color-bg: var(--difme-color-bg);
+  --color-surface: var(--difme-color-surface);
+  --color-border: var(--difme-color-border);
+  --color-fg: var(--difme-color-text);
+  --color-muted: var(--difme-color-muted);
+  --color-accent: var(--difme-color-accent);
+  --color-ok: var(--difme-color-ok);
+  --color-warn: var(--difme-color-warn);
+  --color-danger: var(--difme-color-danger);
+  --radius-card: var(--difme-radius);
+  --font-sans: var(--difme-font);
+  --font-mono: var(--difme-font-mono);
+}

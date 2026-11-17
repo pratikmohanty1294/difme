@@ -1,0 +1,27 @@
+# Builds every micro-frontend and enforces the PDF §5.9 performance budget (≤200 KB gz initial JS per remote).
+name: backoffice
+on:
+  push: { branches: [main], paths: ["backoffice/**", "vendor/formio/js/**", ".github/workflows/backoffice.yml"] }
+  pull_request: { paths: ["backoffice/**", "vendor/formio/js/**"] }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Build vendored formio.js
+        working-directory: vendor/formio/js
+        run: npm install --no-audit --no-fund && npm run lib && npm run dist
+      - run: corepack enable
+      - working-directory: backoffice
+        run: pnpm install --no-frozen-lockfile
+      - working-directory: backoffice
+        run: pnpm turbo run build
+      - name: Bundle budget (hard gate)
+        working-directory: backoffice
+        run: pnpm bundle-budget
+      - name: Storybook builds
+        working-directory: backoffice
+        run: pnpm --filter @difme/ui build-storybook

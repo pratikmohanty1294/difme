@@ -45,6 +45,12 @@ spec:
     plugin.name: yboutput
     topic.prefix: settlements
     table.include.list: settlement.reservation,settlement.instruction
+    transforms: route
+    transforms.route.type: org.apache.kafka.connect.transforms.RegexRouter
+    transforms.route.regex: ".*"
+    transforms.route.replacement: settlements.cdc.v1
+    # Structured-mode JSON CloudEvents so RisingWave can read the envelope directly (analytics/risingwave).
     value.converter: io.debezium.converters.CloudEventsConverter
-    value.converter.serializer.type: avro
-    value.converter.avro.apicurio.registry.url: http://apicurio-registry:8080/apis/registry/v2
+    value.converter.serializer.type: json
+    value.converter.data.serializer.type: json
+    value.converter.extension.attributes.enable: true

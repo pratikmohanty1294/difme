@@ -11,6 +11,8 @@
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
     <dependency><groupId>io.quarkiverse.mybatis</groupId><artifactId>quarkus-mybatis</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-mariadb</artifactId></dependency>
+    <dependency><groupId>io.trino</groupId><artifactId>trino-jdbc</artifactId><version>484</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-redis-client</artifactId></dependency>
     <dependency><groupId>com.github.ben-manes.caffeine</groupId><artifactId>caffeine</artifactId></dependency>
     <dependency><groupId>com.tigerbeetle</groupId><artifactId>tigerbeetle-java</artifactId></dependency>

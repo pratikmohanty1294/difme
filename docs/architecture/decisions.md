@@ -74,3 +74,16 @@ Applying the rule:
 | Airbyte (PDF §5.5) | Platform under Elastic License v2 | **Apache SeaTunnel** (Apache-2.0): 100+ connectors incl. CDC, Zeta engine or Flink, web UI |
 
 Unavoidable platform quota: GitHub Codespaces' free hours (Actions is unlimited for public repositories). No free hosting removes this.
+
+## ADR-010 — Back-office stack and identity (owner-approved 2026-11-17)
+| Concern | Decision | Licence |
+|---|---|---|
+| Identity provider (OIDC/SAML, LDAP federation, RBAC — PDF §4.1 "LDAP/OIDC") | **Keycloak 26.8.2**, realm `difme` with groups compliance / settlements / analytics / ops / process-designers | Apache-2.0 |
+| Shell + React remotes | React 19.3, Module Federation 2.9 on Rsbuild/Rspack, TanStack Query, Zustand, Tailwind CSS 4 tokens | MIT |
+| Compliance remote | **Svelte 5** exposed through Module Federation as a `mount(el, props)` function. SvelteKit's SSR router is not used inside a federated remote. | MIT |
+| Analytics remote | **Angular 22** (latest; the plan said 20) + ECharts 6, shipped as an Angular Elements web component `<difme-analytics>` loaded by the shell's remote registry. Angular's builder is not Rspack, so a framework-neutral custom element is the integration contract. | MIT / Apache-2.0 |
+| Process Studio / form builder | Apache KIE BPMN/DMN standalone editors 10.2 (lazy-loaded); vendored formio.js builder/renderer | Apache-2.0 / MIT |
+| Auth in browser | oidc-client-ts (Authorization Code + PKCE); the token is shared with remotes through the singleton `@difme/auth` store | Apache-2.0 |
+| Feature flags in browser | OpenFeature web SDK + OFREP provider → flagd | Apache-2.0 |
+
+Performance budget (PDF §5.9): each remote's **initial** JS must be ≤ 200 KB compressed (CI gate). The KIE editors and the formio builder are larger, so they load lazily on first use and are excluded from the initial budget.

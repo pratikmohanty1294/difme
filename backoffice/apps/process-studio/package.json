@@ -1,0 +1,29 @@
+{
+  "name": "@difme/process-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "rsbuild dev", "build": "rsbuild build", "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@difme/auth": "workspace:*",
+    "@difme/tokens": "workspace:*",
+    "@difme/ui": "workspace:*",
+    "@formio/js": "link:../../../vendor/formio/js",
+    "@kie-tools/bpmn-editor-standalone": "10.2.0",
+    "@kie-tools/dmn-editor-standalone": "10.2.0",
+    "@tanstack/react-query": "5.107.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zustand": "5.1.0"
+  },
+  "devDependencies": {
+    "@module-federation/rsbuild-plugin": "2.9.3",
+    "@rsbuild/core": "2.3.3",
+    "@rsbuild/plugin-react": "2.1.1",
+    "@tailwindcss/postcss": "4.3.5",
+    "tailwindcss": "4.3.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}

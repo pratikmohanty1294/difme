@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "projects",
+  "cli": { "analytics": false, "packageManager": "pnpm" },
+  "projects": {
+    "analytics": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist",
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "styles": ["src/styles.css"],
+            "outputHashing": "none",
+            "baseHref": "/remotes/analytics/",
+            "budgets": [{ "type": "initial", "maximumError": "200kb" }]
+          },
+          "configurations": { "production": { "optimization": true } },
+          "defaultConfiguration": "production"
+        },
+        "serve": { "builder": "@angular/build:dev-server", "options": { "buildTarget": "analytics:build" } }
+      }
+    }
+  }
+}

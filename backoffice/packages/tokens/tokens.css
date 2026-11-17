@@ -1,0 +1,25 @@
+/* Shared design tokens (PDF §5.9 shared design system). Framework-neutral CSS variables used by React, Svelte and Angular. */
+:root {
+  --difme-color-bg: #0b1020;
+  --difme-color-surface: #121a2f;
+  --difme-color-border: #24304f;
+  --difme-color-text: #e6ebf5;
+  --difme-color-muted: #93a0bd;
+  --difme-color-accent: #4f8cff;
+  --difme-color-ok: #2fbf71;
+  --difme-color-warn: #f2b33d;
+  --difme-color-danger: #ef5b5b;
+  --difme-radius: 8px;
+  --difme-space: 8px;
+  --difme-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --difme-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --difme-color-bg: #f6f8fc;
+    --difme-color-surface: #ffffff;
+    --difme-color-border: #d9e0ee;
+    --difme-color-text: #121a2f;
+    --difme-color-muted: #5b6886;
+  }
+}

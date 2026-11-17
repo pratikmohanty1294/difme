@@ -58,8 +58,6 @@ public interface FluxnovaClient {
     void completeTask(@PathParam("id") String id, CompleteTask body);
 
     default String basicAuth() {
-        var c = ConfigProvider.getConfig();
-        String raw = c.getValue("difme.fluxnova.user", String.class) + ":" + c.getOptionalValue("difme.fluxnova.password", String.class).orElse("");
-        return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+        return EngineAuth.basic();
     }
 }

@@ -5,7 +5,7 @@ PROFILE ?= core
 REPO    ?= https://github.com/pratikmohanty1294/difme.git
 APPS     = $(shell cat deploy/profiles/$(PROFILE).txt 2>/dev/null | grep -v '^\#')
 
-.PHONY: help cluster destroy up down status ui verify test build tla lint check
+.PHONY: help registries cluster destroy up down status ui verify test build tla lint check
 AREA    ?= all
 MODULES ?=
 
@@ -16,7 +16,14 @@ help:            ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n",$$1,$$2}'
 	@echo "  Profiles: $$(ls deploy/profiles | sed 's/.txt//' | tr '\n' ' ')"
 
-cluster:         ## Create the k3d cluster: Cilium (kube-proxy replacement), Argo CD, dev secrets
+registries:      ## Persistent pull-through image caches (survive `make destroy`)
+	@for r in dockerio=https://registry-1.docker.io ghcr=https://ghcr.io quay=https://quay.io k8s=https://registry.k8s.io; do \
+	  name=difme-$${r%%=*}; url=$${r#*=}; \
+	  if k3d registry list -o json 2>/dev/null | grep -q "k3d-$$name\""; then echo "registry cache: $$name (exists)"; \
+	  else k3d registry create $$name --port 0 --proxy-remote-url $$url -v $$name-cache:/var/lib/registry >/dev/null && echo "registry cache: $$name -> $$url (created)"; fi; \
+	done
+
+cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (images via local caches)
 	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:*
 	bash deploy/bootstrap/install.sh $(REPO)
 	bash deploy/bootstrap/dev-secrets.sh

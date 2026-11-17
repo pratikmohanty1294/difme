@@ -20,3 +20,13 @@ options:
       - { arg: --disable=servicelb,         nodeFilters: [server:*] }
       - { arg: --secrets-encryption,        nodeFilters: [server:*] }
       - { arg: --resolv-conf=/etc/difme/resolv.conf, nodeFilters: [server:*] }   # pods' upstream DNS (verified live)
+# Pull-through image caches (created by `make registries`, kept across cluster rebuilds): a rebuilt cluster pulls
+# from local disk instead of re-downloading several GB (ADR-012).
+registries:
+  use: [k3d-difme-dockerio:5000, k3d-difme-ghcr:5000, k3d-difme-quay:5000, k3d-difme-k8s:5000]
+  config: |
+    mirrors:
+      "docker.io":       { endpoint: ["http://k3d-difme-dockerio:5000"] }
+      "ghcr.io":         { endpoint: ["http://k3d-difme-ghcr:5000"] }
+      "quay.io":         { endpoint: ["http://k3d-difme-quay:5000"] }
+      "registry.k8s.io": { endpoint: ["http://k3d-difme-k8s:5000"] }

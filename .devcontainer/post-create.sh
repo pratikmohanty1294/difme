@@ -28,6 +28,7 @@ step wasmedge   bash -c "curl -fsSL https://raw.githubusercontent.com/WasmEdge/W
 step semgrep    pipx install semgrep==1.108.0
 step dbt        bash -c "pipx install dbt-core==1.12.7 && pipx inject dbt-core dbt-trino==1.12.0"
 step rust-targets rustup target add wasm32-wasip1 aarch64-linux-android
+step python-libs pip install --user --quiet pyyaml==6.0.2
 step npm-tools  npm i -g @asyncapi/cli@2.16.0 newman@6.2.1 @stoplight/spectral-cli@6.14.2
 
 if [ ${#failed[@]} -eq 0 ]; then

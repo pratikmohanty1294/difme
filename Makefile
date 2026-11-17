@@ -35,14 +35,14 @@ ui:              ## Port-forward Argo CD, Grafana and Temporal UIs
 	kubectl -n temporal port-forward svc/temporal-web 8233:8080 & wait
 
 build:           ## Build all services
-	cd services/core && ./mvnw -q -B package -DskipTests
+	mvn -q -B -f services/core/pom.xml package -DskipTests
 	cd services/hub && cargo build --release
 	cd services/attestation && cargo build --release
 	cd edge/core && cargo build --release
 	cd backoffice && pnpm install && pnpm turbo build
 
 test:            ## Unit plus contract tests
-	cd services/core && ./mvnw -q -B verify
+	mvn -q -B -f services/core/pom.xml verify
 	cd services/hub && cargo test
 	cd edge/core && cargo test
 	cd backoffice && pnpm turbo test

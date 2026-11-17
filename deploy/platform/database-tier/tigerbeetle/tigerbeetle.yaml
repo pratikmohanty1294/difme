@@ -11,12 +11,12 @@ spec:
     spec:
       initContainers:
         - name: format
-          image: ghcr.io/tigerbeetle/tigerbeetle:0.16.30
+          image: ghcr.io/tigerbeetle/tigerbeetle:0.16.78
           command: [sh, -c, "[ -f /data/0_0.tigerbeetle ] || /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 /data/0_0.tigerbeetle"]
           volumeMounts: [{ name: data, mountPath: /data }]
       containers:
         - name: tigerbeetle
-          image: ghcr.io/tigerbeetle/tigerbeetle:0.16.30
+          image: ghcr.io/tigerbeetle/tigerbeetle:0.16.78
           args: [start, --addresses=0.0.0.0:3000, --cache-grid=256MiB, /data/0_0.tigerbeetle]
           ports: [{ containerPort: 3000 }]
           securityContext: { capabilities: { add: [IPC_LOCK] } }   # io_uring + locked memory

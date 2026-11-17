@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PDF §5.3 — Quarkus CQRS engine on Java 25 LTS (ADR-005). -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>dev.difme</groupId>
+  <artifactId>difme-core</artifactId>
+  <version>0.1.0</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>common</module>
+    <module>consistency</module>
+    <module>cmd-svc</module>
+    <module>qry-svc</module>
+    <module>saga-orchestrator</module>
+    <module>consistency-router</module>
+    <module>rate-limiter</module>
+    <module>projection-svc</module>
+    <module>rehydration-svc</module>
+    <module>replay-engine</module>
+  </modules>
+
+  <properties>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <quarkus.platform.version>3.40.1</quarkus.platform.version>
+    <tigerbeetle.version>0.16.78</tigerbeetle.version>
+    <fdb.version>7.3.81</fdb.version>
+    <temporal.version>1.41.1</temporal.version>
+    <openfeature.version>1.23.0</openfeature.version>
+    <flagd.version>0.15.0</flagd.version>
+    <mybatis.version>2.4.3</mybatis.version>
+    <surefire.version>3.5.3</surefire.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.quarkus.platform</groupId>
+        <artifactId>quarkus-bom</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency><groupId>dev.difme</groupId><artifactId>common</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>dev.difme</groupId><artifactId>consistency</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.tigerbeetle</groupId><artifactId>tigerbeetle-java</artifactId><version>${tigerbeetle.version}</version></dependency>
+      <dependency><groupId>org.foundationdb</groupId><artifactId>fdb-java</artifactId><version>${fdb.version}</version></dependency>
+      <dependency><groupId>io.temporal</groupId><artifactId>temporal-sdk</artifactId><version>${temporal.version}</version></dependency>
+      <dependency><groupId>dev.openfeature</groupId><artifactId>sdk</artifactId><version>${openfeature.version}</version></dependency>
+      <dependency><groupId>dev.openfeature.contrib.providers</groupId><artifactId>flagd</artifactId><version>${flagd.version}</version></dependency>
+      <dependency><groupId>io.quarkiverse.mybatis</groupId><artifactId>quarkus-mybatis</artifactId><version>${mybatis.version}</version></dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>io.quarkus.platform</groupId>
+          <artifactId>quarkus-maven-plugin</artifactId>
+          <version>${quarkus.platform.version}</version>
+          <extensions>true</extensions>
+          <executions>
+            <execution><goals><goal>build</goal><goal>generate-code</goal><goal>generate-code-tests</goal></goals></execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${surefire.version}</version>
+          <configuration>
+            <systemPropertyVariables><java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager></systemPropertyVariables>
+          </configuration>
+        </plugin>
+        <plugin>
+          <!-- gRPC services generate from the shared contracts in api/proto (contract-first, PDF §5.10). -->
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.3.1</version>
+          <executions>
+            <execution>
+              <id>copy-proto</id>
+              <phase>initialize</phase>
+              <goals><goal>copy-resources</goal></goals>
+              <configuration>
+                <outputDirectory>${project.basedir}/src/main/proto</outputDirectory>
+                <resources><resource><directory>${maven.multiModuleProjectDirectory}/../../api/proto</directory><includes><include>**/*.proto</include></includes></resource></resources>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>io.smallrye</groupId>
+          <artifactId>jandex-maven-plugin</artifactId>
+          <version>3.3.0</version>
+          <executions><execution><id>make-index</id><goals><goal>jandex</goal></goals></execution></executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

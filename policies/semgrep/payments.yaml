@@ -1,0 +1,22 @@
+# Payment-specific SAST rules (PDF §4.5).
+rules:
+  - id: difme-money-not-floating-point
+    languages: [java]
+    severity: ERROR
+    message: "Money must be integer minor units, never double/float."
+    pattern-either:
+      - pattern: double $AMOUNT = ...;
+      - pattern: float $AMOUNT = ...;
+    metavariable-regex: { metavariable: $AMOUNT, regex: "(?i).*(amount|balance|price|fee).*" }
+  - id: difme-no-literal-secrets
+    languages: [java]
+    severity: ERROR
+    message: "Credentials must come from OpenBao / config, not literals."
+    pattern-regex: '(?i)(password|secret|api_?key)\s*=\s*"[^"$]{6,}"'
+  - id: difme-idempotency-key-must-be-uuid7
+    languages: [java]
+    severity: WARNING
+    message: "Validate Idempotency-Key with Uuid7.isValid before use."
+    patterns:
+      - pattern: UUID.fromString($KEY)
+      - metavariable-regex: { metavariable: $KEY, regex: "(?i).*idempotency.*" }

@@ -6,9 +6,13 @@ package difme.payments.v1;
 option java_multiple_files = true;
 option java_package = "dev.difme.grpc.payments.v1";
 
+// Served by quarkus-cmd-svc (PDF §7.1).
 service PaymentCommandService {
   rpc SubmitPayment(SubmitPaymentRequest) returns (SubmitPaymentResponse);
-  // Device reconnect: stream CRDT deltas up, receive replayed events down (PDF §7.3).
+}
+
+// Served by rehydration-svc (PDF §7.3): device streams CRDT deltas up, missed events stream down.
+service RehydrationService {
   rpc Rehydrate(stream RehydrateRequest) returns (stream RehydrateResponse);
 }
 

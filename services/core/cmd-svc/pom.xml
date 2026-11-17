@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>dev.difme</groupId><artifactId>difme-core</artifactId><version>0.1.0</version></parent>
+  <artifactId>cmd-svc</artifactId>
+  <description>quarkus-cmd-svc :8080 — command handler, write path, outbox, saga trigger, saga activities (PDF §5.3/§5.4).</description>
+  <dependencies>
+    <dependency><groupId>dev.difme</groupId><artifactId>common</artifactId></dependency>
+    <dependency><groupId>dev.difme</groupId><artifactId>consistency</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-client-jackson</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-grpc</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-hibernate-orm-panache</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-flyway</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-redis-client</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer-registry-prometheus</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-opentelemetry</artifactId></dependency>
+    <dependency><groupId>com.tigerbeetle</groupId><artifactId>tigerbeetle-java</artifactId></dependency>
+    <dependency><groupId>org.foundationdb</groupId><artifactId>fdb-java</artifactId></dependency>
+    <dependency><groupId>io.temporal</groupId><artifactId>temporal-sdk</artifactId></dependency>
+    <dependency><groupId>dev.openfeature</groupId><artifactId>sdk</artifactId></dependency>
+    <dependency><groupId>dev.openfeature.contrib.providers</groupId><artifactId>flagd</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-junit5</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin><artifactId>maven-resources-plugin</artifactId></plugin>
+      <plugin><groupId>io.quarkus.platform</groupId><artifactId>quarkus-maven-plugin</artifactId></plugin>
+      <plugin><artifactId>maven-surefire-plugin</artifactId></plugin>
+    </plugins>
+  </build>
+</project>

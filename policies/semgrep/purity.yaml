@@ -1,0 +1,38 @@
+# PDF §9 — command handlers and projections MUST be pure. Hard merge blocker in CI.
+rules:
+  - id: difme-no-wall-clock-in-pure-code
+    languages: [java]
+    severity: ERROR
+    message: "Pure handler uses the wall clock. Take time from CommandContext.now() / event_timestamp."
+    paths:
+      include: ["**/domain/**", "**/common/projection/**", "**/saga/PaymentWorkflowImpl.java"]
+    pattern-either:
+      - pattern: System.currentTimeMillis()
+      - pattern: System.nanoTime()
+      - pattern: Instant.now(...)
+      - pattern: LocalDateTime.now(...)
+      - pattern: ZonedDateTime.now(...)
+      - pattern: Clock.systemUTC()
+      - pattern: new Date()
+  - id: difme-no-randomness-in-pure-code
+    languages: [java]
+    severity: ERROR
+    message: "Pure handler uses randomness. Derive ids with CommandContext.newId() / Uuid7.derived()."
+    paths:
+      include: ["**/domain/**", "**/common/projection/**", "**/saga/PaymentWorkflowImpl.java"]
+    pattern-either:
+      - pattern: UUID.randomUUID()
+      - pattern: new Random(...)
+      - pattern: ThreadLocalRandom.current()
+      - pattern: Math.random()
+  - id: difme-no-io-in-pure-code
+    languages: [java]
+    severity: ERROR
+    message: "Pure handler performs I/O or calls an external API."
+    paths:
+      include: ["**/domain/**", "**/common/projection/**"]
+    pattern-either:
+      - pattern: java.net.http.HttpClient.newHttpClient()
+      - pattern: new java.net.URL(...)
+      - pattern: $DS.getConnection()
+      - pattern: Files.$M(...)

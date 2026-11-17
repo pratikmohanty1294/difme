@@ -13,7 +13,7 @@ curl -fsSL https://github.com/sigstore/cosign/releases/download/v2.4.3/cosign-li
 curl -fsSL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b $BIN v1.20.0
 curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b $BIN v0.59.1
 curl -fsSL https://github.com/grafana/k6/releases/download/v0.57.0/k6-v0.57.0-linux-${arch}.tar.gz | sudo tar xz --strip-components=1 -C $BIN
-curl -fsSL https://github.com/tigerbeetle/tigerbeetle/releases/download/0.16.30/tigerbeetle-x86_64-linux.zip -o /tmp/tb.zip && sudo unzip -o /tmp/tb.zip -d $BIN
+curl -fsSL https://github.com/tigerbeetle/tigerbeetle/releases/download/0.16.78/tigerbeetle-x86_64-linux.zip -o /tmp/tb.zip && sudo unzip -o /tmp/tb.zip -d $BIN
 curl -fsSL https://github.com/temporalio/cli/releases/download/v1.3.0/temporal_cli_1.3.0_linux_${arch}.tar.gz | sudo tar xz -C $BIN temporal
 sudo mkdir -p /opt/tla && sudo curl -fsSL -o /opt/tla/tla2tools.jar https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
 curl -fsSL https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install_v2.sh | bash -s -- -v 0.14.1

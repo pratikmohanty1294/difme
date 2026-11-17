@@ -14,4 +14,4 @@ gflags:
     ysql_pg_conf_csv: "default_transaction_isolation='serializable'"
   master:
     enable_automatic_tablet_splitting: true
-tls: { enabled: true }
+tls: { enabled: false }   # Codespace: in-cluster encryption via the mesh; production overlay enables YB TLS + auth

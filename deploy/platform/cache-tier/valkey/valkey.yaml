@@ -4,7 +4,7 @@ kind: StatefulSet
 metadata: { name: valkey, namespace: cache-tier, labels: { app: valkey } }
 spec:
   serviceName: valkey-headless
-  replicas: 3
+  replicas: 1   # Codespace (ADR-012); production overlay: 3 (primary + 2 replicas)
   selector: { matchLabels: { app: valkey } }
   template:
     metadata: { labels: { app: valkey } }

@@ -3,6 +3,7 @@ strimzi
 kafka
 apicurio
 debezium
+stream-services
 risingwave-sql
 risingwave
 flink-operator

@@ -1,0 +1,27 @@
+# Creates roles/databases (CREATE DATABASE can't run inside a DO block, so it is guarded in the shell).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: db-init, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:17-alpine
+          env: [{ name: PGHOST, value: yb-tservers }, { name: PGPORT, value: "5433" }, { name: PGUSER, value: yugabyte }, { name: PGDATABASE, value: yugabyte }]
+          command: [sh, -c]
+          args:
+            - |
+              set -e
+              until pg_isready -q; do sleep 3; done
+              psql -v ON_ERROR_STOP=1 -f /sql/init.sql
+              for db in difme:difme temporal:temporal temporal_visibility:temporal apicurio:apicurio polaris:polaris \
+                        risingwave:risingwave superset:superset mlflow:mlflow feast:feast harbor:harbor datahub:datahub; do
+                name=${db%%:*}; owner=${db##*:}
+                psql -tAc "SELECT 1 FROM pg_database WHERE datname='$name'" | grep -q 1 || psql -c "CREATE DATABASE $name OWNER $owner"
+              done
+              psql -d difme -c "GRANT CONNECT ON DATABASE difme TO difme_reader, difme_bulk, debezium, trino"
+              echo "db-init done"
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } }

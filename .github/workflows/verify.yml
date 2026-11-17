@@ -56,7 +56,7 @@ jobs:
       - name: Generated Argo CD apps are current
         run: python deploy/argocd/render.py --check
       - name: Generated core-service manifests are current
-        run: python deploy/components/quarkus-service/render.py && git diff --exit-code deploy/components/quarkus-service/generated.yaml
+        run: python deploy/components/quarkus-service/render.py && git diff --exit-code deploy/platform/core-platform/core-services/generated.yaml deploy/platform/core-platform/stream-services/generated.yaml
       - name: Every catalog entry has its config directory
         run: |
           python - <<'PY'

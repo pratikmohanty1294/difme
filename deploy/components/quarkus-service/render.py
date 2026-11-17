@@ -1,39 +1,68 @@
 #!/usr/bin/env python3
-"""Expand core-services/services.yaml into Deployments + Services (run by `make render`, checked in CI)."""
-import pathlib, yaml
+"""Expand core-services/services.yaml into Deployments + Services, split by profile group:
+   core      -> deploy/platform/core-platform/core-services/generated.yaml   (profile: core)
+   streaming -> deploy/platform/core-platform/stream-services/generated.yaml (profile: streaming; needs Kafka)
+Run by `make check AREA=deploy`; CI fails if the generated files are stale."""
+import pathlib
+import yaml
+
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-cm = yaml.safe_load((ROOT / "deploy/platform/core-platform/core-services/services.yaml").read_text(encoding="utf-8"))
-svcs = yaml.safe_load(cm["data"]["services.yaml"])
-docs = []
-for s in svcs:
+SRC = ROOT / "deploy/platform/core-platform/core-services/services.yaml"
+OUT = {
+    "core": ROOT / "deploy/platform/core-platform/core-services/generated.yaml",
+    "streaming": ROOT / "deploy/platform/core-platform/stream-services/generated.yaml",
+}
+
+
+def manifests(s: dict) -> list[dict]:
     labels = {"app": s["name"], "version": "stable", "difme/team": s["team"], "business.metric": s["metric"]}
-    docs.append({
-        "apiVersion": "apps/v1", "kind": "Deployment",
-        "metadata": {"name": s["name"], "labels": {"app": s["name"]}},
-        "spec": {
-            "replicas": 1, "selector": {"matchLabels": {"app": s["name"]}},
-            "template": {
-                "metadata": {"labels": labels, "annotations": {
-                    "profiles.grafana.com/cpu.scrape": "true", "profiles.grafana.com/cpu.port": str(s["port"])}},
-                "spec": {
-                    "serviceAccountName": s["name"],
-                    "containers": [{
-                        "name": "app",
-                        "image": f"ghcr.io/pratikmohanty1294/{s['image']}:0.1.0",
-                        "ports": [{"name": "http", "containerPort": s["port"]}, {"name": "grpc", "containerPort": 9000}],
-                        "env": [
-                            {"name": "QUARKUS_HTTP_PORT", "value": str(s["port"])},
-                            {"name": "QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://alloy.observability.svc:4317"},
-                            {"name": "PYROSCOPE_SERVER_ADDRESS", "value": "http://pyroscope.observability.svc:4040"},
-                            {"name": "FLAGD_HOST", "value": "flagd.core-platform.svc"},
-                            {"name": "JAVA_TOOL_OPTIONS", "value": "-XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=75"}],
-                        "readinessProbe": {"httpGet": {"path": "/q/health/ready", "port": s["port"]}},
-                        "livenessProbe": {"httpGet": {"path": "/q/health/live", "port": s["port"]}},
-                        "resources": {"requests": {"cpu": s["cpu"], "memory": s["mem"]}, "limits": {"memory": s["mem"]}},
-                    }]}}}})
-    docs.append({"apiVersion": "v1", "kind": "Service", "metadata": {"name": s["name"], "labels": {"app": s["name"]}},
-                 "spec": {"selector": {"app": s["name"]},
-                          "ports": [{"name": "http", "port": s["port"]}, {"name": "grpc", "port": 9000}]}})
-out = ROOT / "deploy/components/quarkus-service/generated.yaml"
-out.write_text("# generated — edit core-services/services.yaml\n" + yaml.safe_dump_all(docs, sort_keys=False), encoding="utf-8", newline="\n")
-print(f"rendered {len(svcs)} services")
+    env = [
+        {"name": "QUARKUS_HTTP_PORT", "value": str(s["port"])},
+        {"name": "QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://alloy.observability.svc:4317"},
+        {"name": "QUARKUS_OTEL_SDK_DISABLED", "value": "true"},  # enabled by the observability overlay
+        {"name": "FLAGD_HOST", "value": "flagd.core-platform.svc"},
+    ]
+    volumes, mounts = [], []
+    if s.get("fdb"):
+        # FoundationDB cluster file, cloned into this namespace by Kyverno (policies/kyverno/clone-fdb-cluster-file.yaml).
+        env.append({"name": "FDB_CLUSTER_FILE", "value": "/var/dynamic-conf/cluster-file"})
+        volumes.append({"name": "fdb", "configMap": {"name": "difme-fdb-config"}})
+        mounts.append({"name": "fdb", "mountPath": "/var/dynamic-conf"})
+    container = {
+        "name": "app",
+        "image": f"ghcr.io/pratikmohanty1294/{s['image']}:0.1.0",
+        "ports": [{"name": "http", "containerPort": s["port"]}, {"name": "grpc", "containerPort": 9000}],
+        "env": env,
+        "readinessProbe": {"httpGet": {"path": "/q/health/ready", "port": s["port"]}, "periodSeconds": 10},
+        "livenessProbe": {"httpGet": {"path": "/q/health/live", "port": s["port"]}, "initialDelaySeconds": 30},
+        "resources": {"requests": {"cpu": s["cpu"], "memory": s["mem"]}, "limits": {"memory": s["mem"]}},
+    }
+    if mounts:
+        container["volumeMounts"] = mounts
+    spec = {"serviceAccountName": s["name"], "containers": [container]}
+    if volumes:
+        spec["volumes"] = volumes
+    return [
+        {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": s["name"], "labels": {"app": s["name"]}},
+         "spec": {"replicas": 1, "selector": {"matchLabels": {"app": s["name"]}},
+                  "template": {"metadata": {"labels": labels}, "spec": spec}}},
+        {"apiVersion": "v1", "kind": "Service", "metadata": {"name": s["name"], "labels": {"app": s["name"]}},
+         "spec": {"selector": {"app": s["name"]}, "ports": [{"name": "http", "port": s["port"]}, {"name": "grpc", "port": 9000}]}},
+        {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": s["name"]}},
+    ]
+
+
+def main() -> None:
+    cm = yaml.safe_load(SRC.read_text(encoding="utf-8"))
+    groups: dict[str, list[dict]] = {g: [] for g in OUT}
+    for s in yaml.safe_load(cm["data"]["services.yaml"]):
+        groups[s.get("group", "core")].extend(manifests(s))
+    for g, docs in groups.items():
+        OUT[g].parent.mkdir(parents=True, exist_ok=True)
+        OUT[g].write_text("# generated by deploy/components/quarkus-service/render.py — edit core-services/services.yaml\n"
+                          + yaml.safe_dump_all(docs, sort_keys=False), encoding="utf-8", newline="\n")
+        print(f"rendered {len(docs) // 3} {g} services")
+
+
+if __name__ == "__main__":
+    main()

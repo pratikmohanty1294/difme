@@ -1,8 +1,3 @@
-# PDF §5.3 — Quarkus CQRS engine. One base Deployment template, patched per service.
+# PDF §5.3 core services (group: core). Generated from services.yaml by deploy/components/quarkus-service/render.py.
 namespace: core-platform
-resources:
-  - ../../../components/quarkus-service
-  - service-accounts.yaml
-  - rollouts.yaml
-  - network-policy.yaml
-# services.yaml is the input for deploy/components/quarkus-service/render.py (not a kustomize resource)
+resources: [generated.yaml, rollouts.yaml, network-policy.yaml]

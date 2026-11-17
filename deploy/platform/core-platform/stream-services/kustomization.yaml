@@ -1,0 +1,3 @@
+# Kafka-dependent services (group: streaming): projection, rehydration, replay.
+namespace: core-platform
+resources: [generated.yaml]

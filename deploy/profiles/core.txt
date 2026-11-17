@@ -2,6 +2,7 @@
 valkey
 tigerbeetle
 yugabytedb
+db-init
 fdb-operator
 foundationdb
 temporal

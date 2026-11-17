@@ -2,6 +2,7 @@
 valkey
 tigerbeetle
 yugabytedb
+db-init
 fdb-operator
 foundationdb
 temporal
@@ -12,6 +13,7 @@ strimzi
 kafka
 apicurio
 debezium
+stream-services
 risingwave-sql
 risingwave
 flink-operator

@@ -1,0 +1,17 @@
+# Copies the FoundationDB cluster file (written by the operator in database-tier) into core-platform so cmd-svc can
+# mount it, and keeps it in sync when the operator changes coordinators.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: clone-fdb-cluster-file }
+spec:
+  generateExisting: true
+  rules:
+    - name: clone-into-core-platform
+      match: { any: [{ resources: { kinds: [Namespace], names: [core-platform] } }] }
+      generate:
+        apiVersion: v1
+        kind: ConfigMap
+        name: difme-fdb-config
+        namespace: core-platform
+        synchronize: true
+        clone: { namespace: database-tier, name: difme-fdb-config }

@@ -6,15 +6,15 @@ package difme.attestation.v1;
 option java_multiple_files = true;
 option java_package = "dev.difme.grpc.attestation.v1";
 
-service AttestationVerifier {
+service AttestationVerifierService {
   rpc Challenge(ChallengeRequest) returns (ChallengeResponse);
-  rpc Verify(Evidence) returns (AttestationResult);
+  rpc Verify(VerifyRequest) returns (VerifyResponse);
 }
 
 message ChallengeRequest { string device_id = 1; }
 message ChallengeResponse { bytes nonce = 1; int64 expires_at_ms = 2; }
 
-message Evidence {
+message VerifyRequest {
   string device_id = 1;
   bytes eat_token = 2;          // CBOR-encoded EAT (RFC 8392 CWT)
   bytes nonce = 3;
@@ -22,7 +22,7 @@ message Evidence {
   string wasm_module_sha256 = 5;
 }
 
-message AttestationResult {
+message VerifyResponse {
   bool trusted = 1;
   repeated string failed_checks = 2;  // binary_hash | freshness | revoked_platform | signature
   bool fallback_server_check = 3;     // FAIL path → full server-side fraud check

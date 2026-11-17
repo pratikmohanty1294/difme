@@ -7,9 +7,9 @@ option java_multiple_files = true;
 option java_package = "dev.difme.grpc.payments.v1";
 
 service PaymentCommandService {
-  rpc SubmitPayment(PaymentCommand) returns (PaymentAck);
+  rpc SubmitPayment(SubmitPaymentRequest) returns (SubmitPaymentResponse);
   // Device reconnect: stream CRDT deltas up, receive replayed events down (PDF §7.3).
-  rpc Rehydrate(stream CrdtDelta) returns (stream RehydrationEvent);
+  rpc Rehydrate(stream RehydrateRequest) returns (stream RehydrateResponse);
 }
 
 message Money {
@@ -17,7 +17,7 @@ message Money {
   string currency = 2;
 }
 
-message PaymentCommand {
+message SubmitPaymentRequest {
   string idempotency_key = 1;   // UUIDv7
   string trace_id = 2;
   string debit_account_id = 3;
@@ -39,7 +39,7 @@ enum Channel {
   CHANNEL_BACK_OFFICE = 4;
 }
 
-message PaymentAck {
+message SubmitPaymentResponse {
   string payment_id = 1;        // UUIDv7
   string workflow_id = 2;
   Status status = 3;
@@ -52,14 +52,14 @@ message PaymentAck {
   }
 }
 
-message CrdtDelta {
+message RehydrateRequest {
   string client_id = 1;
   map<string, uint64> vector_clock = 2;
   bytes automerge_changes = 3;
   int64 last_committed_offset = 4;
 }
 
-message RehydrationEvent {
+message RehydrateResponse {
   string event_id = 1;          // UUIDv7, CloudEvents id
   int64 offset = 2;
   bytes cloudevent = 3;         // binary-mode CloudEvent

@@ -87,3 +87,20 @@ Unavoidable platform quota: GitHub Codespaces' free hours (Actions is unlimited 
 | Feature flags in browser | OpenFeature web SDK + OFREP provider → flagd | Apache-2.0 |
 
 Performance budget (PDF §5.9): each remote's **initial** JS must be ≤ 200 KB compressed (CI gate). The KIE editors and the formio builder are larger, so they load lazily on first use and are excluded from the initial budget.
+
+## ADR-011 — Bulk file processing (owner-approved 2026-11-17)
+**Requirement:** CSV, flat (fixed-width), JSON and Excel files of about 10M records, fully processed in **≤ 5 minutes** (≈ 33k records/s sustained, end to end). Every record is validated against linked records in the database and against DMN business rules.
+
+**Decision:** an **Apache Flink batch job** (operator already deployed) with:
+- **Parallel reading.** File splits for CSV/JSON/fixed-width. Excel goes through Apache POI's streaming reader to Parquet first, because Excel can't be split.
+- **Hybrid DB validation.**
+  - Static reference data (account master, products, limits) is snapshotted into keyed in-memory state at job start, with one partitioned bulk scan.
+  - Volatile checks (balances, duplicates, status) are **batched async lookups** (≈1,000 keys per `IN` query) against YugabyteDB follower replicas. There is never one query per record.
+- **Rules.** The Fluxnova DMN engine is embedded in the operators. The pinned decision version is compiled once per job and evaluated in-process (µs per record), using the same DMN as the forms (ADR-008).
+- **Idempotency.** Record ids are derived from the file SHA-256 plus the line number (UUIDv7-compatible), so re-running a file never double-applies.
+- **Outputs.**
+  - Valid records → batched sinks: TigerBeetle (≤ 8,190 per batch), Kafka or Iceberg.
+  - Rejected records → error file with line number + reasons.
+  - Run report → back-office.
+
+**Throughput caveat:** writing 33k rows/s *into YugabyteDB* needs a multi-node cluster. The single-node Codespace cluster can't sustain it. The 5-minute target is measured by a CI benchmark on a generated 10M-record file, and the measured figure is published rather than assumed.

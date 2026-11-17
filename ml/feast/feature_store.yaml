@@ -1,0 +1,16 @@
+# PDF §5.7 — online store on Valkey (<5ms retrieval), offline store on Iceberg via Trino, registry in YugabyteDB.
+project: difme
+provider: local
+registry:
+  registry_type: sql
+  path: postgresql+psycopg://feast@yb-tservers.database-tier.svc:5433/feast
+online_store:
+  type: redis
+  connection_string: valkey.cache-tier.svc:6379,db=2
+offline_store:
+  type: trino
+  host: trino.lakehouse.svc
+  port: 8080
+  catalog: iceberg
+  connector: { type: iceberg, file_format: parquet }
+entity_key_serialization_version: 3

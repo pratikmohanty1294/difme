@@ -5,5 +5,4 @@ resources:
   - service-accounts.yaml
   - rollouts.yaml
   - network-policy.yaml
-patches:
-  - { path: services.yaml }
+# services.yaml is the input for deploy/components/quarkus-service/render.py (not a kustomize resource)

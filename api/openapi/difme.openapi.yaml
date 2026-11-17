@@ -17,7 +17,7 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/PaymentRequest" } } }
       responses:
-        "202": { description: Accepted — saga started, content: { application/json: { schema: { $ref: "#/components/schemas/PaymentAccepted" } } } }
+        "202": { description: "Accepted — saga started", content: { application/json: { schema: { $ref: "#/components/schemas/PaymentAccepted" } } } }
         "409": { $ref: "#/components/responses/IdempotencyConflict" }
         "422": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
@@ -46,14 +46,14 @@ paths:
       security: [{ oauth2: [accounts:read] }]
       parameters: [{ name: accountId, in: path, required: true, schema: { $ref: "#/components/schemas/Uuid7" } }]
       responses:
-        "200": { description: Account projection (eventual, follower read), content: { application/json: { schema: { $ref: "#/components/schemas/Account" } } } }
+        "200": { description: "Account projection (eventual, follower read)", content: { application/json: { schema: { $ref: "#/components/schemas/Account" } } } }
   /v1/accounts/{accountId}/balance:
     get:
       operationId: getBalance
       security: [{ oauth2: [accounts:read] }]
       parameters: [{ name: accountId, in: path, required: true, schema: { $ref: "#/components/schemas/Uuid7" } }]
       responses:
-        "200": { description: Ledger balance (strict, from TigerBeetle), content: { application/json: { schema: { $ref: "#/components/schemas/Balance" } } } }
+        "200": { description: "Ledger balance (strict, from TigerBeetle)", content: { application/json: { schema: { $ref: "#/components/schemas/Balance" } } } }
 components:
   securitySchemes:
     oauth2:

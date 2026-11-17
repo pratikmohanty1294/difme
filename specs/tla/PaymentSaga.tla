@@ -75,8 +75,7 @@ TypeOK == state \in [Payments -> States] /\ source \in Nat /\ target \in Nat /\ 
 \* Safety: funds are either at source, in flight, or at target — never created or lost.
 MoneyConserved == source + InFlight * Amount + target = InitialBalance
 TargetMatchesCredits == target = Credited * Amount
-CompensatedHoldsNothing == \A p \in Payments : state[p] = "compensated" => p 
-otin held
+CompensatedHoldsNothing == \A p \in Payments : state[p] = "compensated" => p \notin held
 
 \* Liveness: every debited saga eventually completes or is fully compensated.
 Terminates == \A p \in Payments : (state[p] = "debited") ~> (state[p] \in {"completed", "compensated"})

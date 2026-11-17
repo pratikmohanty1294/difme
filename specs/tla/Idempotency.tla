@@ -1,6 +1,6 @@
 ---------------------------- MODULE Idempotency ----------------------------
 (* PDF §9 — FoundationDB linearizable dedup of UUIDv7 idempotency keys (24h TTL). *)
-EXTENDS Naturals
+EXTENDS Integers
 
 CONSTANTS Keys, TTL, MaxTime
 

@@ -31,6 +31,8 @@ kind: Rollout
 metadata: { name: quarkus-cmd-svc }
 spec:
   workloadRef: { apiVersion: apps/v1, kind: Deployment, name: quarkus-cmd-svc, scaleDown: progressively }
+  progressDeadlineSeconds: 300      # auto-rollback if not healthy within 5 minutes (PDF §4.5)
+  progressDeadlineAbort: true
   strategy:
     canary:
       steps:
@@ -38,5 +40,3 @@ spec:
         - analysis: { templates: [{ templateName: slo-gate }], args: [{ name: service, value: quarkus-cmd-svc }] }
         - setWeight: 50
         - pause: { duration: 2m }
-      progressDeadlineSeconds: 300
-      progressDeadlineAbort: true

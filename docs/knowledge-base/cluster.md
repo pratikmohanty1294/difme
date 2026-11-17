@@ -83,3 +83,10 @@
 - **What happened:** moving image layers to the 118 GB ephemeral disk broke every non-root pod (`stat /coredns: permission denied`). `setfacl` isn't installed in the Codespace, and `|| true` hid that, so the inherited default ACL was never cleared.
 - **Decision:** revert to the persistent disk and bound usage with kubelet image GC (70% → 60%) plus eviction thresholds instead. It's simpler, with no special host setup.
 - **Lesson:** never `|| true` a step the fix depends on. Fail loudly, or check the result (`ls -ld` shows `+` while an ACL remains).
+
+### Core profile, first live run: four failures found together
+- **Quarkus services crash:** `/tmp/vertx-cache: Read-only file system`. Our mutate policy sets `readOnlyRootFilesystem`. **Fix:** a 64 Mi disk-backed `emptyDir` at `/tmp` in the service template.
+- **Temporal schema:** `permission denied to create database`. db-init owns database creation and the role has no CREATEDB. **Fix:** `schema.createDatabase.enabled: false`.
+- **flagd blocked by `restrict-registries`:** the rule ported from Gatekeeper (ADR-015) lacked the upstream allowlist. **Fix:** explicitly allow pinned upstream images, plus `docker.io/library/*` as before.
+- **Kyverno reports controller OOMKilled at 128 Mi:** **fix:** limit 320 Mi, to be refined from the baseline.
+- **Lesson:** a policy port must be checked against every live workload it matches. Server dry runs of the policy alone pass, so dry-run the *workloads* against the new policy as well.

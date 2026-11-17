@@ -21,4 +21,6 @@ elasticsearch: { enabled: false }
 prometheus: { enabled: false }
 grafana: { enabled: false }
 web: { enabled: true, resources: { requests: { cpu: 20m, memory: 64Mi } } }
-schema: { createDatabase: { enabled: true }, setup: { enabled: true }, update: { enabled: true } }
+# db-init creates the temporal databases; the temporal role has no CREATEDB privilege by design (found live:
+# "permission denied to create database"), so the chart only sets up and updates the schema.
+schema: { createDatabase: { enabled: false }, setup: { enabled: true }, update: { enabled: true } }

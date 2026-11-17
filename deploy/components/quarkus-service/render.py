@@ -22,12 +22,10 @@ def manifests(s: dict) -> list[dict]:
         {"name": "QUARKUS_OTEL_SDK_DISABLED", "value": "true"},  # enabled by the observability overlay
         {"name": "FLAGD_HOST", "value": "flagd.core-platform.svc"},
     ]
-    volumes, mounts = [], []
-    if s.get("fdb"):
-        # FoundationDB cluster file, cloned into this namespace by Kyverno (policies/kyverno/clone-fdb-cluster-file.yaml).
-        env.append({"name": "FDB_CLUSTER_FILE", "value": "/var/dynamic-conf/cluster-file"})
-        volumes.append({"name": "fdb", "configMap": {"name": "difme-fdb-config"}})
-        mounts.append({"name": "fdb", "mountPath": "/var/dynamic-conf"})
+    # Root filesystem is read-only (policies/kyverno/mutate-defaults.yaml); Quarkus/Vert.x needs a small writable /tmp
+    # for its file cache (found live). Disk-backed so it doesn't count against the memory limit.
+    volumes = [{"name": "tmp", "emptyDir": {"sizeLimit": "64Mi"}}]
+    mounts = [{"name": "tmp", "mountPath": "/tmp"}]
     container = {
         "name": "app",
         "image": f"ghcr.io/pratikmohanty1294/{s['image']}:0.1.0",

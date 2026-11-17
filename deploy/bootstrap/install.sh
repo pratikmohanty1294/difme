@@ -12,7 +12,11 @@ kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.14.11/manifests/install.yaml
 kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 # Kustomize dirs pull shared files (flags, Lua scripts, dashboards) from elsewhere in the repo.
-kubectl -n argocd patch configmap argocd-cm --type merge -p '{"data":{"kustomize.buildOptions":"--load-restrictor LoadRestrictionsNone"}}'
+kubectl -n argocd patch configmap argocd-cm --type merge -p '{"data":{"kustomize.buildOptions":"--load-restrictor LoadRestrictionsNone","application.resourceTrackingMethod":"annotation","resource.exclusions":"- apiGroups: [cilium.io]
+  kinds: [CiliumIdentity]
+  clusters: [\"*\"]
+"}}'
+kubectl -n argocd rollout restart statefulset/argocd-application-controller deploy/argocd-repo-server >/dev/null
 kubectl apply -n argocd --server-side -f https://github.com/argoproj/argo-rollouts/releases/download/v1.8.2/install.yaml || true
 
 sed "s#__REPO__#$REPO#g" deploy/argocd/project.yaml | kubectl apply -f -

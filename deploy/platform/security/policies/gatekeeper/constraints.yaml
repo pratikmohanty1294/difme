@@ -1,6 +1,8 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
 kind: DifmeAllowedRegistries
-metadata: { name: allowed-registries }
+metadata:
+  name: allowed-registries
+  annotations: { argocd.argoproj.io/sync-wave: "1", argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true }
 spec:
   enforcementAction: deny
   match: { namespaces: [core-platform, quinn-hub, back-office-ui, ml-platform] }
@@ -8,7 +10,9 @@ spec:
 ---
 apiVersion: constraints.gatekeeper.sh/v1beta1
 kind: DifmeNoPlaintextSecrets
-metadata: { name: no-plaintext-secrets }
+metadata:
+  name: no-plaintext-secrets
+  annotations: { argocd.argoproj.io/sync-wave: "1", argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true }
 spec:
   enforcementAction: deny
   match: { namespaces: [core-platform, quinn-hub, back-office-ui, ml-platform, streaming] }

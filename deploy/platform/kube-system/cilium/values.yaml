@@ -8,7 +8,7 @@ routingMode: tunnel
 tunnelProtocol: vxlan
 loadBalancer: { algorithm: maglev }
 bpf:
-  masquerade: true
+  masquerade: false   # BPF masquerade needs NodePort/KPR; iptables masquerade alongside kube-proxy (ADR-013, verified live)
   # Kubernetes-in-Docker (k3d in Codespaces) can't use eBPF host routing: pods could not reach the API service.
   # Verified on the first live run (2026-11-17). Bare-metal / VM overlays set this to false for full eBPF routing.
   hostLegacyRouting: true

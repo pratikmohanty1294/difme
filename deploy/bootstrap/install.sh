@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Bootstraps Cilium + Argo CD + the app-of-apps root. Everything after this is GitOps.
+set -euo pipefail
+REPO=${1:-https://github.com/pratikmohanty1294/difme.git}
+API=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+
+helm repo add cilium https://helm.cilium.io >/dev/null
+helm upgrade --install cilium cilium/cilium -n kube-system --version 1.17.3 \
+  -f deploy/platform/cilium/values.yaml --set k8sServiceHost="$API" --set k8sServicePort=6443 --wait
+
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.14.11/manifests/install.yaml
+kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
+kubectl apply -n argocd --server-side -f https://github.com/argoproj/argo-rollouts/releases/download/v1.8.2/install.yaml || true
+
+sed "s#__REPO__#$REPO#g" deploy/argocd/project.yaml | kubectl apply -f -
+# The base profile is always on: infra layer 11 (namespaces, CRDs, policy, ingress).
+for a in $(grep -v '^#' deploy/profiles/base.txt); do kubectl apply -f deploy/argocd/apps/$a.yaml; done
+echo "Argo CD admin password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"

@@ -1,0 +1,22 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: difme
+servers: 1
+agents: 0
+image: rancher/k3s:v1.32.3-k3s1
+ports:
+  - port: 443:443
+    nodeFilters: [loadbalancer]
+  - port: 4443:4443/udp      # QUIC / WebTransport direct path to the Quinn hub
+    nodeFilters: [loadbalancer]
+options:
+  k3s:
+    extraArgs:
+      # Cilium replaces flannel and kube-proxy (PDF §4.6). Traefik and ServiceLB are replaced by ingress-nginx and MetalLB.
+      - { arg: --flannel-backend=none,      nodeFilters: [server:*] }
+      - { arg: --disable-network-policy,    nodeFilters: [server:*] }
+      - { arg: --disable-kube-proxy,        nodeFilters: [server:*] }
+      - { arg: --disable=traefik,           nodeFilters: [server:*] }
+      - { arg: --disable=servicelb,         nodeFilters: [server:*] }
+      - { arg: --secrets-encryption,        nodeFilters: [server:*] }

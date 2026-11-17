@@ -25,6 +25,13 @@
   - The kubelet runs up to 3 parallel pulls.
 - **Prevention:** add new images to manifests normally; prefetch discovers them from the rendered manifests.
 
+### Node load average 38 on 4 cores, SSH timeouts, everything `Progressing` at once
+- **Root cause:** `make up PROFILE=core` ran while the base profile was still converging, so 23 apps synced simultaneously (a thundering herd of image pulls, CRD installs, webhooks and Argo CD diffs).
+- **Fix:**
+  - `ci/up.sh`, run by `make up`, waits for already-deployed apps, then applies a profile **wave by wave**, waiting for each wave to be healthy.
+  - Argo CD concurrency is sized for a small node (`controller.status.processors=6`, `operation.processors=3`, `kubectl.parallelism.limit=4`).
+- **Prevention:** never apply several profiles back-to-back without waiting; `make up` enforces it.
+
 ### `gh codespace ssh` fails: no SSH server
 - **Fix:** the `ghcr.io/devcontainers/features/sshd:1` feature in `.devcontainer/devcontainer.json`.
 - **Note:** a rebuild uses the repo copy already inside the Codespace, so a devcontainer change needs a new Codespace (or `git pull` first).

@@ -34,8 +34,8 @@ destroy:         ## Delete the cluster
 prefetch:        ## Pre-pull a profile's images (parallel, retried) so pods never wait on the network
 	bash ci/prefetch.sh $(PROFILE)
 
-up: prefetch     ## Enable a profile, e.g. make up PROFILE=streaming (images are prefetched first)
-	@for a in $(APPS); do echo "▶ $$a"; kubectl apply -f deploy/argocd/apps/$$a.yaml; done
+up: prefetch     ## Enable a profile wave by wave, e.g. make up PROFILE=streaming (images prefetched first)
+	bash ci/up.sh $(PROFILE)
 	@echo "Argo CD is syncing. Check with: make status"
 
 down:            ## Disable a profile and free resources

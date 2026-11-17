@@ -15,7 +15,7 @@ kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 kubectl -n argocd patch configmap argocd-cm --type merge --patch-file deploy/bootstrap/argocd-cm-patch.yaml
 # Server-side diff (controller-defaulted fields aren't drift) and generous repo/Helm timeouts so large chart
 # downloads on slow links don't fail a sync (ADR-012 network I/O).
-kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.diff.server.side":"true","controller.repo.server.timeout.seconds":"300","reposerver.parallelism.limit":"2"}}'
+kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.diff.server.side":"true","controller.repo.server.timeout.seconds":"300","reposerver.parallelism.limit":"2","controller.status.processors":"6","controller.operation.processors":"3","controller.kubectl.parallelism.limit":"4"}}'
 kubectl -n argocd set env deploy/argocd-repo-server ARGOCD_EXEC_TIMEOUT=300s ARGOCD_GIT_ATTEMPTS_COUNT=5 >/dev/null
 kubectl -n argocd rollout restart statefulset/argocd-application-controller deploy/argocd-repo-server >/dev/null
 # Argo Rollouts lives in its own namespace: its RBAC binds the argo-rollouts/argo-rollouts service account (found live).

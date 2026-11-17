@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: { name: difme-ci, namespace: tekton-pipelines }
+spec:
+  params: [{ name: revision, default: main }]
+  workspaces: [{ name: src }]
+  tasks:
+    - { name: clone, taskRef: { resolver: hub, params: [{ name: name, value: git-clone }, { name: version, value: "0.9" }] }, workspaces: [{ name: output, workspace: src }], params: [{ name: url, value: "https://github.com/pratikmohanty1294/difme" }, { name: revision, value: $(params.revision) }] }
+    - name: semgrep
+      runAfter: [clone]
+      workspaces: [{ name: src, workspace: src }]
+      taskSpec: { workspaces: [{ name: src }], steps: [{ name: scan, image: "semgrep/semgrep:1.108.0", workingDir: $(workspaces.src.path), script: "semgrep --config policies/semgrep --error services/" }] }
+    - name: tla
+      runAfter: [clone]
+      workspaces: [{ name: src, workspace: src }]
+      taskSpec: { workspaces: [{ name: src }], steps: [{ name: tlc, image: "eclipse-temurin:25-jre", workingDir: $(workspaces.src.path), script: "bash specs/tla/check.sh" }] }
+    - name: trivy
+      runAfter: [semgrep, tla]
+      workspaces: [{ name: src, workspace: src }]
+      taskSpec: { workspaces: [{ name: src }], steps: [{ name: scan, image: "aquasec/trivy:0.59.1", workingDir: $(workspaces.src.path), script: "trivy fs --severity CRITICAL --exit-code 1 ." }] }
+    - name: pyroscope-gate
+      runAfter: [trivy]
+      workspaces: [{ name: src, workspace: src }]
+      taskSpec: { workspaces: [{ name: src }], steps: [{ name: bench, image: "python:3.12-slim", workingDir: $(workspaces.src.path), script: "python ci/profile_gate.py --max-regression 0.10" }] }

@@ -1,0 +1,10 @@
+# PDF §4.1 — cluster backup & restore to S3-compatible object storage every 6h.
+configuration:
+  backupStorageLocation: [{ name: default, provider: aws, bucket: velero, config: { region: local, s3ForcePathStyle: "true", s3Url: http://seaweedfs-s3.lakehouse.svc:8333 } }]
+  volumeSnapshotLocation: []
+initContainers:
+  - { name: velero-plugin-for-aws, image: velero/velero-plugin-for-aws:v1.11.1, volumeMounts: [{ mountPath: /target, name: plugins }] }
+schedules:
+  every-6h: { schedule: "0 */6 * * *", template: { ttl: 168h, includedNamespaces: ["*"], snapshotVolumes: false, defaultVolumesToFsBackup: true } }
+credentials: { existingSecret: velero-s3 }
+deployNodeAgent: true

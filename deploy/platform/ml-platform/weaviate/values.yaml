@@ -1,0 +1,6 @@
+# PDF §5.7 / §7.4 L2 — HNSW ANN fraud-pattern similarity, ef=200.
+replicas: 1
+resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }
+storage: { size: 4Gi }
+env: { QUERY_DEFAULTS_LIMIT: 25, DEFAULT_VECTORIZER_MODULE: none, PERSISTENCE_DATA_PATH: /var/lib/weaviate }
+modules: { text2vec-contextionary: { enabled: false } }

@@ -1,0 +1,15 @@
+{
+  "title": "DIFME — FinOps (PDF §16)",
+  "uid": "difme-finops",
+  "schemaVersion": 39,
+  "panels": [
+    { "type": "timeseries", "title": "Hourly cost by namespace", "gridPos": {"x":0,"y":0,"w":12,"h":8},
+      "targets": [{ "expr": "sum by (namespace) (opencost_namespace_cost_hourly)" }] },
+    { "type": "timeseries", "title": "Cost by business.metric", "gridPos": {"x":12,"y":0,"w":12,"h":8},
+      "targets": [{ "expr": "sum by (label_business_metric) (opencost_workload_cost_hourly)" }] },
+    { "type": "timeseries", "title": "KEDA replicas: idle vs peak", "gridPos": {"x":0,"y":8,"w":12,"h":8},
+      "targets": [{ "expr": "sum by (scaledObject) (keda_scaler_active)" }, { "expr": "sum by (deployment) (kube_deployment_status_replicas{namespace=\"core-platform\"})" }] },
+    { "type": "timeseries", "title": "CI test cost per pipeline run (k6 / Playwright / Karate)", "gridPos": {"x":12,"y":8,"w":12,"h":8},
+      "targets": [{ "expr": "sum by (label_difme_pipeline_run) (opencost_workload_cost_hourly{namespace=\"k6\"})" }] }
+  ]
+}

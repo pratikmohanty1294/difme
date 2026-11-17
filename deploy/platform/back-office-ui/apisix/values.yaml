@@ -1,0 +1,26 @@
+# PDF §5.9 / §5.10 — back-office API gateway: OIDC, rate limits, GraphQL, REST routing, OpenBao token mgmt.
+apisix: { deployment: { mode: standalone, role: data_plane, role_data_plane: { config_provider: yaml } } }
+etcd: { enabled: false }
+ingress-controller: { enabled: false }
+resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }
+configYaml: ""
+apisixStandalone:
+  routes:
+    - id: graphql
+      uri: /api/graphql
+      upstream: { type: roundrobin, nodes: { "quarkus-qry-svc.core-platform.svc:8081": 1 } }
+      plugins:
+        openid-connect: { discovery: "https://idp.difme.local/.well-known/openid-configuration", client_id: backoffice, bearer_only: true }
+        limit-req: { rate: 50, burst: 20, key: remote_addr }
+        opentelemetry: { sampler: { name: always_on } }
+    - id: settlements-live
+      uri: /api/settlements/*
+      enable_websocket: true
+      upstream: { type: roundrobin, nodes: { "risingwave.streaming.svc:4566": 1 } }
+      plugins:
+        openid-connect: { discovery: "https://idp.difme.local/.well-known/openid-configuration", client_id: backoffice, bearer_only: true }
+    - id: audit
+      uri: /api/audit/*
+      upstream: { type: roundrobin, nodes: { "trino.lakehouse.svc:8080": 1 } }
+      plugins:
+        openid-connect: { discovery: "https://idp.difme.local/.well-known/openid-configuration", client_id: backoffice, bearer_only: true }

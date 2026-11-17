@@ -1,0 +1,24 @@
+# PDF §5.5 — Debezium CDC (LSN-based, at-least-once) with the CloudEvents converter carrying trace context.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata: { name: debezium, annotations: { strimzi.io/use-connector-resources: "true" } }
+spec:
+  version: 4.0.0
+  replicas: 1
+  bootstrapServers: difme-kafka-bootstrap:9092
+  config:
+    group.id: debezium
+    offset.storage.topic: _connect-offsets
+    config.storage.topic: _connect-configs
+    status.storage.topic: _connect-status
+    config.storage.replication.factor: 1
+    offset.storage.replication.factor: 1
+    status.storage.replication.factor: 1
+  build:
+    output: { type: docker, image: ghcr.io/pratikmohanty1294/difme-debezium-connect:3.1.0 }
+    plugins:
+      - name: debezium-postgres
+        artifacts: [{ type: maven, group: io.debezium, artifact: debezium-connector-postgres, version: 3.1.0.Final }]
+      - name: apicurio-converters
+        artifacts: [{ type: maven, group: io.apicurio, artifact: apicurio-registry-utils-converter, version: 3.0.6 }]
+  resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }

@@ -1,0 +1,30 @@
+# PDF §5.6 — federated SQL across Iceberg, Cassandra (audit), Kafka and YugabyteDB in one query.
+server: { workers: 1 }
+coordinator: { resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }, jvm: { maxHeapSize: 1G } }
+worker: { resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }, jvm: { maxHeapSize: 1G } }
+catalogs:
+  iceberg: |
+    connector.name=iceberg
+    iceberg.catalog.type=rest
+    iceberg.rest-catalog.uri=http://polaris:8181/api/catalog
+    iceberg.rest-catalog.warehouse=difme
+    iceberg.rest-catalog.security=OAUTH2
+    iceberg.rest-catalog.oauth2.credential=${ENV:POLARIS_CREDENTIAL}
+    iceberg.rest-catalog.vended-credentials-enabled=true
+    fs.native-s3.enabled=true
+    s3.endpoint=http://seaweedfs-s3:8333
+    s3.path-style-access=true
+  audit: |
+    connector.name=cassandra
+    cassandra.contact-points=difme-audit-dc1-service.database-tier.svc
+    cassandra.load-policy.dc-aware.local-dc=dc1
+  events: |
+    connector.name=kafka
+    kafka.nodes=difme-kafka-bootstrap.streaming.svc:9092
+    kafka.table-description-supplier=FILE
+    kafka.table-description-dir=/etc/trino/kafka   # generated from api/asyncapi by ci/asyncapi_to_trino.py
+  settlements: |
+    connector.name=postgresql
+    connection-url=jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme
+    connection-user=${ENV:YB_TRINO_USER}
+    connection-password=${ENV:YB_TRINO_PASSWORD}

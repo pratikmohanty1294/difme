@@ -11,7 +11,7 @@ DIFME follows Financial Platform Architecture v1.2. These records log every devi
 | Secrets management | Non-OSI licence | OpenBao 2 | MPL-2.0 | Linux Foundation project. Dynamic DB creds TTL=1h, PKI, transit. |
 | Just-in-time infra access | Non-OSI licence | Warpgate | Apache-2.0 | Identity-aware SSH/HTTP/DB bastion with session recording. |
 | Streaming SQL views | Non-OSI licence | RisingWave | Apache-2.0 | Postgres-wire streaming SQL with incremental materialized views, Kafka source and sink. |
-| Event broker (Kafka API) | Non-OSI licence | Apache Kafka 4 (KRaft) via Strimzi | Apache-2.0 | No ZooKeeper. Tiered storage → MinIO (KIP-405). Wasm transforms → Kafka Streams / Flink. |
+| Event broker (Kafka API) | Non-OSI licence | Apache Kafka 4 (KRaft) via Strimzi | Apache-2.0 | No ZooKeeper. Tiered storage: see ADR-006. Wasm transforms → Kafka Streams / Flink. |
 | Settlements DB (serializable, multi-region) | Non-OSI licence | YugabyteDB 2.25 YSQL | Apache-2.0 | Serializable isolation, geo-partitioned tablespaces, Raft. Also the Temporal persistence backend. |
 | Audit log store | Non-OSI licence | Apache Cassandra 5 | Apache-2.0 | Append-only audit log, quorum writes, SAI indexes. |
 
@@ -44,3 +44,7 @@ The owner chose each of these when offered a newer free alternative to the PDF c
 | Native Android shell + uniffi | **Tauri 2 mobile** (Vue 3 UI + Rust core; Kotlin plugins for HCE/NFC/KeyStore) | One Rust codebase shared with the hub, first-class Android and iOS. |
 | Iceberg catalog (unspecified) | **Apache Polaris** (Iceberg REST) | One catalog with RBAC and credential vending for Trino, Spark, Flink and StarRocks. |
 | Kong + APISIX | **Kept as in the PDF** | Owner's choice: Kong external, APISIX back-office, both behind Envoy Gateway. |
+
+## ADR-006 — Kafka tiered storage (open)
+The PDF tiers old broker segments to object storage. Apache Kafka has the KIP-405 interface but no built-in S3 RemoteStorageManager; the available Apache-2.0 plugins are published by vendors.
+**Current state:** event topics keep infinite local retention, and Flink archives every event to Iceberg on SeaweedFS (Day-0 history). The owner decides whether to add a KIP-405 plugin.

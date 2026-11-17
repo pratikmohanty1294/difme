@@ -1,0 +1,8 @@
+# PDF §11.2 — registry storing images + Syft SBOMs + cosign signatures (on-prem / air-gapped scenario).
+expose: { type: clusterIP, tls: { enabled: false } }
+persistence:
+  imageChartStorage: { type: s3, s3: { regionendpoint: http://seaweedfs-s3.lakehouse.svc:8333, bucket: harbor, secure: false, v4auth: true } }
+trivy: { enabled: true }
+database: { type: external, external: { host: yb-tservers.database-tier.svc, port: "5433", username: harbor, coreDatabase: harbor, existingSecret: harbor-db } }
+redis: { type: external, external: { addr: valkey.cache-tier.svc:6379 } }
+core: { resources: { requests: { cpu: 50m, memory: 128Mi } } }

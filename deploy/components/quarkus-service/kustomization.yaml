@@ -1,0 +1,2 @@
+# Rendered by deploy/components/quarkus-service/render.py into explicit manifests (kustomize has no loops).
+resources: [generated.yaml]

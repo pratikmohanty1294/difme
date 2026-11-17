@@ -1,0 +1,25 @@
+# PDF §5.7 — server-side ONNX Runtime fraud scoring (fallback when edge attestation fails, §11.1 FAIL path).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: onnx-serving, labels: { app: onnx-serving } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: onnx-serving } }
+  template:
+    metadata: { labels: { app: onnx-serving, difme/team: ml, business.metric: fraud-check } }
+    spec:
+      containers:
+        - name: scorer
+          image: ghcr.io/pratikmohanty1294/difme-fraud-scorer:0.1.0
+          env:
+            - { name: MODEL_URI, value: "s3://mlflow/models/fraud/production/model.onnx" }
+            - { name: FEAST_URL, value: "http://feast-server:6566" }
+            - { name: WEAVIATE_URL, value: "http://weaviate:80" }
+            - { name: FLAGD_HOST, value: "flagd.core-platform.svc" }
+          ports: [{ containerPort: 8090 }]
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: onnx-serving }
+spec: { selector: { app: onnx-serving }, ports: [{ port: 8090 }] }

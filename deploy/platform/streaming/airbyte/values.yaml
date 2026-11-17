@@ -1,0 +1,6 @@
+# PDF §5.5 — external data ingestion (300+ connectors, dbt normalisation, reverse ETL). Profile streaming-extra (heavy).
+global:
+  storage: { type: S3, bucket: { log: airbyte, state: airbyte, workloadOutput: airbyte }, s3: { endpoint: http://seaweedfs-s3.lakehouse.svc:8333, authenticationType: credentials } }
+  database: { type: external, host: yb-tservers.database-tier.svc, port: 5433, database: airbyte, user: airbyte, secretName: airbyte-db }
+postgresql: { enabled: false }
+minio: { enabled: false }

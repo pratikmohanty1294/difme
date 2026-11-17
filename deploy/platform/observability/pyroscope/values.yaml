@@ -1,0 +1,3 @@
+# PDF §10.2 — always-on continuous profiling (<1% CPU). JFR for Quarkus, pprof for Rust.
+pyroscope: { replicaCount: 1, resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } } }
+alloy: { enabled: false }

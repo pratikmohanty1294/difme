@@ -1,0 +1,44 @@
+# Object storage (ADR-005 replaces MinIO): S3 API for Iceberg, Kafka tiered storage, Flink checkpoints,
+# RisingWave state, Velero backups, etcd snapshots. Erasure coding + replication enabled in production overlay.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: seaweedfs, labels: { app: seaweedfs } }
+spec:
+  serviceName: seaweedfs
+  replicas: 1
+  selector: { matchLabels: { app: seaweedfs } }
+  template:
+    metadata: { labels: { app: seaweedfs } }
+    spec:
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:3.85
+          args: [server, -dir=/data, -s3, -s3.port=8333, -s3.config=/etc/seaweedfs/s3.json, -volume.max=0, -master.volumeSizeLimitMB=1024, -metricsPort=9327]
+          ports: [{ name: s3, containerPort: 8333 }, { name: master, containerPort: 9333 }, { name: filer, containerPort: 8888 }, { name: metrics, containerPort: 9327 }]
+          volumeMounts: [{ name: data, mountPath: /data }, { name: s3cfg, mountPath: /etc/seaweedfs }]
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
+      volumes: [{ name: s3cfg, secret: { secretName: seaweedfs-s3-config } }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 16Gi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: seaweedfs-s3 }
+spec: { selector: { app: seaweedfs }, ports: [{ name: s3, port: 8333 }, { name: filer, port: 8888 }, { name: master, port: 9333 }] }
+---
+apiVersion: batch/v1
+kind: Job
+metadata: { name: create-buckets, annotations: { argocd.argoproj.io/hook: PostSync } }
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: buckets
+          image: rclone/rclone:1.69.1
+          envFrom: [{ secretRef: { name: seaweedfs-s3-admin } }]   # RCLONE_CONFIG_SW_* variables
+          command: [sh, -c]
+          args:
+            - for b in lakehouse flink risingwave velero etcd-snapshots airbyte mlflow loki harbor cdn; do
+                rclone mkdir sw:$b; done

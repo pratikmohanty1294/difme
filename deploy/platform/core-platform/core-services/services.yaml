@@ -1,0 +1,16 @@
+# Ports from PDF §5.3: cmd 8080 · qry 8081 · saga 8082 · consistency-router 8083 · rate-limiter 8084 · rehydration 8085.
+# The quarkus-service component renders one Deployment+Service per entry via the difme-services ConfigMap
+# consumed by the Kustomize replacement plugin in components/quarkus-service.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: difme-services }
+data:
+  services.yaml: |
+    - { name: quarkus-cmd-svc,     port: 8080, image: difme-cmd-svc,            team: payments,   metric: payment-processing, cpu: 200m, mem: 384Mi }
+    - { name: quarkus-qry-svc,     port: 8081, image: difme-qry-svc,            team: payments,   metric: account-query,      cpu: 100m, mem: 256Mi }
+    - { name: saga-orchestrator,   port: 8082, image: difme-saga-orchestrator,  team: payments,   metric: settlement-saga,    cpu: 100m, mem: 256Mi }
+    - { name: consistency-router,  port: 8083, image: difme-consistency-router, team: platform,   metric: payment-processing, cpu: 50m,  mem: 192Mi }
+    - { name: rate-limiter,        port: 8084, image: difme-rate-limiter,       team: platform,   metric: rate-limiting,      cpu: 50m,  mem: 128Mi }
+    - { name: rehydration-svc,     port: 8085, image: difme-rehydration-svc,    team: edge,       metric: offline-rehydration, cpu: 100m, mem: 256Mi }
+    - { name: projection-svc,      port: 8086, image: difme-projection-svc,     team: payments,   metric: payment-processing, cpu: 100m, mem: 256Mi }
+    - { name: replay-engine,       port: 8087, image: difme-replay-engine,      team: compliance, metric: audit-replay,       cpu: 100m, mem: 256Mi }

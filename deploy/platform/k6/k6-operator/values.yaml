@@ -1,0 +1,2 @@
+# PDF §4.5 / §10 — distributed k6 load tests in-cluster (replaces the hosted SaaS, ADR-002).
+manager: { resources: { requests: { cpu: 20m, memory: 64Mi } } }

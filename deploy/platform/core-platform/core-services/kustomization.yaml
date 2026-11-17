@@ -1,0 +1,9 @@
+# PDF §5.3 — Quarkus CQRS engine. One base Deployment template, patched per service.
+namespace: core-platform
+resources:
+  - ../../../components/quarkus-service
+  - service-accounts.yaml
+  - rollouts.yaml
+  - network-policy.yaml
+patches:
+  - { path: services.yaml }

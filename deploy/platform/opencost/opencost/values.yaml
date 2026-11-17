@@ -1,0 +1,14 @@
+# PDF §16 — per-namespace, per-workload, per-transaction cost attribution.
+opencost:
+  exporter:
+    defaultClusterId: difme-codespace
+    resources: { requests: { cpu: 20m, memory: 64Mi } }
+    extraEnv: { EMIT_POD_ANNOTATIONS_METRIC: "true", EMIT_NAMESPACE_ANNOTATIONS_METRIC: "true" }
+  customPricing:
+    enabled: true
+    provider: custom
+    costModel: { description: "Codespace on-demand equivalent", CPU: "0.031611", RAM: "0.004237", storage: "0.00005" }
+  prometheus:
+    internal: { enabled: true, serviceName: vmsingle-victoria-metrics-k8s-stack, namespaceName: observability, port: 8429 }
+  ui: { enabled: true }
+  metrics: { kubeStateMetrics: { emitPodAnnotations: true, emitNamespaceAnnotations: true } }

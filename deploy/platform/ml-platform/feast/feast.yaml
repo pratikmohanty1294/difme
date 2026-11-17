@@ -1,0 +1,23 @@
+# PDF §5.7 — feature store: online on Valkey (<5ms), offline on Iceberg, point-in-time correct.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: feast-server, labels: { app: feast-server } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: feast-server } }
+  template:
+    metadata: { labels: { app: feast-server, difme/team: ml, business.metric: fraud-check } }
+    spec:
+      containers:
+        - name: feast
+          image: ghcr.io/pratikmohanty1294/difme-feast:0.1.0
+          args: [feast, serve, --host, 0.0.0.0, --port, "6566"]
+          ports: [{ containerPort: 6566 }]
+          volumeMounts: [{ name: repo, mountPath: /feature_repo/feature_store.yaml, subPath: feature_store.yaml }]
+          resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
+      volumes: [{ name: repo, configMap: { name: feast-repo } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: feast-server }
+spec: { selector: { app: feast-server }, ports: [{ port: 6566 }] }

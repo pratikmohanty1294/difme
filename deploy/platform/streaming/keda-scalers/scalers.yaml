@@ -1,0 +1,32 @@
+# PDF §6.2 — lagThreshold 100, activationLagThreshold 10, min 2, max 50, scale-down after 5 min at lag 0.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: projection-svc, namespace: core-platform }
+spec:
+  scaleTargetRef: { name: projection-svc }
+  minReplicaCount: 2
+  maxReplicaCount: 50
+  cooldownPeriod: 300
+  pollingInterval: 5
+  advanced: { horizontalPodAutoscalerConfig: { behavior: { scaleDown: { stabilizationWindowSeconds: 300 } } } }
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: difme-kafka-bootstrap.streaming.svc:9092
+        consumerGroup: projection-svc
+        topic: payments.events.v1
+        lagThreshold: "100"
+        activationLagThreshold: "10"
+        offsetResetPolicy: earliest
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: rehydration-svc, namespace: core-platform }
+spec:
+  scaleTargetRef: { name: rehydration-svc }
+  minReplicaCount: 2
+  maxReplicaCount: 50
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata: { bootstrapServers: difme-kafka-bootstrap.streaming.svc:9092, consumerGroup: rehydration-svc, topic: crdt.deltas.v1, lagThreshold: "100", activationLagThreshold: "10" }

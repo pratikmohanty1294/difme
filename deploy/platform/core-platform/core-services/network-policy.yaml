@@ -1,0 +1,19 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: { name: core-flows }
+spec:
+  endpointSelector: { matchLabels: { app: quarkus-cmd-svc } }
+  ingress:
+    - fromEndpoints:
+        - { matchLabels: { "k8s:io.kubernetes.pod.namespace": quinn-hub } }
+        - { matchLabels: { "k8s:io.kubernetes.pod.namespace": ingress-system } }
+        - { matchLabels: { app: saga-orchestrator } }
+        - { matchLabels: { app: rehydration-svc } }
+      toPorts: [{ ports: [{ port: "8080" }, { port: "9000" }] }]
+  egress:
+    - toEndpoints:
+        - { matchLabels: { "k8s:io.kubernetes.pod.namespace": database-tier } }
+        - { matchLabels: { "k8s:io.kubernetes.pod.namespace": cache-tier } }
+        - { matchLabels: { "k8s:io.kubernetes.pod.namespace": temporal } }
+        - { matchLabels: { app: flagd } }
+        - { matchLabels: { "k8s:io.kubernetes.pod.namespace": observability } }

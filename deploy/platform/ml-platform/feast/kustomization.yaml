@@ -1,0 +1,4 @@
+resources: [feast.yaml]
+configMapGenerator:
+  - name: feast-repo
+    files: [feature_store.yaml=../../../../ml/feast/feature_store.yaml]

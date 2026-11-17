@@ -1,0 +1,5 @@
+# PDF §5.6 — OLAP engine (MPP, vectorised) reading Iceberg through the Polaris external catalog.
+starrocks:
+  starrocksFESpec: { replicas: 1, resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }, storageSpec: { name: fe, storageSize: 4Gi } }
+  starrocksBeSpec: { replicas: 1, resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }, storageSpec: { name: be, storageSize: 8Gi } }
+  initPassword: { enabled: true, passwordSecret: starrocks-root }

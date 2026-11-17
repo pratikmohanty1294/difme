@@ -1,0 +1,50 @@
+# Outbox pattern (§5.4): command handlers write to the outbox table in the same ACID transaction; Debezium
+# reads it via CDC → no dual-write. The outbox event router turns rows into CloudEvents on per-aggregate topics.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata: { name: core-outbox, labels: { strimzi.io/cluster: debezium } }
+spec:
+  class: io.debezium.connector.postgresql.PostgresConnector
+  tasksMax: 1
+  config:
+    database.hostname: yb-tservers.database-tier.svc
+    database.port: 5433
+    database.user: debezium
+    database.password: ${secrets:streaming/debezium-db:password}
+    database.dbname: difme
+    plugin.name: yboutput
+    topic.prefix: difme
+    table.include.list: core.outbox
+    transforms: outbox
+    transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+    transforms.outbox.table.field.event.id: id
+    transforms.outbox.table.field.event.key: aggregate_id
+    transforms.outbox.table.field.event.payload: payload
+    transforms.outbox.route.by.field: aggregate_type
+    transforms.outbox.route.topic.replacement: "${routedByValue}.events.v1"
+    transforms.outbox.table.fields.additional.placement: "trace_id:header:traceparent,event_timestamp:header:event_timestamp"
+    value.converter: io.debezium.converters.CloudEventsConverter
+    value.converter.serializer.type: avro
+    value.converter.data.serializer.type: avro
+    value.converter.avro.apicurio.registry.url: http://apicurio-registry:8080/apis/registry/v2
+    value.converter.extension.attributes.enable: true
+    value.converter.metadata.source: "value,id:header,type:header,traceparent:header"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata: { name: settlements-cdc, labels: { strimzi.io/cluster: debezium } }
+spec:
+  class: io.debezium.connector.postgresql.PostgresConnector
+  tasksMax: 1
+  config:
+    database.hostname: yb-tservers.database-tier.svc
+    database.port: 5433
+    database.user: debezium
+    database.password: ${secrets:streaming/debezium-db:password}
+    database.dbname: difme
+    plugin.name: yboutput
+    topic.prefix: settlements
+    table.include.list: settlement.reservation,settlement.instruction
+    value.converter: io.debezium.converters.CloudEventsConverter
+    value.converter.serializer.type: avro
+    value.converter.avro.apicurio.registry.url: http://apicurio-registry:8080/apis/registry/v2

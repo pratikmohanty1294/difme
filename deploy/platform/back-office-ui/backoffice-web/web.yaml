@@ -1,0 +1,71 @@
+# PDF §5.9 — Module Federation shell + independently deployed remotes (one Deployment each, own Argo CD sync).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: backoffice-shell, labels: { app: backoffice-shell } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: backoffice-shell } }
+  template:
+    metadata: { labels: { app: backoffice-shell, difme/team: backoffice, business.metric: backoffice-ui } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/pratikmohanty1294/difme-backoffice-shell:0.1.0
+          ports: [{ containerPort: 8080 }]
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: backoffice-shell }
+spec: { selector: { app: backoffice-shell }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-settlements, labels: { app: remote-settlements } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-settlements } }
+  template:
+    metadata: { labels: { app: remote-settlements, difme/team: settlements, business.metric: backoffice-ui } }
+    spec:
+      containers:
+        - { name: web, image: ghcr.io/pratikmohanty1294/difme-remote-settlements:0.1.0, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-settlements }
+spec: { selector: { app: remote-settlements }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-compliance, labels: { app: remote-compliance } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-compliance } }
+  template:
+    metadata: { labels: { app: remote-compliance, difme/team: compliance, business.metric: backoffice-ui } }
+    spec:
+      containers:
+        - { name: web, image: ghcr.io/pratikmohanty1294/difme-remote-compliance:0.1.0, ports: [{ containerPort: 3000 }], resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 128Mi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-compliance }
+spec: { selector: { app: remote-compliance }, ports: [{ port: 80, targetPort: 3000 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-analytics, labels: { app: remote-analytics } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-analytics } }
+  template:
+    metadata: { labels: { app: remote-analytics, difme/team: analytics, business.metric: backoffice-ui } }
+    spec:
+      containers:
+        - { name: web, image: ghcr.io/pratikmohanty1294/difme-remote-analytics:0.1.0, ports: [{ containerPort: 4000 }], resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 128Mi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-analytics }
+spec: { selector: { app: remote-analytics }, ports: [{ port: 80, targetPort: 4000 }] }

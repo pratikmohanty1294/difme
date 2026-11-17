@@ -1,0 +1,46 @@
+# PDF §10.4 business observability metrics and thresholds.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata: { name: difme-business }
+spec:
+  groups:
+    - name: business
+      rules:
+        - alert: PaymentSuccessRateLow
+          expr: sum by (bank, channel) (rate(difme_payments_total{outcome="success"}[5m])) / sum by (bank, channel) (rate(difme_payments_total[5m])) < 0.995
+          for: 5m
+          labels: { severity: P1 }
+        - alert: CostPerTransactionHigh
+          expr: difme:cost_per_transaction_usd > 0.001
+          for: 15m
+          labels: { severity: warn }
+        - alert: SettlementLagHigh
+          expr: histogram_quantile(0.99, sum by (le, bank_pair) (rate(difme_settlement_lag_seconds_bucket[5m]))) > 0.5
+          for: 5m
+          labels: { severity: warn }
+        - alert: SagaCompensationRateHigh
+          expr: sum by (saga_type) (rate(difme_saga_compensations_total[15m])) / sum by (saga_type) (rate(difme_saga_started_total[15m])) > 0.001
+          for: 10m
+          labels: { severity: P2 }
+        - alert: ConsumerLagHigh
+          expr: sum by (consumergroup) (kafka_consumergroup_lag) > 100
+          for: 2m
+          labels: { severity: info }
+        - alert: IdempotencyCollisionRate
+          expr: rate(difme_idempotency_collisions_total[1h]) / rate(difme_idempotency_checks_total[1h]) > 0.00001
+          labels: { severity: inspect }
+        - alert: ReplayDivergence
+          expr: increase(difme_replay_divergence_total[5m]) > 0
+          labels: { severity: P1 }
+        - alert: ApiSchemaDrift
+          expr: increase(difme_schema_breaking_change_total[5m]) > 0
+          labels: { severity: P1 }
+        - alert: FraudFalsePositiveReview
+          expr: sum by (model_version) (rate(difme_fraud_false_positive_total[1d])) > 0
+          labels: { severity: review }
+    - name: finops
+      rules:
+        - record: difme:cost_per_transaction_usd
+          expr: |
+            sum(opencost_namespace_cost_hourly{namespace=~"core-platform|quinn-hub|streaming|database-tier"}) / 3600
+            / clamp_min(sum(rate(difme_payments_total[1h])), 1)

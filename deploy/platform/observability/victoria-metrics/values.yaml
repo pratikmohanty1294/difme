@@ -1,0 +1,19 @@
+# PDF §10 — VictoriaMetrics (metrics), Grafana (dashboards), Alertmanager + vmalert (alerting).
+vmsingle: { spec: { retentionPeriod: "30d", resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }, storage: { resources: { requests: { storage: 8Gi } } } } }
+vmagent: { spec: { resources: { requests: { cpu: 50m, memory: 128Mi } } } }
+alertmanager:
+  spec: { resources: { requests: { cpu: 10m, memory: 32Mi } } }
+  config:
+    route: { receiver: default, group_by: [alertname, severity], routes: [{ matchers: ["severity=P1"], receiver: pager }] }
+    receivers: [{ name: default }, { name: pager }]   # chat/paging webhooks are injected from OpenBao per environment
+grafana:
+  adminPassword: ""   # from secret grafana-admin
+  admin: { existingSecret: grafana-admin }
+  sidecar: { dashboards: { enabled: true, searchNamespace: ALL }, datasources: { enabled: true } }
+  additionalDataSources:
+    - { name: Loki, type: loki, url: http://loki-gateway.observability.svc }
+    - { name: Tempo, type: tempo, url: http://tempo.observability.svc:3100, jsonData: { tracesToProfiles: { datasourceUid: pyroscope, profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds" }, tracesToLogsV2: { datasourceUid: loki } } }
+    - { name: Pyroscope, uid: pyroscope, type: grafana-pyroscope-datasource, url: http://pyroscope.observability.svc:4040 }
+  resources: { requests: { cpu: 50m, memory: 128Mi } }
+kube-state-metrics: { resources: { requests: { cpu: 10m, memory: 32Mi } } }
+prometheus-node-exporter: { resources: { requests: { cpu: 10m, memory: 32Mi } } }

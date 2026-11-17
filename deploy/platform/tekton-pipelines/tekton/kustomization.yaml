@@ -1,0 +1,4 @@
+# PDF §4.5 / §13A — on-cluster CI (air-gapped scenario). Mirrors .github/workflows stages.
+resources:
+  - https://storage.googleapis.com/tekton-releases/pipeline/previous/v0.68.0/release.yaml
+  - pipeline.yaml

@@ -1,0 +1,22 @@
+{
+  "title": "DIFME — Business Observability (PDF §10.4)",
+  "uid": "difme-business",
+  "schemaVersion": 39,
+  "panels": [
+    { "type": "stat", "title": "Payment success rate", "gridPos": {"x":0,"y":0,"w":6,"h":4},
+      "targets": [{ "expr": "sum(rate(difme_payments_total{outcome=\"success\"}[5m])) / sum(rate(difme_payments_total[5m]))" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":0.995}] } } } },
+    { "type": "stat", "title": "Cost per transaction (USD)", "gridPos": {"x":6,"y":0,"w":6,"h":4},
+      "targets": [{ "expr": "difme:cost_per_transaction_usd" }], "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 5 } } },
+    { "type": "timeseries", "title": "Settlement lag p99 by bank pair", "gridPos": {"x":0,"y":4,"w":12,"h":8},
+      "targets": [{ "expr": "histogram_quantile(0.99, sum by (le, bank_pair) (rate(difme_settlement_lag_seconds_bucket[5m])))" }] },
+    { "type": "timeseries", "title": "Saga compensation rate", "gridPos": {"x":12,"y":0,"w":12,"h":6},
+      "targets": [{ "expr": "sum by (saga_type) (rate(difme_saga_compensations_total[15m])) / sum by (saga_type) (rate(difme_saga_started_total[15m]))" }] },
+    { "type": "timeseries", "title": "Kafka consumer lag", "gridPos": {"x":12,"y":6,"w":12,"h":6},
+      "targets": [{ "expr": "sum by (consumergroup) (kafka_consumergroup_lag)" }] },
+    { "type": "stat", "title": "Replay divergences (24h)", "gridPos": {"x":0,"y":12,"w":6,"h":4},
+      "targets": [{ "expr": "increase(difme_replay_divergence_total[24h])" }] },
+    { "type": "stat", "title": "Idempotency collision rate", "gridPos": {"x":6,"y":12,"w":6,"h":4},
+      "targets": [{ "expr": "rate(difme_idempotency_collisions_total[1h]) / rate(difme_idempotency_checks_total[1h])" }] }
+  ]
+}

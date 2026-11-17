@@ -1,0 +1,26 @@
+# PDF §5.7 — in-database ML inference (train & serve with SQL).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgresml, labels: { app: postgresml } }
+spec:
+  serviceName: postgresml
+  replicas: 1
+  selector: { matchLabels: { app: postgresml } }
+  template:
+    metadata: { labels: { app: postgresml } }
+    spec:
+      containers:
+        - name: postgresml
+          image: ghcr.io/postgresml/postgresml:2.10.0
+          env: [{ name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: postgresml-db, key: password } } }]
+          ports: [{ containerPort: 5432 }]
+          resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 4Gi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgresml }
+spec: { selector: { app: postgresml }, ports: [{ port: 5432 }] }

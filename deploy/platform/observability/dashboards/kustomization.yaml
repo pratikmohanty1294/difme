@@ -1,0 +1,8 @@
+resources: [alerts.yaml]
+configMapGenerator:
+  - name: difme-dashboards
+    options: { labels: { grafana_dashboard: "1" } }
+    files:
+      - business.json=../../../../observability/dashboards/business.json
+      - latency-budget.json=../../../../observability/dashboards/latency-budget.json
+      - finops.json=../../../../observability/dashboards/finops.json

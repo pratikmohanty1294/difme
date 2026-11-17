@@ -124,3 +124,13 @@ Inside k3d (Kubernetes-in-Docker on a Codespace), Cilium's full kube-proxy repla
 
 **Live base-profile measurements (Codespace, 4 cores / 16 GB, 2026-11-17):** 13/13 apps Synced+Healthy.
 Excluding high-churn objects from Argo CD (policy reports, Gatekeeper status, Cilium endpoints, leases/events), status-only update suppression, a 300 s reconcile and a 300 s Gatekeeper audit reduced Argo CD's controller from ~300–900m bursts to **4–6m** and Gatekeeper from ~120–400m to **~5m**. The node idles at **0.22–0.68 cores, ~4.9 GB**.
+
+## ADR-014 — Testing toolset: lean 4 (owner-approved 2026-11-17)
+PDF §4.5 lists nine overlapping tools. Each capability is covered once:
+| Capability | Tool | Replaces |
+|---|---|---|
+| UI cross-browser E2E, visual regression, API functional | **Playwright** | Cypress, TestCafe, Karate, Newman |
+| Load / performance (in-cluster via k6-operator, results to VictoriaMetrics) | **k6** | Gatling, Locust |
+| Contract + generated tests from OpenAPI / GraphQL specs | **Schemathesis** | LLM-based test generation (paid API; non-deterministic) |
+| ISO 8583 / financial message simulation | **jPOS** | MSGSIM / FINSIM |
+Unit tests stay in each stack's native runner (JUnit 5, Vitest, Rust `cargo test`). Fewer tools mean less CI time, fewer images and less RAM (ADR-012).

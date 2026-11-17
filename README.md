@@ -45,7 +45,7 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 4.2 | ingress-system: nginx-ingress, cert-manager, external-dns, metallb | **Envoy Gateway** replaces nginx-ingress (ADR-005); others same | `deploy/platform/ingress-system/` |
 | 4.3 | NLB / ALB / QUIC paths, WAF OWASP CRS 4.0 | MetalLB + Envoy Gateway (TLS 1.3) + **Coraza** CRS 4 · UDP 4443 → Quinn via UDPRoute | `deploy/platform/ingress-system/` |
 | 4.4 | Istio mTLS STRICT, VirtualService canary, circuit breaker, retries, egress allowlist | **Istio Ambient** (ztunnel + waypoints, ADR-005) with the same policies | `deploy/platform/istio/` |
-| 4.5 | Semgrep, Trivy, TLA+/TLC, Sigstore/cosign, SLSA L3, Karate, Newman, k6, Gatling, Locust, Playwright, Cypress, TestCafe, LLM test gen, Argo CD rollback, canary SLO gate, Pyroscope CI gate | Same in GitHub Actions + Argo Rollouts | `.github/workflows/`, `tests/` |
+| 4.5 | Semgrep, Trivy, TLA+/TLC, Sigstore/cosign, SLSA L3, Karate, Newman, k6, Gatling, Locust, Playwright, Cypress, TestCafe, LLM test gen, Argo CD rollback, canary SLO gate, Pyroscope CI gate | Same gates in GitHub Actions + Argo Rollouts; testing consolidated to **Playwright, k6, Schemathesis, jPOS** (ADR-014) | `.github/workflows/`, `tests/` |
 | 4.5 | Financial message / scenario simulators | **jPOS** ISO 8583 simulator + scenario runner | `tests/simulator/` |
 | 4.5 | Tekton | Tekton pipelines (on-cluster mirror of GitHub Actions) | `deploy/platform/tekton/` |
 | 4.6 | Cilium eBPF kube-proxy replacement, Hubble | Same (k3d with flannel disabled) | `deploy/platform/cilium/` |
@@ -102,5 +102,5 @@ ml/              Fraud model training → ONNX, Feast definitions
 policies/        Kyverno, OPA Rego, Semgrep rules
 services/        core (Quarkus), hub (Rust), attestation
 specs/tla/       TLA+ specifications, checked in CI
-tests/           Karate, Newman, k6, Gatling, Locust, Playwright, Cypress, TestCafe, jPOS simulator
+tests/           Playwright (UI + API), k6 (load), Schemathesis (contract), jPOS simulator
 ```

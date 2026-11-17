@@ -34,7 +34,9 @@ jobs:
       - name: CloudEvents envelope schema
         run: npx -y -p ajv-cli@5.0.0 -p ajv-formats@3.0.1 ajv compile --spec=draft2020 -c ajv-formats -s api/cloudevents/envelope.schema.json
       - name: GraphQL SDL validate
-        run: npx -y @graphql-inspector/cli@5.0.8 validate 'api/graphql/*.graphql' api/graphql/backoffice.graphql || npx -y graphql@16.10.0 --version
+        run: |
+          npm i --no-save --prefix /tmp/gql graphql@16.10.0
+          NODE_PATH=/tmp/gql/node_modules node -e "const g=require('graphql');const s=g.buildSchema(require('fs').readFileSync('api/graphql/backoffice.graphql','utf8'));console.log('schema ok:',Object.keys(s.getQueryType().getFields()).length,'queries')"
       - uses: bufbuild/buf-action@v1
         with: { input: api/proto, lint: true, format: false, breaking: "${{ github.event_name == 'pull_request' }}", breaking_against: "${{ github.event.repository.clone_url }}#branch=main,subdir=api/proto", push: false }
       - name: OpenAPI breaking-change gate

@@ -45,6 +45,9 @@ The owner chose each of these when offered a newer free alternative to the PDF c
 | Iceberg catalog (unspecified) | **Apache Polaris** (Iceberg REST) | One catalog with RBAC and credential vending for Trino, Spark, Flink and StarRocks. |
 | Kong + APISIX | **Kept as in the PDF** | Owner's choice: Kong external, APISIX back-office, both behind Envoy Gateway. |
 
-## ADR-006 — Kafka tiered storage (open)
+## ADR-006 — Kafka tiered storage (decided 2026-11-17)
 The PDF tiers old broker segments to object storage. Apache Kafka has the KIP-405 interface but no built-in S3 RemoteStorageManager; the available Apache-2.0 plugins are published by vendors.
-**Current state:** event topics keep infinite local retention, and Flink archives every event to Iceberg on SeaweedFS (Day-0 history). The owner decides whether to add a KIP-405 plugin.
+**Current state:** event topics keep infinite local retention, and Flink archives every event to Iceberg on SeaweedFS (Day-0 history). **Decision (owner):** no KIP-405 plugin. Infinite retention plus the Flink→Iceberg archive is the tiering mechanism, which avoids vendor-named plugins.
+
+## ADR-007 — Backups (decided 2026-11-17)
+**Decision (owner):** keep Velero for cluster backup to SeaweedFS S3. The vendor word in its S3 plugin is accepted as a technical identifier.

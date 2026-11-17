@@ -20,6 +20,22 @@ COMPOSITE = {
 }
 
 
+IGNORE = {
+    "policy-controller": [
+        {"group": "admissionregistration.k8s.io", "kind": "MutatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle"]},
+        {"group": "admissionregistration.k8s.io", "kind": "ValidatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle"]},
+    ],
+    "policies": [
+        {"group": "kyverno.io", "kind": "ClusterPolicy", "managedFieldsManagers": ["kyverno"], "jqPathExpressions": [".spec.rules[]?.skipBackgroundRequests", ".spec.admission", ".spec.emitWarning"]},
+        {"group": "constraints.gatekeeper.sh", "kind": "*", "managedFieldsManagers": ["gatekeeper"]},
+    ],
+    "envoy-gateway": [
+        {"group": "rbac.authorization.k8s.io", "kind": "ClusterRole", "jqPathExpressions": [".rules"]},
+        {"group": "rbac.authorization.k8s.io", "kind": "ClusterRoleBinding", "jqPathExpressions": [".subjects"]},
+    ],
+}
+
+
 def application(c: dict) -> dict:
     base = {
         "apiVersion": "argoproj.io/v1alpha1",
@@ -41,6 +57,11 @@ def application(c: dict) -> dict:
             },
         },
     }
+    # Fields owned by controllers/webhooks at runtime (verified on the live cluster) are not drift.
+    ignore = IGNORE.get(c["name"])
+    if ignore:
+        base["spec"]["ignoreDifferences"] = ignore
+        base["spec"]["syncPolicy"]["syncOptions"].append("RespectIgnoreDifferences=true")
     local = f"deploy/platform/{c['ns']}/{c['name']}"
     if c["kind"] == "helm":
         base["spec"]["sources"] = [

@@ -23,19 +23,41 @@ public final class BatchLookup<K, V> implements AutoCloseable {
         t.setDaemon(true);
         return t;
     });
+    private final long maxWaitNanos;
     private Map<K, List<CompletableFuture<V>>> pending = new HashMap<>();
+    private long firstPendingAt;
 
     public BatchLookup(Function<Collection<K>, Map<K, V>> fetch, int maxBatch, long maxWaitMs) {
         this.fetch = fetch;
         this.maxBatch = maxBatch;
-        worker.scheduleWithFixedDelay(this::flush, maxWaitMs, maxWaitMs, TimeUnit.MILLISECONDS);
+        this.maxWaitNanos = TimeUnit.MILLISECONDS.toNanos(maxWaitMs);
+        worker.scheduleWithFixedDelay(this::flushIfStale, maxWaitMs, Math.max(1, maxWaitMs / 2), TimeUnit.MILLISECONDS);
     }
 
-    public synchronized CompletableFuture<V> get(K key) {
+    /** Full batches are cut immediately and queried as one statement; partial ones wait at most maxWaitMs. */
+    public CompletableFuture<V> get(K key) {
         CompletableFuture<V> f = new CompletableFuture<>();
-        pending.computeIfAbsent(key, k -> new ArrayList<>(1)).add(f);
-        if (pending.size() >= maxBatch) worker.execute(this::flush);
+        Map<K, List<CompletableFuture<V>>> full = null;
+        synchronized (this) {
+            if (pending.isEmpty()) firstPendingAt = System.nanoTime();
+            pending.computeIfAbsent(key, k -> new ArrayList<>(1)).add(f);
+            if (pending.size() >= maxBatch) { full = pending; pending = new HashMap<>(); }
+        }
+        if (full != null) {
+            Map<K, List<CompletableFuture<V>>> batch = full;
+            worker.execute(() -> run(batch));
+        }
         return f;
+    }
+
+    private void flushIfStale() {
+        Map<K, List<CompletableFuture<V>>> batch;
+        synchronized (this) {
+            if (pending.isEmpty() || System.nanoTime() - firstPendingAt < maxWaitNanos) return;
+            batch = pending;
+            pending = new HashMap<>();
+        }
+        run(batch);
     }
 
     private void flush() {
@@ -45,6 +67,10 @@ public final class BatchLookup<K, V> implements AutoCloseable {
             batch = pending;
             pending = new HashMap<>();
         }
+        run(batch);
+    }
+
+    private void run(Map<K, List<CompletableFuture<V>>> batch) {
         try {
             Map<K, V> found = fetch.apply(batch.keySet());
             batch.forEach((k, fs) -> fs.forEach(f -> f.complete(found.get(k))));

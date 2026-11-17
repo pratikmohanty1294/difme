@@ -16,6 +16,13 @@
     <fluxnova.version>3.1.1</fluxnova.version>
   </properties>
 
+  <dependencyManagement>
+    <dependencies>
+      <!-- One JUnit version for every artifact (flink-test-utils pulls an older vintage engine). -->
+      <dependency><groupId>org.junit</groupId><artifactId>junit-bom</artifactId><version>5.13.4</version><type>pom</type><scope>import</scope></dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <!-- Provided by the Flink runtime image -->
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
@@ -38,7 +45,8 @@
     <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId><version>2.23.0</version></dependency>
     <dependency><groupId>com.github.pjfanning</groupId><artifactId>excel-streaming-reader</artifactId><version>6.0.0</version></dependency>
     <!-- Tests -->
-    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-test-utils</artifactId><version>${flink.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-test-utils</artifactId><version>${flink.version}</version><scope>test</scope>
+      <exclusions><exclusion><groupId>org.junit.vintage</groupId><artifactId>junit-vintage-engine</artifactId></exclusion></exclusions></dependency>
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.13.4</version><scope>test</scope></dependency>
   </dependencies>
 

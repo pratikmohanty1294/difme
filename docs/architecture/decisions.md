@@ -117,3 +117,7 @@ Each service's RSS, startup and throughput are recorded by CI and compared again
 
 **Measured (CI, 2026-11-17):** native images built for rate-limiter, consistency-router, projection-svc and replay-engine. process-gateway moved to JVM + AOT cache: the Temporal SDK's shaded gRPC/Netty fails native-image analysis (`ApplicationProtocolConfig` in the image heap). Revisit once the SDK ships native-image metadata.
 Bulk benchmark (ADR-011), 10M records with DB + DMN validation on a 4-vCPU runner: **855 s → 56 s (178,571 records/s)** after the JVM-shared account snapshot, memoised DMN, flat POJO records and per-partition counting.
+
+## ADR-013 — Cilium data path in the Codespace (verified live 2026-11-17)
+Inside k3d (Kubernetes-in-Docker on a Codespace), Cilium's full kube-proxy replacement left host-network pods unable to reach ClusterIP services, even with legacy host routing and cgroup-root changes. The node-agent namespaces depend on that path.
+**Decision:** the Codespace cluster runs Cilium **alongside k3s kube-proxy**. eBPF networking, network policy (L3–L7), WireGuard and Hubble stay. Real clusters (RKE2 on VMs or bare metal, `deploy/fleet/rke2-config.yaml` with `disable-kube-proxy`) use `kubeProxyReplacement: true` for the full eBPF service data path (PDF §4.6), where it is supported natively.

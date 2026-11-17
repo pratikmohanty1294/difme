@@ -1,5 +1,7 @@
 # PDF §4.6 — eBPF kube-proxy replacement, WireGuard pod-to-pod encryption, Hubble L7 flow logs.
-kubeProxyReplacement: true
+# Codespace (k3d, Kubernetes-in-Docker): Cilium runs alongside kube-proxy; ADR-013. Real clusters (RKE2 on VMs or
+# bare metal, deploy/fleet/rke2-config.yaml) set kubeProxyReplacement: true for the full eBPF data path (PDF §4.6).
+kubeProxyReplacement: false
 k8sServiceHost: ""          # set by bootstrap/install.sh
 k8sServicePort: 6443
 routingMode: tunnel
@@ -10,12 +12,7 @@ bpf:
   # Kubernetes-in-Docker (k3d in Codespaces) can't use eBPF host routing: pods could not reach the API service.
   # Verified on the first live run (2026-11-17). Bare-metal / VM overlays set this to false for full eBPF routing.
   hostLegacyRouting: true
-# Socket LB must hook the real cgroup root so host-network pods (MetalLB speaker, node agents) can reach ClusterIPs
-# inside Kubernetes-in-Docker (verified live 2026-11-17).
-socketLB: { hostNamespaceOnly: false }
-cgroup:
-  autoMount: { enabled: false }
-  hostRoot: /run/cilium/cgroupv2   # mounted by deploy/bootstrap/k3d-entrypoint-cilium.sh
+socketLB: { enabled: false }
 encryption: { enabled: true, type: wireguard }
 hubble:
   enabled: true

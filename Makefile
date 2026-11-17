@@ -12,7 +12,7 @@ help:            ## List targets
 	@echo "  Profiles: $$(ls deploy/profiles | sed 's/.txt//' | tr '\n' ' ')"
 
 cluster:         ## Create the k3d cluster: Cilium (kube-proxy replacement), Argo CD, dev secrets
-	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:* --volume $(CURDIR)/deploy/bootstrap/k3d-entrypoint-cilium.sh:/bin/k3d-entrypoint-cilium.sh@server:*
+	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:*
 	bash deploy/bootstrap/install.sh $(REPO)
 	bash deploy/bootstrap/dev-secrets.sh
 

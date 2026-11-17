@@ -16,7 +16,6 @@ options:
       # Cilium replaces flannel and kube-proxy (PDF §4.6). Traefik and ServiceLB are replaced by ingress-nginx and MetalLB.
       - { arg: --flannel-backend=none,      nodeFilters: [server:*] }
       - { arg: --disable-network-policy,    nodeFilters: [server:*] }
-      - { arg: --disable-kube-proxy,        nodeFilters: [server:*] }
       - { arg: --disable=traefik,           nodeFilters: [server:*] }
       - { arg: --disable=servicelb,         nodeFilters: [server:*] }
       - { arg: --secrets-encryption,        nodeFilters: [server:*] }

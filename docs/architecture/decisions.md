@@ -30,3 +30,17 @@ DIFME follows Financial Platform Architecture v1.2. These records log every devi
 
 ## ADR-004 — Repo visibility
 **Decision:** The repository is public. The PDF's "CONFIDENTIAL" marking is not carried into the repo. Secrets live only in GitHub Actions secrets, Codespaces secrets and OpenBao.
+
+## ADR-005 — Newer free alternatives (owner-approved 2026-11-17)
+The owner chose each of these when offered a newer free alternative to the PDF component.
+
+| PDF component | Chosen | Reason |
+|---|---|---|
+| NGINX Ingress Controller + ModSecurity | **Envoy Gateway** (Gateway API) + **Coraza** WAF running OWASP CRS 4 | ingress-nginx was retired upstream (no fixes after March 2026). Gateway API is the Kubernetes standard and routes UDP/QUIC and HTTP/3 natively. |
+| MinIO | **SeaweedFS** | MinIO community edition stopped shipping binaries and images and is in maintenance mode. SeaweedFS is Apache-2.0, S3-compatible, has erasure coding and replication, and is light enough for a Codespace. |
+| Istio with sidecars | **Istio Ambient** (ztunnel + waypoints) | GA since 1.24 and much lighter (PDF §17 candidate). mTLS STRICT, L7 policy, canary and circuit breaking keep working through waypoints. |
+| Java 21 | **Java 25 LTS** | Current LTS. Fixes virtual-thread pinning on `synchronized`, adds scoped values and compact object headers. |
+| React 18 / Svelte 4 / Angular 17 + Webpack 5 Module Federation | **React 19 / Svelte 5 / Angular 20 + Module Federation 2.0 on Rspack** | The old majors are out of support. MF 2.0 adds manifest-based remotes and type hints, and Rspack builds faster. |
+| Native Android shell + uniffi | **Tauri 2 mobile** (Vue 3 UI + Rust core; Kotlin plugins for HCE/NFC/KeyStore) | One Rust codebase shared with the hub, first-class Android and iOS. |
+| Iceberg catalog (unspecified) | **Apache Polaris** (Iceberg REST) | One catalog with RBAC and credential vending for Trino, Spark, Flink and StarRocks. |
+| Kong + APISIX | **Kept as in the PDF** | Owner's choice: Kong external, APISIX back-office, both behind Envoy Gateway. |

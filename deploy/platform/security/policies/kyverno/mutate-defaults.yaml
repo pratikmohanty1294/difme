@@ -1,0 +1,14 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: mutate-security-defaults }
+spec:
+  rules:
+    - name: run-as-non-root
+      match: { any: [{ resources: { kinds: [Pod], namespaces: [core-platform, quinn-hub, back-office-ui] } }] }
+      mutate:
+        patchStrategicMerge:
+          spec:
+            securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+            containers:
+              - (name): "*"
+                securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }

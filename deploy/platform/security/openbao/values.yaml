@@ -1,0 +1,7 @@
+# PDF §5.8 — secrets management (OpenBao, ADR-001): dynamic DB creds TTL=1h, PKI CA, transit encryption-as-a-service.
+server:
+  ha: { enabled: true, replicas: 3, raft: { enabled: true, setNodeId: true } }   # vault-0/1/2 Raft HA in the PDF
+  resources: { requests: { cpu: 50m, memory: 128Mi } }
+  dataStorage: { size: 2Gi }
+injector: { enabled: true }
+csi: { enabled: true }

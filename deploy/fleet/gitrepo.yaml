@@ -1,0 +1,11 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata: { name: difme, namespace: fleet-default }
+spec:
+  repo: https://github.com/pratikmohanty1294/difme
+  branch: main
+  paths: [deploy/argocd]
+  targets:
+    - { name: region-a, clusterSelector: { matchLabels: { difme/region: region-a, difme/role: primary } } }
+    - { name: region-b, clusterSelector: { matchLabels: { difme/region: region-b, difme/role: replica } } }
+    - { name: region-c, clusterSelector: { matchLabels: { difme/region: region-c, difme/role: dr } } }

@@ -1,0 +1,14 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: DifmeAllowedRegistries
+metadata: { name: allowed-registries }
+spec:
+  enforcementAction: deny
+  match: { namespaces: [core-platform, quinn-hub, back-office-ui, ml-platform] }
+  parameters: { registries: ["ghcr.io/pratikmohanty1294/", "harbor.difme.local/", "docker.io/library/"] }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: DifmeNoPlaintextSecrets
+metadata: { name: no-plaintext-secrets }
+spec:
+  enforcementAction: deny
+  match: { namespaces: [core-platform, quinn-hub, back-office-ui, ml-platform, streaming] }

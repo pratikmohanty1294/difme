@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-system
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quinn-hub
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: core-platform
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: temporal
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cache-tier
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database-tier
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: streaming
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    difme/workload-type: StatefulSet-DaemonSet
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+  labels:
+    difme/workload-type: StatefulSet-DaemonSet
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opencost
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: back-office-ui
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lakehouse
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: governance
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tekton-pipelines
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor
+  labels:
+    difme/workload-type: StatefulSet
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k6
+  labels:
+    difme/workload-type: Job
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline

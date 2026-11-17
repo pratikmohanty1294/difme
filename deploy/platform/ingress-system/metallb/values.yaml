@@ -1,0 +1,2 @@
+# PDF §4.3 — L4 NLB. BGP in production (scenario A); L2 inside the Codespace.
+speaker: { frr: { enabled: true } }

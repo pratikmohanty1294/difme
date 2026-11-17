@@ -1,0 +1,18 @@
+# PDF §11.1 — RATS RFC 9334 Verifier backend (Veraison, ADR-002).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: veraison, namespace: security, labels: { app: veraison } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: veraison } }
+  template:
+    metadata: { labels: { app: veraison } }
+    spec:
+      containers:
+        - { name: verification, image: ghcr.io/veraison/verification:0.0.2501, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 256Mi } } }
+        - { name: provisioning, image: ghcr.io/veraison/provisioning:0.0.2501, ports: [{ containerPort: 8888 }], resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 256Mi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: veraison, namespace: security }
+spec: { selector: { app: veraison }, ports: [{ name: verify, port: 8080 }, { name: provision, port: 8888 }] }

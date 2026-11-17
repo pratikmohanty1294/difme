@@ -1,0 +1,9 @@
+# PDF §4.4 — egress allowlist: only declared external endpoints (payment networks, settlement gateways).
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata: { name: payment-networks, namespace: istio-system }
+spec:
+  hosts: [upi-switch.example.invalid, settlement-gw.example.invalid]   # replace with real endpoints per environment
+  location: MESH_EXTERNAL
+  ports: [{ number: 443, name: https, protocol: TLS }]
+  resolution: DNS

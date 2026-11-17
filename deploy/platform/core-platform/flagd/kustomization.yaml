@@ -1,0 +1,5 @@
+resources: [flagd.yaml]
+configMapGenerator:
+  - name: flagd-flags
+    namespace: core-platform
+    files: [flags.json=../../../../config/flags/flags.json]

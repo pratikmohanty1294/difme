@@ -1,0 +1,12 @@
+# Istio Ambient (ADR-005). mTLS identities come from SPIRE (PDF §4.4 SPIFFE X.509 SVIDs).
+profile: ambient
+meshConfig:
+  trustDomain: difme.local
+  accessLogFile: /dev/stdout
+  enableTracing: true
+  defaultConfig: { tracing: { sampling: 10 } }
+  extensionProviders:
+    - name: otel
+      opentelemetry: { service: alloy.observability.svc.cluster.local, port: 4317 }
+  outboundTrafficPolicy: { mode: REGISTRY_ONLY }     # egress allowlist (§4.4)
+pilot: { resources: { requests: { cpu: 100m, memory: 256Mi } } }

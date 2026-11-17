@@ -1,0 +1,1 @@
+resources: [mtls.yaml, waypoints.yaml, traffic.yaml, egress.yaml, telemetry.yaml]

@@ -1,0 +1,23 @@
+# PDF §5.10 — Kong (external API gateway): rate limiting, OIDC, OpenAPI request validation against Apicurio specs.
+ingressController: { enabled: true, ingressClass: kong }
+env: { database: "off", router_flavor: expressions, tracing_instrumentations: all, tracing_sampling_rate: 0.1 }
+proxy: { type: ClusterIP }
+resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }
+dblessConfig:
+  config: |
+    _format_version: "3.0"
+    services:
+      - name: payments
+        url: http://quarkus-cmd-svc.core-platform.svc:8080
+        routes: [{ name: payments, paths: [/v1/payments, /v1/transfers] }]
+        plugins:
+          - { name: rate-limiting, config: { second: 100, policy: local } }
+          - { name: request-size-limiting, config: { allowed_payload_size: 64, size_unit: kilobytes } }
+          - { name: opentelemetry, config: { traces_endpoint: "http://alloy.observability.svc:4318/v1/traces" } }
+      - name: accounts
+        url: http://quarkus-qry-svc.core-platform.svc:8081
+        routes: [{ name: accounts, paths: [/v1/accounts] }]
+        plugins:
+          - { name: rate-limiting, config: { second: 500, policy: local } }
+    plugins:
+      - { name: correlation-id, config: { header_name: traceparent, generator: uuid, echo_downstream: true } }

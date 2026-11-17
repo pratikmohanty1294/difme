@@ -1,0 +1,9 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata: { name: difme, namespace: argocd }
+spec:
+  description: DIFME platform — every layer of the v1.2 architecture
+  sourceRepos: ["*"]
+  destinations: [{ server: https://kubernetes.default.svc, namespace: "*" }]
+  clusterResourceWhitelist: [{ group: "*", kind: "*" }]
+  orphanedResources: { warn: true }

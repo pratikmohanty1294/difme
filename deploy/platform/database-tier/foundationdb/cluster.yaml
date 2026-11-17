@@ -1,0 +1,17 @@
+# PDF §8 / §9 — linearizable KV for idempotency keys (UUIDv7, 24h TTL), sequence numbers, locks, webhook dedup.
+apiVersion: apps.foundationdb.org/v1beta2
+kind: FoundationDBCluster
+metadata: { name: difme-fdb, namespace: database-tier }
+spec:
+  version: 7.3.63
+  databaseConfiguration: { redundancy_mode: single, storage_engine: ssd-redwood-1 }
+  processCounts: { storage: 1, log: 1, stateless: -1, cluster_controller: 1 }
+  processes:
+    general:
+      volumeClaimTemplate: { spec: { resources: { requests: { storage: 4Gi } } } }
+      podTemplate:
+        spec:
+          containers:
+            - { name: foundationdb, resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } } }
+            - { name: foundationdb-kubernetes-sidecar, resources: { requests: { cpu: 10m, memory: 32Mi } } }
+  routing: { useDNSInClusterFile: true }

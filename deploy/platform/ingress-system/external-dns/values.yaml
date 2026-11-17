@@ -1,0 +1,4 @@
+# Codespace uses the in-memory provider. Overlays switch to a real DNS provider (scenario B/C).
+provider: { name: inmemory }
+sources: [service, ingress]
+policy: sync

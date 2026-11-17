@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: datahub
+  namespace: argocd
+  labels:
+    difme/profile: lakehouse-extra
+    difme/pdf-section: '5.8'
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: difme
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: governance
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  sources:
+  - repoURL: https://helm.datahubproject.io
+    chart: datahub
+    targetRevision: 0.5.10
+    helm:
+      releaseName: datahub
+      valueFiles:
+      - $values/deploy/platform/governance/datahub/values.yaml
+  - repoURL: https://github.com/pratikmohanty1294/difme.git
+    targetRevision: main
+    ref: values

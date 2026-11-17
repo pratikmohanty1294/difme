@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spire
+  namespace: argocd
+  labels:
+    difme/profile: security
+    difme/pdf-section: '5.8'
+  annotations:
+    argocd.argoproj.io/sync-wave: '-4'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: difme
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  sources:
+  - repoURL: https://spiffe.github.io/helm-charts-hardened
+    chart: spire
+    targetRevision: 0.24.1
+    helm:
+      releaseName: spire
+      valueFiles:
+      - $values/deploy/platform/security/spire/values.yaml
+  - repoURL: https://github.com/pratikmohanty1294/difme.git
+    targetRevision: main
+    ref: values

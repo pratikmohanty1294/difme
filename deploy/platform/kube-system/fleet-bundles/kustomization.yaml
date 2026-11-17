@@ -1,0 +1,3 @@
+# PDF §4.1 — Fleet multi-cluster GitOps. In the Codespace Argo CD is the deployer;
+# deploy/fleet/ is applied when the platform runs on RKE2 clusters managed by Rancher.
+resources: []

@@ -1,0 +1,23 @@
+# PDF §6.3 — OpenFeature + flagd. Runs as a shared service and as an optional sidecar.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: flagd, namespace: core-platform, labels: { app: flagd } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: flagd } }
+  template:
+    metadata: { labels: { app: flagd, difme/team: platform, business.metric: feature-flags } }
+    spec:
+      containers:
+        - name: flagd
+          image: ghcr.io/open-feature/flagd:v0.12.4
+          args: [start, --uri, file:/etc/flagd/flags.json, --metrics-exporter, otel, --otel-collector-uri, alloy.observability.svc:4317]
+          ports: [{ name: grpc, containerPort: 8013 }, { name: ofrep, containerPort: 8016 }]
+          volumeMounts: [{ name: flags, mountPath: /etc/flagd }]
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } }
+      volumes: [{ name: flags, configMap: { name: flagd-flags } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: flagd, namespace: core-platform }
+spec: { selector: { app: flagd }, ports: [{ name: grpc, port: 8013 }, { name: ofrep, port: 8016 }] }

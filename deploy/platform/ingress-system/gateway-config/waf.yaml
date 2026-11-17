@@ -1,0 +1,24 @@
+# PDF §4.3 / §11.3 — WAF OWASP CRS 4.0. Coraza runs as an Envoy Wasm extension (ADR-005).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata: { name: coraza-waf, namespace: ingress-system }
+spec:
+  targetRefs: [{ group: gateway.networking.k8s.io, kind: Gateway, name: difme-edge }]
+  wasm:
+    - name: coraza
+      rootID: ""
+      code:
+        type: Image
+        image: { url: ghcr.io/corazawaf/coraza-proxy-wasm:0.5.0 }
+      config:
+        directives_map:
+          default:
+            - Include @demo-conf
+            - SecRuleEngine On
+            - SecRequestBodyAccess On
+            - SecAuditEngine RelevantOnly
+            - SecAuditLogFormat JSON
+            - Include @crs-setup-conf
+            - SecAction "id:900000,phase:1,pass,nolog,setvar:tx.blocking_paranoia_level=2"
+            - Include @owasp_crs/*.conf
+        default_directives: default

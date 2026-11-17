@@ -1,0 +1,12 @@
+# PDF §4.1 — RKE2 with CIS hardening profile, used for real clusters (scenarios A–C).
+profile: cis
+selinux: true
+secrets-encryption: true
+cni: none                      # Cilium installed by GitOps
+disable-kube-proxy: true
+disable: [rke2-ingress-nginx]
+etcd-snapshot-schedule-cron: "0 */6 * * *"   # PDF: ETCD snapshots every 6h
+etcd-snapshot-retention: 28
+etcd-s3: true
+etcd-s3-endpoint: seaweedfs-s3.lakehouse.svc:8333
+etcd-s3-bucket: etcd-snapshots

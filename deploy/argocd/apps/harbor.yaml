@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harbor
+  namespace: argocd
+  labels:
+    difme/profile: platform-ops
+    difme/pdf-section: '11.2'
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: difme
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harbor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  sources:
+  - repoURL: https://helm.goharbor.io
+    chart: harbor
+    targetRevision: 1.16.2
+    helm:
+      releaseName: harbor
+      valueFiles:
+      - $values/deploy/platform/harbor/harbor/values.yaml
+  - repoURL: https://github.com/pratikmohanty1294/difme.git
+    targetRevision: main
+    ref: values

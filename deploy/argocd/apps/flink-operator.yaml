@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: flink-operator
+  namespace: argocd
+  labels:
+    difme/profile: streaming
+    difme/pdf-section: '5.5'
+  annotations:
+    argocd.argoproj.io/sync-wave: '-3'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: difme
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: streaming
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  sources:
+  - repoURL: https://archive.apache.org/dist/flink/flink-kubernetes-operator-1.11.0/
+    chart: flink-kubernetes-operator
+    targetRevision: 1.11.0
+    helm:
+      releaseName: flink-operator
+      valueFiles:
+      - $values/deploy/platform/streaming/flink-operator/values.yaml
+  - repoURL: https://github.com/pratikmohanty1294/difme.git
+    targetRevision: main
+    ref: values

@@ -1,0 +1,28 @@
+# PDF §5.8 — just-in-time, identity-based infra access with session recording (Warpgate, ADR-001).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: warpgate, namespace: security, labels: { app: warpgate } }
+spec:
+  serviceName: warpgate
+  replicas: 1
+  selector: { matchLabels: { app: warpgate } }
+  template:
+    metadata: { labels: { app: warpgate } }
+    spec:
+      containers:
+        - name: warpgate
+          image: ghcr.io/warp-tech/warpgate:v0.13.2
+          args: [--config, /data/warpgate.yaml, run]
+          ports: [{ name: https, containerPort: 8888 }, { name: ssh, containerPort: 2222 }, { name: postgres, containerPort: 55432 }]
+          volumeMounts: [{ name: data, mountPath: /data }]
+          resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 256Mi } }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 1Gi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: warpgate, namespace: security }
+spec:
+  selector: { app: warpgate }
+  ports: [{ name: https, port: 8888 }, { name: ssh, port: 2222 }, { name: postgres, port: 55432 }]

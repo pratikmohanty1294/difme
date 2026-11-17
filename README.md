@@ -40,27 +40,27 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | PDF § | PDF component | DIFME implementation | Path |
 |---|---|---|---|
 | 4.1 | Rancher / RKE2 / Fleet | k3d (dev) · RKE2-compatible manifests · Rancher Fleet `fleet.yaml` per bundle | `deploy/bootstrap/`, `deploy/fleet/` |
-| 4.1 | Rancher Backup Operator → MinIO | Velero + MinIO (Codespace) · Rancher Backup CR kept for RKE2 | `deploy/platform/backup/` |
-| 4.2 | ingress-system: nginx-ingress, cert-manager, external-dns, metallb | Same (Helm via Argo CD) | `deploy/platform/ingress-system/` |
-| 4.3 | NLB / ALB / QUIC paths, WAF OWASP CRS 4.0 | MetalLB + ingress-nginx ModSecurity CRS 4 · UDP 4443 → Quinn | `deploy/platform/ingress-system/` |
-| 4.4 | Istio mTLS STRICT, VirtualService canary, circuit breaker, retries, egress allowlist | Same | `deploy/platform/istio/` |
+| 4.1 | Rancher Backup Operator → MinIO | Velero + **SeaweedFS** S3 (ADR-005) · RKE2 etcd snapshots every 6h | `deploy/platform/backup/` |
+| 4.2 | ingress-system: nginx-ingress, cert-manager, external-dns, metallb | **Envoy Gateway** replaces nginx-ingress (ADR-005); others same | `deploy/platform/ingress-system/` |
+| 4.3 | NLB / ALB / QUIC paths, WAF OWASP CRS 4.0 | MetalLB + Envoy Gateway (TLS 1.3) + **Coraza** CRS 4 · UDP 4443 → Quinn via UDPRoute | `deploy/platform/ingress-system/` |
+| 4.4 | Istio mTLS STRICT, VirtualService canary, circuit breaker, retries, egress allowlist | **Istio Ambient** (ztunnel + waypoints, ADR-005) with the same policies | `deploy/platform/istio/` |
 | 4.5 | Semgrep, Trivy, TLA+/TLC, Sigstore/cosign, SLSA L3, Karate, Newman, k6, Gatling, Locust, Playwright, Cypress, TestCafe, LLM test gen, Argo CD rollback, canary SLO gate, Pyroscope CI gate | Same in GitHub Actions + Argo Rollouts | `.github/workflows/`, `tests/` |
 | 4.5 | Financial message / scenario simulators | **jPOS** ISO 8583 simulator + scenario runner | `tests/simulator/` |
 | 4.5 | Tekton | Tekton pipelines (on-cluster mirror of GitHub Actions) | `deploy/platform/tekton/` |
 | 4.6 | Cilium eBPF kube-proxy replacement, Hubble | Same (k3d with flannel disabled) | `deploy/platform/cilium/` |
-| 5.1 | Vue 3 + Rust (uniffi) app, WasmEdge 0.14 + ONNX, automerge-rs CRDT, StrongBox/KeyMint/Blake3, HCE HostApduService, WorkManager | Same | `edge/` |
+| 5.1 | Vue 3 + Rust (uniffi) app → **Tauri 2 mobile** (ADR-005), WasmEdge 0.14 + ONNX, automerge-rs CRDT, StrongBox/KeyMint/Blake3, HCE HostApduService, WorkManager | Same | `edge/` |
 | 5.2 | Quinn hub, session manager, telemetry relay, tonic gRPC bridge, live dashboard relay, rustls+SPIRE, Pyroscope Rust | Same | `services/hub/` |
-| 5.3 | quarkus-cmd-svc, qry-svc, saga-orchestrator, consistency-router, rate-limiter, rehydration-svc | Same | `services/core/` |
+| 5.3 | quarkus-cmd-svc, qry-svc, saga-orchestrator, consistency-router, rate-limiter, rehydration-svc | Same, on **Java 25 LTS** (ADR-005) | `services/core/` |
 | 5.4 | Hibernate 6 + Panache, outbox, MyBatis, Caffeine L1, Redisson JCache L2 | Same (L2 on Valkey) | `services/core/` |
 | 5.5 | Event broker (Kafka API) | **Apache Kafka 4 (KRaft)** via Strimzi — OSI replacement | `deploy/platform/streaming/` |
 | 5.5 | Debezium (CloudEvents), Flink, Apicurio, Airbyte, KEDA | Same | `deploy/platform/streaming/` |
 | 5.5 | Streaming SQL views | **RisingWave** — OSI replacement | `deploy/platform/streaming/` |
-| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | Same | `deploy/platform/lakehouse/`, `analytics/` |
+| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | Same, with **SeaweedFS** instead of MinIO and an **Apache Polaris** catalog (ADR-005) | `deploy/platform/lakehouse/`, `analytics/` |
 | 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | Same | `deploy/platform/ml-platform/`, `ml/` |
 | 5.8 | SPIFFE/SPIRE, Cilium, OPA Gatekeeper, Kyverno, Sigstore, OpenTelemetry, Alloy, DataHub + OpenLineage | Same | `deploy/platform/security/`, `deploy/platform/governance/` |
 | 5.8 | Secrets management | **OpenBao** — OSI replacement | `deploy/platform/security/` |
 | 5.8 | Just-in-time access | **Warpgate** — OSI replacement | `deploy/platform/security/` |
-| 5.9 | React 18 shell + Module Federation, Settlements (TanStack Query), Compliance (SvelteKit), Analytics (Angular 17 + ECharts), Zustand, Turborepo + pnpm, Tailwind tokens, Storybook, Bundlesize | Same | `backoffice/` |
+| 5.9 | React 18 shell + Module Federation, Settlements (TanStack Query), Compliance (SvelteKit), Analytics (Angular 17 + ECharts), Zustand, Turborepo + pnpm, Tailwind tokens, Storybook, Bundlesize | Same design on **React 19 / Svelte 5 / Angular 20 + Module Federation 2.0 (Rspack)** (ADR-005) | `backoffice/` |
 | 5.9 | Kong + APISIX | Same (Kong external, APISIX back-office) | `deploy/platform/api-gateway/` |
 | 5.10 | OpenAPI 4.0 | **OpenAPI 3.1** — 4.0 is unreleased | `api/openapi/` |
 | 5.10 | AsyncAPI 3, CloudEvents 1.0, GraphQL SDL, proto3 + Buf, Apicurio, Swagger UI, AsyncAPI Studio | Same | `api/` |

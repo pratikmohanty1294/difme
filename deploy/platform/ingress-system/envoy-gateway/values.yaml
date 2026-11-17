@@ -1,0 +1,7 @@
+# PDF §4.3 ALB replaced by Envoy Gateway (ADR-005). Gateway API is the routing standard.
+config:
+  envoyGateway:
+    extensionApis: { enableEnvoyPatchPolicy: true, enableBackend: true }
+    provider: { type: Kubernetes }
+deployment:
+  envoyGateway: { resources: { requests: { cpu: 50m, memory: 128Mi } } }

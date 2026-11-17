@@ -1,0 +1,32 @@
+# PDF §8 — double-entry ledger, strict ACID. Single replica in the Codespace; 3/6 replicas via overlays.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: tigerbeetle, namespace: database-tier, labels: { app: tigerbeetle } }
+spec:
+  serviceName: tigerbeetle
+  replicas: 1
+  selector: { matchLabels: { app: tigerbeetle } }
+  template:
+    metadata: { labels: { app: tigerbeetle } }
+    spec:
+      initContainers:
+        - name: format
+          image: ghcr.io/tigerbeetle/tigerbeetle:0.16.30
+          command: [sh, -c, "[ -f /data/0_0.tigerbeetle ] || /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 /data/0_0.tigerbeetle"]
+          volumeMounts: [{ name: data, mountPath: /data }]
+      containers:
+        - name: tigerbeetle
+          image: ghcr.io/tigerbeetle/tigerbeetle:0.16.30
+          args: [start, --addresses=0.0.0.0:3000, --cache-grid=256MiB, /data/0_0.tigerbeetle]
+          ports: [{ containerPort: 3000 }]
+          securityContext: { capabilities: { add: [IPC_LOCK] } }   # io_uring + locked memory
+          resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
+          volumeMounts: [{ name: data, mountPath: /data }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 4Gi } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: tigerbeetle, namespace: database-tier }
+spec: { selector: { app: tigerbeetle }, ports: [{ port: 3000 }] }

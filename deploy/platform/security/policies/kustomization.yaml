@@ -1,0 +1,8 @@
+resources:
+  - kyverno/require-signed-images.yaml
+  - kyverno/require-labels-and-limits.yaml
+  - kyverno/mutate-defaults.yaml
+  - kyverno/generate-default-deny.yaml
+  - gatekeeper/templates.yaml
+  - gatekeeper/constraints.yaml
+  - sigstore/cluster-image-policy.yaml

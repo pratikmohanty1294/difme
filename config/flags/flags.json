@@ -1,0 +1,29 @@
+{
+  "$schema": "https://flagd.dev/schema/v0/flags.json",
+  "flags": {
+    "use-temporal-saga": {
+      "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "on",
+      "targeting": { "fractional": [["on", 100], ["off", 0]] }
+    },
+    "fraud-model-version": {
+      "state": "ENABLED", "variants": { "v1": "fraud-v1", "v2": "fraud-v2" }, "defaultVariant": "v1",
+      "targeting": { "if": [{ "==": [{ "var": "attested" }, true] }, { "fractional": [{ "var": "deviceId" }, ["v2", 1], ["v1", 99]] }, "v1"] }
+    },
+    "avro-schema-v2-fields": { "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "off" },
+    "kill-cdc-consumers":    { "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "off" },
+    "kill-replay-engine":    { "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "off" },
+    "kill-analytics-sinks":  { "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "off" },
+    "kill-saga-step":        { "state": "ENABLED", "variants": { "none": "", "debit": "debit-account", "reserve": "reserve-settlement", "notify": "notify-target-bank", "credit": "credit-beneficiary" }, "defaultVariant": "none" },
+    "backoffice-module-settlements": {
+      "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "on"
+    },
+    "backoffice-module-compliance": {
+      "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "off",
+      "targeting": { "if": [{ "in": [{ "var": "group" }, ["compliance", "audit"]] }, "on", "off"] }
+    },
+    "backoffice-module-analytics": {
+      "state": "ENABLED", "variants": { "on": true, "off": false }, "defaultVariant": "off",
+      "targeting": { "if": [{ "in": [{ "var": "region" }, ["region-a"]] }, "on", "off"] }
+    }
+  }
+}

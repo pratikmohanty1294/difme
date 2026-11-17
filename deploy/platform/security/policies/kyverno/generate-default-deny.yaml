@@ -1,0 +1,22 @@
+# Zero trust: every meshed namespace starts with default-deny; Cilium policies open only declared flows.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: generate-default-deny }
+spec:
+  rules:
+    - name: default-deny
+      match: { any: [{ resources: { kinds: [Namespace], selector: { matchLabels: { istio.io/dataplane-mode: ambient } } } }] }
+      generate:
+        apiVersion: cilium.io/v2
+        kind: CiliumNetworkPolicy
+        name: default-deny
+        namespace: "{{request.object.metadata.name}}"
+        synchronize: true
+        data:
+          spec:
+            endpointSelector: {}
+            ingress: [{ fromEndpoints: [{ matchLabels: { "k8s:io.kubernetes.pod.namespace": "{{request.object.metadata.name}}" } }] }]
+            egress:
+              - toEndpoints: [{ matchLabels: { "k8s:io.kubernetes.pod.namespace": kube-system, "k8s:k8s-app": kube-dns } }]
+                toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
+              - toEndpoints: [{ matchLabels: { "k8s:io.kubernetes.pod.namespace": "{{request.object.metadata.name}}" } }]

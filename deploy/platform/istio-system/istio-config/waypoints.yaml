@@ -1,0 +1,14 @@
+# Ambient L7: waypoints give VirtualService/DestinationRule features (canary, retries, circuit breaker).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata: { name: waypoint, namespace: core-platform, labels: { istio.io/waypoint-for: service } }
+spec:
+  gatewayClassName: istio-waypoint
+  listeners: [{ name: mesh, port: 15008, protocol: HBONE }]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata: { name: waypoint, namespace: back-office-ui, labels: { istio.io/waypoint-for: service } }
+spec:
+  gatewayClassName: istio-waypoint
+  listeners: [{ name: mesh, port: 15008, protocol: HBONE }]

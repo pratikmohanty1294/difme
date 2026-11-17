@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kong
+  namespace: argocd
+  labels:
+    difme/profile: core
+    difme/pdf-section: '5.10'
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: difme
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  sources:
+  - repoURL: https://charts.konghq.com
+    chart: kong
+    targetRevision: 2.47.0
+    helm:
+      releaseName: kong
+      valueFiles:
+      - $values/deploy/platform/ingress-system/kong/values.yaml
+  - repoURL: https://github.com/pratikmohanty1294/difme.git
+    targetRevision: main
+    ref: values

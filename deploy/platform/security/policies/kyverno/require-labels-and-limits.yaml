@@ -1,0 +1,22 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: require-labels-and-limits }
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: cost-attribution-labels       # PDF §16 — OpenCost needs team + business.metric labels
+      match: { any: [{ resources: { kinds: [Deployment, StatefulSet, Job], namespaces: [core-platform, quinn-hub, streaming, ml-platform, back-office-ui, k6] } }] }
+      validate:
+        message: "difme/team and business.metric labels are required for cost attribution"
+        pattern: { spec: { template: { metadata: { labels: { difme/team: "?*", business.metric: "?*" } } } } }
+    - name: resource-limits
+      match: { any: [{ resources: { kinds: [Pod], namespaces: [core-platform, quinn-hub, back-office-ui] } }] }
+      validate:
+        message: "CPU and memory requests/limits are required"
+        pattern: { spec: { containers: [{ resources: { requests: { memory: "?*", cpu: "?*" }, limits: { memory: "?*" } } }] } }
+    - name: no-latest-tag
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      validate:
+        message: "Image tags must be pinned (no :latest)"
+        pattern: { spec: { containers: [{ image: "!*:latest" }] } }

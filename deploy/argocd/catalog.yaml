@@ -1,0 +1,100 @@
+# Single source of truth for every platform component.
+# `python deploy/argocd/render.py` turns this into deploy/argocd/apps/*.yaml and deploy/profiles/*.txt.
+#
+# kind: helm  -> upstream chart + values from deploy/platform/<namespace>/<name>/values.yaml
+# kind: path  -> kustomize directory deploy/platform/<namespace>/<name>/
+# wave: Argo CD sync wave (CRDs/operators first)
+# pdf:  section of Financial Platform Architecture v1.2 this implements
+
+components:
+  # ── Layer 11 · Infrastructure (profile: base, always on) ─────────────────────
+  - { name: namespaces,        ns: kube-system,     kind: path, profile: base, wave: -10, pdf: "4.2" }
+  - { name: cilium,            ns: kube-system,     kind: helm, profile: base, wave: -9, pdf: "4.6", repo: https://helm.cilium.io, chart: cilium, version: 1.17.3 }
+  - { name: metallb,           ns: ingress-system,  kind: helm, profile: base, wave: -8, pdf: "4.3", repo: https://metallb.github.io/metallb, chart: metallb, version: 0.14.9 }
+  - { name: metallb-config,    ns: ingress-system,  kind: path, profile: base, wave: -7, pdf: "4.3" }
+  - { name: cert-manager,      ns: ingress-system,  kind: helm, profile: base, wave: -8, pdf: "4.2", repo: https://charts.jetstack.io, chart: cert-manager, version: v1.17.1 }
+  - { name: envoy-gateway,     ns: ingress-system,  kind: helm, profile: base, wave: -6, pdf: "4.3", repo: docker.io/envoyproxy, chart: gateway-helm, version: v1.4.0 }
+  - { name: gateway-config,    ns: ingress-system,  kind: path, profile: base, wave: -4, pdf: "4.3" }
+  - { name: external-dns,      ns: ingress-system,  kind: helm, profile: base, wave: -6, pdf: "4.2", repo: https://kubernetes-sigs.github.io/external-dns, chart: external-dns, version: 1.16.0 }
+  - { name: kyverno,           ns: security,        kind: helm, profile: base, wave: -8, pdf: "5.8", repo: https://kyverno.github.io/kyverno, chart: kyverno, version: 3.3.7 }
+  - { name: gatekeeper,        ns: security,        kind: helm, profile: base, wave: -8, pdf: "5.8", repo: https://open-policy-agent.github.io/gatekeeper/charts, chart: gatekeeper, version: 3.18.2 }
+  - { name: policy-controller, ns: security,        kind: helm, profile: base, wave: -7, pdf: "11.2", repo: https://sigstore.github.io/helm-charts, chart: policy-controller, version: 0.10.0 }
+  - { name: policies,          ns: security,        kind: path, profile: base, wave: -5, pdf: "11.3" }
+  - { name: fleet-bundles,     ns: kube-system,     kind: path, profile: base, wave: -5, pdf: "4.1" }
+
+  # ── Security / zero trust (profile: security) ──────────────────────────────
+  - { name: openbao,           ns: security,        kind: helm, profile: security, wave: -4, pdf: "5.8", repo: https://openbao.github.io/openbao-helm, chart: openbao, version: 0.8.1 }
+  - { name: spire-crds,        ns: security,        kind: helm, profile: security, wave: -5, pdf: "5.8", repo: https://spiffe.github.io/helm-charts-hardened, chart: spire-crds, version: 0.5.0 }
+  - { name: spire,             ns: security,        kind: helm, profile: security, wave: -4, pdf: "5.8", repo: https://spiffe.github.io/helm-charts-hardened, chart: spire, version: 0.24.1 }
+  - { name: warpgate,          ns: security,        kind: path, profile: security, wave: -3, pdf: "5.8" }
+  - { name: istio-base,        ns: istio-system,    kind: helm, profile: security, wave: -5, pdf: "4.4", repo: https://istio-release.storage.googleapis.com/charts, chart: base, version: 1.25.1 }
+  - { name: istiod,            ns: istio-system,    kind: helm, profile: security, wave: -4, pdf: "4.4", repo: https://istio-release.storage.googleapis.com/charts, chart: istiod, version: 1.25.1 }
+  - { name: istio-cni,         ns: istio-system,    kind: helm, profile: security, wave: -4, pdf: "4.4", repo: https://istio-release.storage.googleapis.com/charts, chart: cni, version: 1.25.1 }
+  - { name: ztunnel,           ns: istio-system,    kind: helm, profile: security, wave: -3, pdf: "4.4", repo: https://istio-release.storage.googleapis.com/charts, chart: ztunnel, version: 1.25.1 }
+  - { name: istio-config,      ns: istio-system,    kind: path, profile: security, wave: -2, pdf: "4.4" }
+  - { name: attestation,       ns: security,        kind: path, profile: security, wave: 2,  pdf: "11.1" }
+
+  # ── Layers 3–5 · Core, workflow, OLTP data (profile: core) ─────────────────
+  - { name: valkey,            ns: cache-tier,      kind: path, profile: core, wave: -2, pdf: "8" }
+  - { name: tigerbeetle,       ns: database-tier,   kind: path, profile: core, wave: -2, pdf: "8" }
+  - { name: yugabytedb,        ns: database-tier,   kind: helm, profile: core, wave: -2, pdf: "8", repo: https://charts.yugabyte.com, chart: yugabyte, version: 2.25.1 }
+  - { name: fdb-operator,      ns: database-tier,   kind: helm, profile: core, wave: -3, pdf: "8", repo: https://foundationdb.github.io/fdb-kubernetes-operator, chart: fdb-operator, version: 2.3.0 }
+  - { name: foundationdb,      ns: database-tier,   kind: path, profile: core, wave: -1, pdf: "8" }
+  - { name: temporal,          ns: temporal,        kind: helm, profile: core, wave: 0,  pdf: "6.1", repo: https://go.temporal.io/helm-charts, chart: temporal, version: 0.62.0 }
+  - { name: flagd,             ns: core-platform,   kind: path, profile: core, wave: 0,  pdf: "6.3" }
+  - { name: core-services,     ns: core-platform,   kind: path, profile: core, wave: 1,  pdf: "5.3" }
+  - { name: kong,              ns: ingress-system,  kind: helm, profile: core, wave: 0,  pdf: "5.10", repo: https://charts.konghq.com, chart: kong, version: 2.47.0 }
+
+  # ── Audit / extra data stores (profile: data) ──────────────────────────────
+  - { name: k8ssandra-operator, ns: database-tier,  kind: helm, profile: data, wave: -3, pdf: "8", repo: https://helm.k8ssandra.io/stable, chart: k8ssandra-operator, version: 1.21.1 }
+  - { name: cassandra,         ns: database-tier,   kind: path, profile: data, wave: -1, pdf: "8" }
+
+  # ── Layer 2 · Hub (profile: hub) ───────────────────────────────────────────
+  - { name: quinn-hub,         ns: quinn-hub,       kind: path, profile: hub, wave: 1, pdf: "5.2" }
+
+  # ── Layers 6–7 · Streaming, CDC, replay (profile: streaming) ───────────────
+  - { name: strimzi,           ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "5.5", repo: https://strimzi.io/charts/, chart: strimzi-kafka-operator, version: 0.45.0 }
+  - { name: kafka,             ns: streaming,       kind: path, profile: streaming, wave: -1, pdf: "5.5" }
+  - { name: apicurio,          ns: streaming,       kind: path, profile: streaming, wave: -1, pdf: "5.10" }
+  - { name: debezium,          ns: streaming,       kind: path, profile: streaming, wave: 0,  pdf: "5.5" }
+  - { name: risingwave,        ns: streaming,       kind: helm, profile: streaming, wave: 0,  pdf: "5.5", repo: https://risingwavelabs.github.io/helm-charts/, chart: risingwave, version: 0.2.27 }
+  - { name: flink-operator,    ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "5.5", repo: https://archive.apache.org/dist/flink/flink-kubernetes-operator-1.11.0/, chart: flink-kubernetes-operator, version: 1.11.0 }
+  - { name: flink-jobs,        ns: streaming,       kind: path, profile: streaming, wave: 1,  pdf: "5.5" }
+  - { name: keda,              ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "6.2", repo: https://kedacore.github.io/charts, chart: keda, version: 2.16.1 }
+  - { name: keda-scalers,      ns: streaming,       kind: path, profile: streaming, wave: 2,  pdf: "6.2" }
+  - { name: airbyte,           ns: streaming,       kind: helm, profile: streaming-extra, wave: 1, pdf: "5.5", repo: https://airbytehq.github.io/helm-charts, chart: airbyte, version: 1.5.1 }
+
+  # ── Layer 8 · Lakehouse (profile: lakehouse) ───────────────────────────────
+  - { name: seaweedfs,         ns: lakehouse,       kind: path, profile: lakehouse, wave: -2, pdf: "5.6" }
+  - { name: polaris,           ns: lakehouse,       kind: path, profile: lakehouse, wave: -1, pdf: "5.6" }
+  - { name: trino,             ns: lakehouse,       kind: helm, profile: lakehouse, wave: 0,  pdf: "5.6", repo: https://trinodb.github.io/charts, chart: trino, version: 1.37.0 }
+  - { name: spark-operator,    ns: lakehouse,       kind: helm, profile: lakehouse, wave: -1, pdf: "5.6", repo: https://kubeflow.github.io/spark-operator, chart: spark-operator, version: 2.1.1 }
+  - { name: starrocks,         ns: lakehouse,       kind: helm, profile: lakehouse, wave: 0,  pdf: "5.6", repo: https://starrocks.github.io/starrocks-kubernetes-operator, chart: kube-starrocks, version: 1.10.1 }
+  - { name: superset,          ns: lakehouse,       kind: helm, profile: lakehouse, wave: 1,  pdf: "5.6", repo: https://apache.github.io/superset, chart: superset, version: 0.14.2 }
+  - { name: datahub,           ns: governance,      kind: helm, profile: lakehouse-extra, wave: 1, pdf: "5.8", repo: https://helm.datahubproject.io, chart: datahub, version: 0.5.10 }
+
+  # ── AI / ML plane (profile: ml) ────────────────────────────────────────────
+  - { name: feast,             ns: ml-platform,     kind: path, profile: ml, wave: 0, pdf: "5.7" }
+  - { name: mlflow,            ns: ml-platform,     kind: helm, profile: ml, wave: 0, pdf: "5.7", repo: https://community-charts.github.io/helm-charts, chart: mlflow, version: 0.17.2 }
+  - { name: weaviate,          ns: ml-platform,     kind: helm, profile: ml, wave: 0, pdf: "5.7", repo: https://weaviate.github.io/weaviate-helm, chart: weaviate, version: 17.4.4 }
+  - { name: postgresml,        ns: ml-platform,     kind: path, profile: ml, wave: 0, pdf: "5.7" }
+  - { name: onnx-serving,      ns: ml-platform,     kind: path, profile: ml, wave: 1, pdf: "5.7" }
+
+  # ── Layers 9–10 · Observability + FinOps (profile: observability) ──────────
+  - { name: victoria-metrics,  ns: observability,   kind: helm, profile: observability, wave: -1, pdf: "10", repo: https://victoriametrics.github.io/helm-charts, chart: victoria-metrics-k8s-stack, version: 0.39.0 }
+  - { name: loki,              ns: observability,   kind: helm, profile: observability, wave: 0,  pdf: "10", repo: https://grafana.github.io/helm-charts, chart: loki, version: 6.29.0 }
+  - { name: tempo,             ns: observability,   kind: helm, profile: observability, wave: 0,  pdf: "10", repo: https://grafana.github.io/helm-charts, chart: tempo, version: 1.18.3 }
+  - { name: pyroscope,         ns: observability,   kind: helm, profile: observability, wave: 0,  pdf: "10.2", repo: https://grafana.github.io/helm-charts, chart: pyroscope, version: 1.13.2 }
+  - { name: alloy,             ns: observability,   kind: helm, profile: observability, wave: 1,  pdf: "10", repo: https://grafana.github.io/helm-charts, chart: alloy, version: 1.0.1 }
+  - { name: dashboards,        ns: observability,   kind: path, profile: observability, wave: 2,  pdf: "10.4" }
+  - { name: opencost,          ns: opencost,        kind: helm, profile: observability, wave: 1,  pdf: "16", repo: https://opencost.github.io/opencost-helm-chart, chart: opencost, version: 2.0.2 }
+
+  # ── Back-office (profile: backoffice) ──────────────────────────────────────
+  - { name: apisix,            ns: back-office-ui,  kind: helm, profile: backoffice, wave: 0, pdf: "5.9", repo: https://charts.apiseven.com, chart: apisix, version: 2.10.0 }
+  - { name: backoffice-web,    ns: back-office-ui,  kind: path, profile: backoffice, wave: 1, pdf: "5.9" }
+
+  # ── CI / supply chain / backup (profile: platform-ops) ─────────────────────
+  - { name: tekton,            ns: tekton-pipelines, kind: path, profile: platform-ops, wave: -1, pdf: "4.5" }
+  - { name: harbor,            ns: harbor,          kind: helm, profile: platform-ops, wave: 0, pdf: "11.2", repo: https://helm.goharbor.io, chart: harbor, version: 1.16.2 }
+  - { name: k6-operator,       ns: k6,              kind: helm, profile: platform-ops, wave: 0, pdf: "4.5", repo: https://grafana.github.io/helm-charts, chart: k6-operator, version: 3.11.1 }
+  - { name: velero,            ns: backup,          kind: helm, profile: platform-ops, wave: 0, pdf: "4.1", repo: https://vmware-tanzu.github.io/helm-charts, chart: velero, version: 8.5.0 }

@@ -1,0 +1,33 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: public-api, namespace: ingress-system }
+spec:
+  parentRefs: [{ name: difme-edge, sectionName: https }]
+  hostnames: [api.difme.local]
+  rules:
+    - backendRefs: [{ name: kong-kong-proxy, port: 80 }]        # external API → Kong (§5.10)
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: back-office, namespace: ingress-system }
+spec:
+  parentRefs: [{ name: difme-edge, sectionName: https }]
+  hostnames: [ops.difme.local]
+  rules:
+    - matches: [{ path: { type: PathPrefix, value: /api } }]
+      backendRefs: [{ name: apisix-gateway, namespace: back-office-ui, port: 80 }]   # back-office API → APISIX
+    - backendRefs: [{ name: backoffice-shell, namespace: back-office-ui, port: 80 }]
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata: { name: quic-hub, namespace: quinn-hub }
+spec:
+  parentRefs: [{ name: difme-edge, namespace: ingress-system, sectionName: quic }]
+  rules: [{ backendRefs: [{ name: quinn-hub, port: 4443 }] }]
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata: { name: allow-ingress-system, namespace: back-office-ui }
+spec:
+  from: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, namespace: ingress-system }]
+  to: [{ group: "", kind: Service }]

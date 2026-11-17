@@ -1,0 +1,17 @@
+# PDF §8 — KYC / user accounts (eventual follower reads) AND settlements (serializable; ADR-001 replaces the
+# proprietary settlement DB). Also the Temporal persistence backend and the Apicurio/Polaris metadata store.
+replicas: { master: 1, tserver: 1 }
+resource:
+  master: { requests: { cpu: 200m, memory: 512Mi }, limits: { memory: 1Gi } }
+  tserver: { requests: { cpu: 300m, memory: 1Gi }, limits: { memory: 2Gi } }
+storage: { master: { size: 4Gi }, tserver: { size: 8Gi } }
+enableLoadBalancer: false
+gflags:
+  tserver:
+    yb_enable_read_committed_isolation: true
+    ysql_enable_packed_row: true
+    enable_automatic_tablet_splitting: true
+    ysql_pg_conf_csv: "default_transaction_isolation='serializable'"
+  master:
+    enable_automatic_tablet_splitting: true
+tls: { enabled: true }

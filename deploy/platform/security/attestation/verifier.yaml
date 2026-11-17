@@ -1,0 +1,23 @@
+# DIFME attestation-verifier: checks Wasm binary hash against SLSA provenance, nonce freshness, revocation list (§11.1 steps 5a–5c).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: attestation-verifier, namespace: security, labels: { app: attestation-verifier } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: attestation-verifier } }
+  template:
+    metadata: { labels: { app: attestation-verifier, difme/team: security, business.metric: fraud-attestation } }
+    spec:
+      containers:
+        - name: verifier
+          image: ghcr.io/pratikmohanty1294/difme-attestation-verifier:0.1.0
+          env:
+            - { name: VERAISON_URL, value: http://veraison.security.svc:8080 }
+            - { name: VALKEY_URL, value: redis://valkey.cache-tier.svc:6379/3 }
+          ports: [{ containerPort: 8443 }]
+          resources: { requests: { cpu: 20m, memory: 32Mi }, limits: { memory: 128Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: attestation-verifier, namespace: security }
+spec: { selector: { app: attestation-verifier }, ports: [{ port: 8443 }] }

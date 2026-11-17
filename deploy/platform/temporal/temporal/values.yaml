@@ -1,0 +1,24 @@
+# PDF §6.1 — Temporal OSS durable execution. Persistence on YugabyteDB YSQL (postgres12 plugin, ADR-001).
+server:
+  replicaCount: 1
+  config:
+    persistence:
+      default:
+        driver: sql
+        sql: { driver: postgres12, host: yb-tservers.database-tier.svc, port: 5433, database: temporal, user: temporal, existingSecret: temporal-db, maxConns: 20 }
+      visibility:
+        driver: sql
+        sql: { driver: postgres12, host: yb-tservers.database-tier.svc, port: 5433, database: temporal_visibility, user: temporal, existingSecret: temporal-db, maxConns: 10 }
+  frontend: { resources: { requests: { cpu: 50m, memory: 128Mi } } }
+  history:  { replicaCount: 1, resources: { requests: { cpu: 100m, memory: 256Mi } } }   # ×3 in production overlay
+  matching: { resources: { requests: { cpu: 50m, memory: 128Mi } } }
+  worker:   { resources: { requests: { cpu: 50m, memory: 128Mi } } }
+  metrics: { serviceMonitor: { enabled: false }, annotations: { enabled: true } }
+cassandra: { enabled: false }
+mysql: { enabled: false }
+postgresql: { enabled: false }
+elasticsearch: { enabled: false }
+prometheus: { enabled: false }
+grafana: { enabled: false }
+web: { enabled: true, resources: { requests: { cpu: 20m, memory: 64Mi } } }
+schema: { createDatabase: { enabled: true }, setup: { enabled: true }, update: { enabled: true } }

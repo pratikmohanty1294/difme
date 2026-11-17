@@ -1,0 +1,23 @@
+# PDF §5.8 — SPIFFE workload identity, X.509 SVIDs, 24h rotation, OpenBao as upstream CA.
+global:
+  spire:
+    trustDomain: difme.local
+    clusterName: difme
+spire-server:
+  ca_ttl: 168h
+  default_x509_svid_ttl: 24h
+  upstreamAuthority:
+    vault:
+      enabled: true
+      vaultAddr: http://openbao.security.svc:8200
+      pkiMountPoint: pki_int
+      k8sAuth: { enabled: true, k8sAuthRoleName: spire-server }
+  federation: { enabled: true }        # scenario C: on-prem ↔ cloud federated trust domains
+  controllerManager:
+    identities:
+      clusterSPIFFEIDs:
+        default:
+          spiffeIDTemplate: "spiffe://{{ .TrustDomain }}/ns/{{ .PodMeta.Namespace }}/sa/{{ .PodSpec.ServiceAccountName }}"
+spire-agent: { resources: { requests: { cpu: 20m, memory: 64Mi } } }
+spiffe-csi-driver: { enabled: true }
+spiffe-oidc-discovery-provider: { enabled: true }

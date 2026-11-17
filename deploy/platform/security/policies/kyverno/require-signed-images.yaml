@@ -1,0 +1,25 @@
+# PDF §11.2 — every DIFME-built image must be cosign-signed (keyless, CI OIDC) and carry SLSA provenance.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: require-signed-images }
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 15
+  rules:
+    - name: verify-signature-and-provenance
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      verifyImages:
+        - imageReferences: ["ghcr.io/pratikmohanty1294/difme-*"]
+          attestors:
+            - entries:
+                - keyless:
+                    subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/*"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor: { url: https://rekor.sigstore.dev }
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        subject: "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@*"
+                        issuer: "https://token.actions.githubusercontent.com"

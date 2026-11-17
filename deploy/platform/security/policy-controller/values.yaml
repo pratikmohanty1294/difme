@@ -1,0 +1,2 @@
+# PDF §11.2 — Sigstore Policy Controller admission gate: only signed images with SLSA provenance run in opted-in namespaces.
+webhook: { replicaCount: 1 }

@@ -1,0 +1,5 @@
+resources: [valkey.yaml]
+configMapGenerator:
+  - name: valkey-scripts
+    namespace: cache-tier
+    files: [pn_counter.lua=../../../../services/core/rate-limiter/src/main/resources/pn_counter.lua]

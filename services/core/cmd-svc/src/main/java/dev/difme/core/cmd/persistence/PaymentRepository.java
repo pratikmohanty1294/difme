@@ -57,6 +57,12 @@ public class PaymentRepository {
         return p;
     }
 
+    /** Marks the saga as started (bulk update: no version bump, so it never conflicts with the running workflow). */
+    @Transactional
+    public void markDispatched(java.util.UUID paymentId, java.time.Instant at) {
+        PaymentEntity.update("dispatchedAt = ?1 where paymentId = ?2 and dispatchedAt is null", at, paymentId);
+    }
+
     private String toJson(PaymentEvent e) {
         try {
             return json.writeValueAsString(e);

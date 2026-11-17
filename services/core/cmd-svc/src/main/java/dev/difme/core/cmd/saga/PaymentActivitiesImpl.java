@@ -28,10 +28,13 @@ public class PaymentActivitiesImpl implements PaymentActivities {
     @Inject LedgerClient ledger;
     @Inject PaymentRepository repository;
     @Inject AgroalDataSource db;
+    @Inject io.micrometer.core.instrument.MeterRegistry metrics;
+    static final java.util.List<String> NOTHING_TO_REFUND =
+            java.util.List.of("PendingTransferNotFound", "PendingTransferAlreadyVoided", "PendingTransferExpired");
     Clock clock = Clock.systemUTC();
 
     static UUID stepId(String paymentId, String step) {
-        return UUID.nameUUIDFromBytes((paymentId + "/" + step).getBytes(StandardCharsets.UTF_8));
+        return dev.difme.core.common.StepIds.of(paymentId, step);
     }
 
     @Override
@@ -82,14 +85,34 @@ public class PaymentActivitiesImpl implements PaymentActivities {
         try {
             ledger.voidPending(stepId(in.paymentId(), "refund"), stepId(in.paymentId(), "debit"));
         } catch (LedgerClient.LedgerRejected e) {
-            // Pending transfer never existed (debit failed) — nothing to refund. Idempotent.
-            if (!e.getMessage().contains("PendingTransferNotFound")) throw e;
+            // Nothing left to refund: the pending debit never existed, was already voided, or expired (TigerBeetle
+            // releases expired pending amounts itself). Anything else is retried by Temporal until it succeeds.
+            if (NOTHING_TO_REFUND.stream().noneMatch(e.getMessage()::contains)) {
+                compensationFailed("refund");
+                throw e;
+            }
+        } catch (RuntimeException e) {
+            compensationFailed("refund");
+            throw e;
         }
     }
 
     @Override
     @ConsistencyProfile(Consistency.SERIALIZABLE)
     public void cancelReservation(TransferInput in) {
+        try {
+            cancelReservationRow(in);
+        } catch (RuntimeException e) {
+            compensationFailed("cancel-reservation");
+            throw e;
+        }
+    }
+
+    private void compensationFailed(String step) {
+        metrics.counter("difme_compensation_failures_total", "step", step).increment();
+    }
+
+    private void cancelReservationRow(TransferInput in) {
         exec("UPDATE settlement.reservation SET status = 'COMPENSATED', updated_at = ? WHERE payment_id = ?::uuid AND status = 'RESERVED'",
                 Timestamp.from(clock.instant()), in.paymentId());
     }

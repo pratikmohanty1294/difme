@@ -26,5 +26,7 @@ public class PaymentEntity extends PanacheEntityBase {
     @Column(name = "ledger_transfer_id") public String ledgerTransferId;
     @Column(name = "created_at", nullable = false) public Instant createdAt;
     @Column(name = "updated_at", nullable = false) public Instant updatedAt;
+    @Column(length = 12) public String dispatch;                  // SAGA | DIRECT (ADR-017)
+    @Column(name = "dispatched_at") public Instant dispatchedAt;
     @Version public long version;
 }

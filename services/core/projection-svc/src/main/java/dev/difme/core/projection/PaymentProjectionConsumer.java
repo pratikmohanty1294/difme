@@ -17,8 +17,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.apache.kafka.common.header.Header;
+import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.eclipse.microprofile.reactive.messaging.Message;
 
@@ -26,6 +31,7 @@ import org.eclipse.microprofile.reactive.messaging.Message;
  * PDF §7.1 steps 9–11: consume CDC CloudEvent → inbox check (skip duplicates) → update read model.
  * Inbox claim and projection write share one local transaction (specs/tla/InboxOutbox.tla).
  * After commit: refresh L2 and broadcast L1 invalidation.
+ * Errors (ADR-017): poison messages go straight to the DLQ; anything else is nacked into the delay-topic retry ladder.
  */
 @ApplicationScoped
 public class PaymentProjectionConsumer {
@@ -35,14 +41,21 @@ public class PaymentProjectionConsumer {
     @Inject ObjectMapper json;
     @Inject RedisDataSource redis;
     @Inject MeterRegistry metrics;
+    @Inject @Channel("payments-dlq") Emitter<String> dlq;
 
     @Incoming("payments")
     @RunOnVirtualThread
     public CompletionStage<Void> on(Message<String> msg) {
+        var meta = msg.getMetadata(IncomingKafkaRecordMetadata.class).orElseThrow();
+        UUID eventId;
+        PaymentEvent event;
         try {
-            var meta = msg.getMetadata(IncomingKafkaRecordMetadata.class).orElseThrow();
-            UUID eventId = UUID.fromString(header(meta, "ce_id"));
-            PaymentEvent event = EventCodec.decode(json, header(meta, "ce_type"), msg.getPayload());
+            eventId = UUID.fromString(header(meta, "ce_id"));
+            event = EventCodec.decode(json, header(meta, "ce_type"), msg.getPayload());
+        } catch (Exception poison) {
+            return toDlq(msg, meta, poison);
+        }
+        try {
             PaymentView updated = project(eventId, event);
             if (updated != null) {
                 String key = "payment:" + updated.paymentId;
@@ -56,6 +69,27 @@ public class PaymentProjectionConsumer {
         } catch (Exception e) {
             return msg.nack(e);
         }
+    }
+
+    /** Non-retryable: no amount of retrying fixes a message that cannot be decoded. */
+    private CompletionStage<Void> toDlq(Message<String> msg, IncomingKafkaRecordMetadata<?, ?> meta, Exception cause) {
+        RecordHeaders headers = new RecordHeaders(meta.getHeaders().toArray());
+        headers.add("dead-letter-reason", String.valueOf(cause.getMessage()).getBytes(StandardCharsets.UTF_8));
+        headers.add("dead-letter-cause", cause.getClass().getName().getBytes(StandardCharsets.UTF_8));
+        headers.add("dead-letter-topic", meta.getTopic().getBytes(StandardCharsets.UTF_8));
+        headers.add("dead-letter-partition", String.valueOf(meta.getPartition()).getBytes(StandardCharsets.UTF_8));
+        headers.add("dead-letter-offset", String.valueOf(meta.getOffset()).getBytes(StandardCharsets.UTF_8));
+        headers.add("dead-letter-retryable", "false".getBytes(StandardCharsets.UTF_8));
+        metrics.counter("difme_dlq_total", "consumer", CONSUMER, "reason", "poison").increment();
+        // The source offset is committed only once the DLQ write is acknowledged (no message is ever lost).
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        dlq.send(Message.of(msg.getPayload())
+                .addMetadata(OutgoingKafkaRecordMetadata.<Object>builder().withKey(meta.getKey()).withHeaders(headers).build())
+                .withAck(() -> msg.ack().whenComplete((v, t) -> {
+                    if (t != null) done.completeExceptionally(t); else done.complete(null);
+                }))
+                .withNack(t -> msg.nack(t).whenComplete((v, x) -> done.complete(null))));
+        return done;
     }
 
     private PaymentView project(UUID eventId, PaymentEvent event) throws Exception {

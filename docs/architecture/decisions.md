@@ -157,3 +157,44 @@ Kept on purpose:
 - **Promoted from PDF §17 (v2.0).** Sandboxed plug-in logic (fraud rules, limit checks) ships as WASI Preview 2 components. They run on **Wasmtime** (Bytecode Alliance, Apache-2.0), embedded in Rust in the Tauri edge app and the QUIC hub.
 - **Why not WasmEdge (the PDF's choice):** Wasmtime is the reference implementation of WASI Preview 2 and the component model, so it has the most complete support; WasmEdge's lags.
 - **Also promoted:** `specs/tla/CrdtMerge.tla` verifies offline edge spending as an escrow ("bounded counter") CRDT. The edge's automerge document carries this counter. A mutation test confirms the spec catches overspending.
+
+## ADR-017 — Error-handling and resilience standard (owner-approved 2026-11-18)
+**Distributed transactions:** Temporal sagas only, no separate LRA coordinator. Temporal provides LRA semantics (start, complete, compensate) with durability.
+- Forward steps retry a bounded number of times with backoff.
+- **Compensations retry until they succeed** (unlimited attempts, capped backoff), so a refund can never give up. Compensations are idempotent, and their failures are counted and alerted.
+
+**Idempotency (three layers):**
+- **Command:** the UUIDv7 `Idempotency-Key` is claimed **in the same transaction** as the payment and its outbox event. Before this, a failed write left the key claimed with no payment behind it.
+- **Side effects:** step-derived ids (`StepIds`) make TigerBeetle transfers and events duplicate-safe.
+- **Saga:** workflow id = payment id with `REJECT_DUPLICATE`, so no second run can start, even after the first finishes.
+- **Consumers:** the inbox table.
+
+**Transactional outbox:** payment + outbox row in one transaction; Debezium relays it to Kafka.
+- The relay never skips records: `errors.tolerance: none`, retries for 10 min, idempotent producer, `acks=all`. A stopped relay is alerted.
+- **Recovery sweeper:** accepted payments whose dispatch never finished (crash, timeout, open circuit) are re-dispatched every 15 s. Safe because every step is idempotent; the backlog is alerted.
+
+**Database conflicts:** `TxRetry` re-runs the whole transaction on SQLSTATE 40001/40P01 (YugabyteDB serializable) with full-jitter backoff. Nothing else is retried.
+
+**Synchronous calls** use SmallRye Fault Tolerance: every outbound call has a timeout, a circuit breaker and a bulkhead.
+- **Retries** only for idempotent calls (ledger by transfer id, saga start), with jitter. Business rejections are neither retried nor counted as failures.
+- **Rate limiter:** not retried (an acquire isn't idempotent). On failure it falls back to a conservative per-pod token bucket, so an outage degrades throughput instead of stopping payments or removing the limit.
+
+**Throttling, layered:**
+- **Gateway:** fixed per-route rate limits.
+- **Service:** an adaptive concurrency limit (AIMD on latency) sheds excess with 503 + `Retry-After` instead of queueing.
+- **Shared:** the per-account rate limiter.
+- **Kafka consumers:** bounded polls with pause/resume (backpressure).
+
+**Messaging failures:**
+- **Transient:** a retry ladder of delay topics (1 s, 10 s, 60 s), then the DLQ.
+- **Poison messages:** straight to the DLQ.
+- **DLQ records** keep the original headers plus reason, cause, source topic/partition/offset and a retryable flag. The source offset commits only after the DLQ write is acknowledged.
+
+**Observability:** every degraded path has a metric and an alert. That covers circuit opened, bulkhead rejecting, rate limiter degraded, load shedding, dispatch backlog, stuck compensation, DLQ growth and outbox relay down.
+
+**Lifecycle:** 20 s graceful shutdown. Outbound HTTP clients have connect and read timeouts.
+
+**Still to do:**
+- **Gateway:** Envoy Gateway circuit breaking, outlier detection and retries for idempotent GETs, validated against the live CRDs.
+- **Tooling:** a DLQ inspect/replay API in replay-engine.
+- **Coverage:** the same treatment for the remaining consumers and services.

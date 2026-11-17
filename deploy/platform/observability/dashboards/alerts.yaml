@@ -38,6 +38,42 @@ spec:
         - alert: FraudFalsePositiveReview
           expr: sum by (model_version) (rate(difme_fraud_false_positive_total[1d])) > 0
           labels: { severity: review }
+    - name: resilience            # ADR-017: every fallback path is visible, so degraded modes never stay silent
+      rules:
+        - alert: CircuitBreakerOpened
+          expr: sum by (application, method) (increase(ft_circuitbreaker_opened_total[5m])) > 0
+          labels: { severity: P2 }
+          annotations: { summary: "Circuit opened on {{ $labels.method }} — dependency failing; fallback in use" }
+        - alert: BulkheadRejecting
+          expr: sum by (application, method) (rate(ft_bulkhead_calls_total{bulkheadResult="rejected"}[5m])) > 1
+          for: 5m
+          labels: { severity: P2 }
+        - alert: RateLimiterDegraded
+          expr: sum(rate(difme_ratelimit_degraded_total[5m])) > 0
+          for: 2m
+          labels: { severity: P2 }
+          annotations: { summary: "Shared rate limiter unreachable; pods are on the local degraded limit" }
+        - alert: LoadShedding
+          expr: sum by (application) (rate(difme_loadshed_rejected_total[5m])) > 5
+          for: 5m
+          labels: { severity: P2 }
+        - alert: DispatchBacklog
+          expr: max(difme_payments_undispatched) > 0
+          for: 5m
+          labels: { severity: P1 }
+          annotations: { summary: "Accepted payments not dispatched for 5 min — saga/ledger path failing" }
+        - alert: SagaCompensationStuck
+          expr: sum by (step) (increase(difme_compensation_failures_total[30m])) > 10
+          labels: { severity: P1 }
+          annotations: { summary: "Compensation {{ $labels.step }} keeps failing — money may be held; operator needed" }
+        - alert: DeadLetterQueueGrowing
+          expr: sum by (consumer, reason) (increase(difme_dlq_total[15m])) > 0
+          labels: { severity: P2 }
+        - alert: OutboxRelayDown
+          expr: max(kafka_connect_connector_status{connector="core-outbox", status!="running"}) > 0
+          for: 2m
+          labels: { severity: P1 }
+          annotations: { summary: "Outbox relay stopped — events are being kept in core.outbox, not published" }
     - name: finops
       rules:
         - record: difme:cost_per_transaction_usd

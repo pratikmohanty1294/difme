@@ -25,7 +25,25 @@ public class PaymentWorkflowImpl implements PaymentWorkflow {
                             .setInitialInterval(Duration.ofMillis(200))
                             .setBackoffCoefficient(2.0)          // exponential backoff (§7.2 notify step)
                             .setMaximumAttempts(5)
+                            .setMaximumInterval(Duration.ofSeconds(10))
                             .setDoNotRetry("dev.difme.core.cmd.ledger.LedgerClient$LedgerRejected")
+                            .build())
+                    .build());
+
+    /**
+     * Compensations must eventually succeed: a refund that gave up would leave the source account debited (ADR-017).
+     * They retry without an attempt limit (capped backoff) until they succeed; each is idempotent (step-derived ledger
+     * ids). A compensation stuck for an hour raises the SagaCompensationStuck alert for an operator.
+     */
+    private final PaymentActivities compensations = Workflow.newActivityStub(PaymentActivities.class,
+            ActivityOptions.newBuilder()
+                    .setTaskQueue(PaymentActivities.TASK_QUEUE)
+                    .setStartToCloseTimeout(Duration.ofSeconds(10))
+                    .setRetryOptions(RetryOptions.newBuilder()
+                            .setInitialInterval(Duration.ofMillis(500))
+                            .setBackoffCoefficient(2.0)
+                            .setMaximumInterval(Duration.ofMinutes(1))
+                            .setMaximumAttempts(0)                   // 0 = unlimited
                             .build())
                     .build());
 
@@ -37,13 +55,13 @@ public class PaymentWorkflowImpl implements PaymentWorkflow {
         try {
             step = "debit";
             steps.debitSource(in);
-            saga.addCompensation(steps::refundSource, in);
+            saga.addCompensation(compensations::refundSource, in);
 
             int v = Workflow.getVersion("settlement-reserve", Workflow.DEFAULT_VERSION, 1);
             if (v >= 1) {
                 step = "reserve";
                 steps.reserveSettlement(in);
-                saga.addCompensation(steps::cancelReservation, in);
+                saga.addCompensation(compensations::cancelReservation, in);
             }
 
             step = "notify";
@@ -63,7 +81,7 @@ public class PaymentWorkflowImpl implements PaymentWorkflow {
             String failed = step;
             step = "compensating";
             saga.compensate();
-            steps.markCompensated(in, failed, String.valueOf(e.getCause() == null ? e.getMessage() : e.getCause().getMessage()));
+            compensations.markCompensated(in, failed, String.valueOf(e.getCause() == null ? e.getMessage() : e.getCause().getMessage()));
             step = "compensated";
             return new TransferResult(in.paymentId(), "COMPENSATED", null, failed);
         }

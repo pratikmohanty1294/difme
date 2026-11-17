@@ -7,6 +7,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,9 +16,9 @@ import java.util.UUID;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * PDF §9 command-layer dedup on YugabyteDB (ADR-015 replaces FoundationDB): a serializable check-and-set on a
- * unique-key table. Same contract as specs/tla/Idempotency.tla: a key is applied at most once per TTL window and
- * duplicates get the original payment id back.
+ * PDF §9 command-layer dedup on YugabyteDB (ADR-015): a serializable check-and-set on a unique-key table, same contract
+ * as specs/tla/Idempotency.tla. {@link #claim} does not manage its own transaction (ADR-017): the connection is
+ * enlisted in the caller's JTA transaction, so the claim, the payment and its outbox event commit atomically.
  */
 @ApplicationScoped
 public class YbIdempotencyStore implements IdempotencyStore {
@@ -32,40 +33,48 @@ public class YbIdempotencyStore implements IdempotencyStore {
     @Override
     @ConsistencyProfile(Consistency.LINEARIZABLE)
     public Optional<UUID> claim(UUID key, UUID paymentId, long nowEpochMs) {
-        Timestamp now = Timestamp.from(Instant.ofEpochMilli(nowEpochMs));
-        Timestamp expiredBefore = Timestamp.from(Instant.ofEpochMilli(nowEpochMs - ttlMs));
         try (Connection c = db.getConnection()) {
-            c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-            c.setAutoCommit(false);
-            try {
-                // New key, or an expired one: take it. A live key leaves the row untouched and returns nothing.
-                try (PreparedStatement ps = c.prepareStatement("""
-                        INSERT INTO core.idempotency_key (idempotency_key, payment_id, stored_at) VALUES (?, ?, ?)
-                        ON CONFLICT (idempotency_key) DO UPDATE SET payment_id = EXCLUDED.payment_id, stored_at = EXCLUDED.stored_at
-                          WHERE core.idempotency_key.stored_at < ?
-                        RETURNING payment_id""")) {
-                    ps.setObject(1, key);
-                    ps.setObject(2, paymentId);
-                    ps.setTimestamp(3, now);
-                    ps.setTimestamp(4, expiredBefore);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) { c.commit(); return Optional.empty(); }
-                    }
+            // New key, or an expired one: take it. A live key leaves the row untouched and returns nothing.
+            try (PreparedStatement ps = c.prepareStatement("""
+                    INSERT INTO core.idempotency_key (idempotency_key, payment_id, stored_at) VALUES (?, ?, ?)
+                    ON CONFLICT (idempotency_key) DO UPDATE SET payment_id = EXCLUDED.payment_id, stored_at = EXCLUDED.stored_at
+                      WHERE core.idempotency_key.stored_at < ?
+                    RETURNING payment_id""")) {
+                ps.setObject(1, key);
+                ps.setObject(2, paymentId);
+                ps.setTimestamp(3, at(nowEpochMs));
+                ps.setTimestamp(4, at(nowEpochMs - ttlMs));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) return Optional.empty();
                 }
-                try (PreparedStatement ps = c.prepareStatement("SELECT payment_id FROM core.idempotency_key WHERE idempotency_key = ?")) {
-                    ps.setObject(1, key);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        Optional<UUID> original = rs.next() ? Optional.of(rs.getObject(1, UUID.class)) : Optional.empty();
-                        c.commit();
-                        return original;
-                    }
-                }
-            } catch (Exception e) {
-                c.rollback();
-                throw e;
             }
-        } catch (java.sql.SQLException e) {
-            throw new IllegalStateException("idempotency check failed", e);
+            return lookup(c, key, Long.MIN_VALUE);
+        } catch (SQLException e) {
+            throw new IllegalStateException("idempotency claim failed", e);
         }
+    }
+
+    @Override
+    public Optional<UUID> find(UUID key, long nowEpochMs) {
+        try (Connection c = db.getConnection()) {
+            return lookup(c, key, nowEpochMs - ttlMs);
+        } catch (SQLException e) {
+            throw new IllegalStateException("idempotency lookup failed", e);
+        }
+    }
+
+    private static Optional<UUID> lookup(Connection c, UUID key, long notBeforeMs) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT payment_id FROM core.idempotency_key WHERE idempotency_key = ? AND stored_at >= ?")) {
+            ps.setObject(1, key);
+            ps.setTimestamp(2, notBeforeMs == Long.MIN_VALUE ? new Timestamp(0) : at(notBeforeMs));
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(rs.getObject(1, UUID.class)) : Optional.empty();
+            }
+        }
+    }
+
+    private static Timestamp at(long epochMs) {
+        return Timestamp.from(Instant.ofEpochMilli(epochMs));
     }
 }

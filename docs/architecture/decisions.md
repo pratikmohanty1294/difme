@@ -121,3 +121,6 @@ Bulk benchmark (ADR-011), 10M records with DB + DMN validation on a 4-vCPU runne
 ## ADR-013 — Cilium data path in the Codespace (verified live 2026-11-17)
 Inside k3d (Kubernetes-in-Docker on a Codespace), Cilium's full kube-proxy replacement left host-network pods unable to reach ClusterIP services, even with legacy host routing and cgroup-root changes. The node-agent namespaces depend on that path.
 **Decision:** the Codespace cluster runs Cilium **alongside k3s kube-proxy**. eBPF networking, network policy (L3–L7), WireGuard and Hubble stay. Real clusters (RKE2 on VMs or bare metal, `deploy/fleet/rke2-config.yaml` with `disable-kube-proxy`) use `kubeProxyReplacement: true` for the full eBPF service data path (PDF §4.6), where it is supported natively.
+
+**Live base-profile measurements (Codespace, 4 cores / 16 GB, 2026-11-17):** 13/13 apps Synced+Healthy.
+Excluding high-churn objects from Argo CD (policy reports, Gatekeeper status, Cilium endpoints, leases/events), status-only update suppression, a 300 s reconcile and a 300 s Gatekeeper audit reduced Argo CD's controller from ~300–900m bursts to **4–6m** and Gatekeeper from ~120–400m to **~5m**. The node idles at **0.22–0.68 cores, ~4.9 GB**.

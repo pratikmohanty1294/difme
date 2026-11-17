@@ -4,7 +4,7 @@ metadata:
   name: ingress-system
   labels:
     difme/workload-type: Deployment
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged   # node agents: MetalLB speaker, SPIRE agent/CSI, Alloy, node-exporter, Velero node-agent
 ---
 apiVersion: v1
 kind: Namespace
@@ -75,7 +75,7 @@ metadata:
   name: observability
   labels:
     difme/workload-type: StatefulSet-DaemonSet
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged   # node agents: MetalLB speaker, SPIRE agent/CSI, Alloy, node-exporter, Velero node-agent
 ---
 apiVersion: v1
 kind: Namespace
@@ -83,7 +83,7 @@ metadata:
   name: security
   labels:
     difme/workload-type: StatefulSet-DaemonSet
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged   # node agents: MetalLB speaker, SPIRE agent/CSI, Alloy, node-exporter, Velero node-agent
 ---
 apiVersion: v1
 kind: Namespace
@@ -156,7 +156,7 @@ metadata:
   name: backup
   labels:
     difme/workload-type: Deployment
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged   # node agents: MetalLB speaker, SPIRE agent/CSI, Alloy, node-exporter, Velero node-agent
 ---
 apiVersion: v1
 kind: Namespace

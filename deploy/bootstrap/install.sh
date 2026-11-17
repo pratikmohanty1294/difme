@@ -16,6 +16,8 @@ kubectl -n argocd patch configmap argocd-cm --type merge -p '{"data":{"kustomize
   kinds: [CiliumIdentity]
   clusters: [\"*\"]
 "}}'
+# Server-side diff: fields defaulted by controllers/webhooks are not reported as drift.
+kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.diff.server.side":"true"}}'
 kubectl -n argocd rollout restart statefulset/argocd-application-controller deploy/argocd-repo-server >/dev/null
 kubectl apply -n argocd --server-side -f https://github.com/argoproj/argo-rollouts/releases/download/v1.8.2/install.yaml || true
 

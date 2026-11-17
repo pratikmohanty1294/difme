@@ -24,9 +24,11 @@ spec:
                     - keyless:
                         subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
                         issuer: "https://token.actions.githubusercontent.com"
+                        rekor: { url: https://rekor.sigstore.dev }
             - type: https://spdx.dev/Document/v2.3
               attestors:
                 - entries:
                     - keyless:
                         subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
                         issuer: "https://token.actions.githubusercontent.com"
+                        rekor: { url: https://rekor.sigstore.dev }

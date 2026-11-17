@@ -17,10 +17,11 @@ spec:
       containers:
         - name: tigerbeetle
           image: ghcr.io/tigerbeetle/tigerbeetle:0.16.78
-          args: [start, --addresses=0.0.0.0:3000, --cache-grid=256MiB, /data/0_0.tigerbeetle]
+          # Lean caches (measured: ~2.1 GiB RSS; TigerBeetle allocates statically, its 1 GiB journal dominates).
+          args: [start, --addresses=0.0.0.0:3000, --experimental, --cache-grid=128MiB, --cache-accounts=32MiB,
+                 --cache-transfers=32MiB, --cache-transfers-pending=16MiB, /data/0_0.tigerbeetle]
           ports: [{ containerPort: 3000 }]
-          securityContext: { capabilities: { add: [IPC_LOCK] } }   # io_uring + locked memory
-          resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
+          resources: { requests: { cpu: 200m, memory: 2200Mi }, limits: { memory: 2560Mi } }
           volumeMounts: [{ name: data, mountPath: /data }]
   volumeClaimTemplates:
     - metadata: { name: data }

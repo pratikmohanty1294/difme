@@ -1,8 +1,13 @@
-# Zero trust: every meshed namespace starts with default-deny; Cilium policies open only declared flows.
+# Zero trust (PDF §11.3): every meshed namespace starts deny-by-default. Allowed baseline:
+#   - Kubernetes API server and cluster DNS (operators and controllers need them — found live: the FoundationDB
+#     operator could not start, and Temporal could not reach YugabyteDB, under a same-namespace-only policy);
+#   - traffic to/from DIFME namespaces only (labelled difme/workload-type); never to/from the internet.
+# Per-service identity rules come from the Istio ambient mesh AuthorizationPolicies on top of this.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata: { name: generate-default-deny }
 spec:
+  generateExisting: true
   rules:
     - name: default-deny
       match: { any: [{ resources: { kinds: [Namespace], selector: { matchLabels: { istio.io/dataplane-mode: ambient } } } }] }
@@ -15,8 +20,13 @@ spec:
         data:
           spec:
             endpointSelector: {}
-            ingress: [{ fromEndpoints: [{ matchLabels: { "k8s:io.kubernetes.pod.namespace": "{{request.object.metadata.name}}" } }] }]
+            ingress:
+              - fromEndpoints:
+                  - matchExpressions: [{ key: "k8s:io.cilium.k8s.namespace.labels.difme/workload-type", operator: Exists }]
+              - fromEntities: [host, remote-node, kube-apiserver]      # kubelet probes, webhooks
             egress:
+              - toEntities: [kube-apiserver]
               - toEndpoints: [{ matchLabels: { "k8s:io.kubernetes.pod.namespace": kube-system, "k8s:k8s-app": kube-dns } }]
                 toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
-              - toEndpoints: [{ matchLabels: { "k8s:io.kubernetes.pod.namespace": "{{request.object.metadata.name}}" } }]
+              - toEndpoints:
+                  - matchExpressions: [{ key: "k8s:io.cilium.k8s.namespace.labels.difme/workload-type", operator: Exists }]

@@ -24,4 +24,6 @@ spec:
               done
               psql -d difme -c "GRANT CONNECT ON DATABASE difme TO difme_reader, difme_bulk, debezium, trino"
               echo "db-init done"
+          volumeMounts: [{ name: sql, mountPath: /sql }]
           resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } }
+      volumes: [{ name: sql, configMap: { name: db-init-sql } }]

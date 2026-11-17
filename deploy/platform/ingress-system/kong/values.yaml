@@ -1,5 +1,5 @@
 # PDF §5.10 — Kong (external API gateway): rate limiting, OIDC, OpenAPI request validation against Apicurio specs.
-ingressController: { enabled: true, ingressClass: kong }
+ingressController: { enabled: false }   # DB-less static config below; no controller needed (lighter, no Gateway API RBAC)
 env: { database: "off", router_flavor: expressions, tracing_instrumentations: all, tracing_sampling_rate: 0.1 }
 proxy: { type: ClusterIP }
 resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }

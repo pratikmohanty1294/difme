@@ -39,3 +39,20 @@
 ### Post-create stopped half-way; several CLIs missing
 - **Root cause:** `set -e` plus one failed download (the pinned Trivy release asset).
 - **Fix:** every tool installs independently (`step` wrapper), and Trivy runs from its pinned image.
+
+### TigerBeetle OOM-killed at 1.5 GiB
+- **Measured:** about 2.1–2.3 GiB RSS at 0.16.78 regardless of cache flags. It allocates statically, and its 1 GiB journal dominates.
+- **Fix:** lean caches (`--experimental --cache-grid=128MiB --cache-accounts/transfers=32MiB --cache-transfers-pending=16MiB`, saves ~200 MB) and a 2.5 GiB limit.
+- **Also:** no `IPC_LOCK` capability; it violates baseline Pod Security and isn't needed.
+
+### Default-deny blocked operators and cross-namespace flows
+- **Root cause:** the generated CiliumNetworkPolicy allowed only same-namespace traffic and DNS.
+- **Fix:** also allow the kube-apiserver and traffic between DIFME namespaces (`difme/workload-type` label). The mesh adds per-identity rules on top.
+
+### Kong pod stuck at 1/2 Ready
+- **Root cause:** Kong's ingress controller lacked RBAC for the Gateway API resources it auto-watches.
+- **Fix:** Kong runs DB-less from its static config, so the controller is disabled (lighter too).
+
+### db-init: `/sql/init.sql: No such file`
+- **Root cause:** the Job never mounted its ConfigMap. Caught only at runtime, because a dry run doesn't execute containers.
+- **Prevention:** check `volumes`/`volumeMounts` whenever a configMapGenerator is added.

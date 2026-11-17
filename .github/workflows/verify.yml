@@ -87,7 +87,11 @@ jobs:
           fail=0
           while read name repo chart version ns; do
             if [[ "$repo" == *docker.io* ]]; then ref="oci://$repo/$chart"; else ref="$chart --repo $repo"; fi
-            helm template "$name" $ref --version "$version" -n "$ns" --api-versions cert-manager.io/v1 --api-versions monitoring.coreos.com/v1 -f "deploy/platform/$ns/$name/values.yaml" > /dev/null 2>/tmp/err \
+            helm template "$name" $ref --version "$version" -n "$ns" --api-versions cert-manager.io/v1 --api-versions monitoring.coreos.com/v1 -f "deploy/platform/$ns/$name/values.yaml" > /tmp/out.yaml 2>/tmp/err \
               && echo "✓ $name $version" || { echo "✗ $name $version: $(head -c 300 /tmp/err)"; fail=1; }
+            # Withdrawn image catalogs must never be referenced (found live: bitnami/kubectl is no longer pullable).
+            if grep -qE 'image: .*bitnami/' /tmp/out.yaml; then
+              echo "✗ $name renders a withdrawn bitnami image: $(grep -oE 'bitnami/[^" ]+' /tmp/out.yaml | sort -u | tr '\n' ' ')"; fail=1
+            fi
           done < /tmp/charts.txt
           exit $fail

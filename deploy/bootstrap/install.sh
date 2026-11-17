@@ -6,7 +6,7 @@ API=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
 
 helm repo add cilium https://helm.cilium.io >/dev/null
 helm upgrade --install cilium cilium/cilium -n kube-system --version 1.17.3 \
-  -f deploy/platform/cilium/values.yaml --set k8sServiceHost="$API" --set k8sServicePort=6443 --wait
+  -f deploy/platform/kube-system/cilium/values.yaml --set k8sServiceHost="$API" --set k8sServicePort=6443 --wait
 
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.14.11/manifests/install.yaml

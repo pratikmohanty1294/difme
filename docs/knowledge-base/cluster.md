@@ -78,3 +78,8 @@
 - **Root cause:** Codespaces' `/tmp` carries a default ACL, so new directories come out `drwxr-xrw-+` (no traverse for others), and non-root containers can't reach their image layers.
 - **Fix:** `make cluster` recreates the image directory, clears ACLs (`setfacl -R -b -k`) and sets `chmod 755` before k3d starts.
 - **Prevention:** a `+` in `ls -ld` means an ACL is in play; check it whenever a bind mount comes from a new host path.
+
+### Containerd store on `/tmp`: abandoned after 2 attempts (time-box)
+- **What happened:** moving image layers to the 118 GB ephemeral disk broke every non-root pod (`stat /coredns: permission denied`). `setfacl` isn't installed in the Codespace, and `|| true` hid that, so the inherited default ACL was never cleared.
+- **Decision:** revert to the persistent disk and bound usage with kubelet image GC (70% → 60%) plus eviction thresholds instead. It's simpler, with no special host setup.
+- **Lesson:** never `|| true` a step the fix depends on. Fail loudly, or check the result (`ls -ld` shows `+` while an ACL remains).

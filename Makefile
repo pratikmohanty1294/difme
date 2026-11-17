@@ -2,7 +2,6 @@
 SHELL := /bin/bash
 CLUSTER ?= difme
 PROFILE ?= core
-IMAGE_DISK ?= $(shell df --output=avail /tmp 2>/dev/null | tail -1 | awk '$$1>50000000{print "/tmp/difme"}' | grep . || echo $(HOME)/.difme)
 REPO    ?= https://github.com/pratikmohanty1294/difme.git
 APPS     = $(shell cat deploy/profiles/$(PROFILE).txt 2>/dev/null | grep -v '^\#')
 
@@ -25,16 +24,10 @@ registries:      ## Persistent pull-through image caches (survive `make destroy`
 	done
 
 cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (images via local caches)
-	@# Image layers (re-fetchable, ~14 GB) go to the large ephemeral disk; volumes and registry caches stay on the
-	@# persistent disk. After a Codespace stop the layers re-pull from the local caches (knowledge-base/cluster.md).
-	@# Codespaces' /tmp has a default ACL that drops "x" for others; non-root containers then can't reach their layers.
-	rm -rf $(IMAGE_DISK) && mkdir -p $(IMAGE_DISK)/containerd
-	setfacl -R -b -k $(IMAGE_DISK) 2>/dev/null || true
-	chmod -R 755 $(IMAGE_DISK)
+	@# Disk use is bounded by kubelet image GC (deploy/bootstrap/kubelet-difme.conf), not by relocating layers.
 	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml \
 	  --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:* \
-	  --volume $(CURDIR)/deploy/bootstrap/kubelet-difme.conf:/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/50-difme.conf@server:* \
-	  --volume $(IMAGE_DISK)/containerd:/var/lib/rancher/k3s/agent/containerd@server:*
+	  --volume $(CURDIR)/deploy/bootstrap/kubelet-difme.conf:/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/50-difme.conf@server:*
 	bash deploy/bootstrap/install.sh $(REPO)
 	bash deploy/bootstrap/dev-secrets.sh
 

@@ -3,7 +3,7 @@ name: images
 on:
   push:
     branches: [main]
-    paths: ["services/**", "vendor/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml"]
+    paths: ["services/**", "vendor/**", "backoffice/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml"]
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write, attestations: write }
 
@@ -31,6 +31,25 @@ jobs:
         WITH_FDB=${{ matrix.fdb }}
       java: true
       prebuild: mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
+
+  backoffice:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: shell,          image: difme-backoffice-shell,       out: dist }
+          - { app: settlements,    image: difme-remote-settlements,     out: dist }
+          - { app: compliance,     image: difme-remote-compliance,      out: dist }
+          - { app: analytics,      image: difme-remote-analytics,       out: dist/browser }
+          - { app: process-studio, image: difme-remote-process-studio,  out: dist }
+          - { app: form-builder,   image: difme-remote-form-builder,    out: dist }
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: ${{ matrix.image }}
+      dockerfile: backoffice/Dockerfile
+      build-args: |
+        APP=${{ matrix.app }}
+        OUT=${{ matrix.out }}
 
   formio:
     uses: ./.github/workflows/_image.yml

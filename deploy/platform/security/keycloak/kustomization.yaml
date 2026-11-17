@@ -1,0 +1,4 @@
+resources: [keycloak.yaml]
+configMapGenerator:
+  - name: keycloak-realm
+    files: [difme-realm.json]

@@ -1,0 +1,4 @@
+resources: [job.yaml]
+configMapGenerator:
+  - name: risingwave-sql
+    files: [settlement_positions.sql=../../../../analytics/risingwave/settlement_positions.sql]

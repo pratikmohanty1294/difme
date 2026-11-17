@@ -9,3 +9,4 @@ istio-cni
 ztunnel
 istio-config
 attestation
+keycloak

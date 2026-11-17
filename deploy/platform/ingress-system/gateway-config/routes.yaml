@@ -15,8 +15,31 @@ spec:
   hostnames: [ops.difme.local]
   rules:
     - matches: [{ path: { type: PathPrefix, value: /api } }]
-      backendRefs: [{ name: apisix-gateway, namespace: back-office-ui, port: 80 }]   # back-office API → APISIX
+      backendRefs: [{ name: apisix-gateway, namespace: back-office-ui, port: 80 }]   # back-office API → APISIX (OIDC)
+    - matches: [{ path: { type: PathPrefix, value: /remotes/settlements } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: / } } }]
+      backendRefs: [{ name: remote-settlements, namespace: back-office-ui, port: 80 }]
+    - matches: [{ path: { type: PathPrefix, value: /remotes/compliance } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: / } } }]
+      backendRefs: [{ name: remote-compliance, namespace: back-office-ui, port: 80 }]
+    - matches: [{ path: { type: PathPrefix, value: /remotes/analytics } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: / } } }]
+      backendRefs: [{ name: remote-analytics, namespace: back-office-ui, port: 80 }]
+    - matches: [{ path: { type: PathPrefix, value: /remotes/process-studio } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: / } } }]
+      backendRefs: [{ name: remote-process-studio, namespace: back-office-ui, port: 80 }]
+    - matches: [{ path: { type: PathPrefix, value: /remotes/form-builder } }]
+      filters: [{ type: URLRewrite, urlRewrite: { path: { type: ReplacePrefixMatch, replacePrefixMatch: / } } }]
+      backendRefs: [{ name: remote-form-builder, namespace: back-office-ui, port: 80 }]
     - backendRefs: [{ name: backoffice-shell, namespace: back-office-ui, port: 80 }]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: identity, namespace: ingress-system }
+spec:
+  parentRefs: [{ name: difme-edge, sectionName: https }]
+  hostnames: [id.difme.local]
+  rules: [{ backendRefs: [{ name: keycloak, namespace: security, port: 8080 }] }]
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
@@ -31,3 +54,10 @@ metadata: { name: allow-ingress-system, namespace: back-office-ui }
 spec:
   from: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, namespace: ingress-system }]
   to: [{ group: "", kind: Service }]
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata: { name: allow-ingress-system, namespace: security }
+spec:
+  from: [{ group: gateway.networking.k8s.io, kind: HTTPRoute, namespace: ingress-system }]
+  to: [{ group: "", kind: Service, name: keycloak }]

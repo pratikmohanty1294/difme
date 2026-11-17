@@ -1,3 +1,10 @@
 packages:
   - "apps/*"
   - "packages/*"
+# pnpm ≥11: only these dependencies may run install scripts (native binaries). Everything else is denied.
+allowBuilds:
+  "@parcel/watcher": true
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true
+  svelte-preprocess: false

@@ -1,0 +1,15 @@
+# Applies the streaming views in analytics/risingwave after each sync (statements are idempotent).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: apply-risingwave-sql, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:17-alpine
+          command: [sh, -c, "for f in /sql/*.sql; do psql -v ON_ERROR_STOP=1 -h risingwave -p 4566 -U root -d dev -f $f; done"]
+          volumeMounts: [{ name: sql, mountPath: /sql }]
+      volumes: [{ name: sql, configMap: { name: risingwave-sql } }]

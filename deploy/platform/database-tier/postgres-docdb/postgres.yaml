@@ -33,6 +33,7 @@ metadata: { name: postgres-docdb-init }
 data:
   10-fluxnova.sql: |
     CREATE DATABASE fluxnova;
+    CREATE DATABASE keycloak;
 ---
 apiVersion: v1
 kind: Service

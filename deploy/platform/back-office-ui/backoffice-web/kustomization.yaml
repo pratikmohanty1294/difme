@@ -1,1 +1,1 @@
-resources: [web.yaml]
+resources: [web.yaml, remotes.yaml]

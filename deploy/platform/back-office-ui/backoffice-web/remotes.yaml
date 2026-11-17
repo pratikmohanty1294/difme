@@ -1,0 +1,75 @@
+# One Deployment + Service per remote; rendered from this list by kustomize replacements would add little — kept explicit.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-settlements, labels: { app: remote-settlements } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-settlements } }
+  template:
+    metadata: { labels: { app: remote-settlements, difme/team: settlements, business.metric: backoffice-ui } }
+    spec: { containers: [{ name: web, image: ghcr.io/pratikmohanty1294/difme-remote-settlements:0.1.0, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } } }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-settlements }
+spec: { selector: { app: remote-settlements }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-compliance, labels: { app: remote-compliance } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-compliance } }
+  template:
+    metadata: { labels: { app: remote-compliance, difme/team: compliance, business.metric: backoffice-ui } }
+    spec: { containers: [{ name: web, image: ghcr.io/pratikmohanty1294/difme-remote-compliance:0.1.0, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } } }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-compliance }
+spec: { selector: { app: remote-compliance }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-analytics, labels: { app: remote-analytics } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-analytics } }
+  template:
+    metadata: { labels: { app: remote-analytics, difme/team: analytics, business.metric: backoffice-ui } }
+    spec: { containers: [{ name: web, image: ghcr.io/pratikmohanty1294/difme-remote-analytics:0.1.0, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } } }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-analytics }
+spec: { selector: { app: remote-analytics }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-process-studio, labels: { app: remote-process-studio } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-process-studio } }
+  template:
+    metadata: { labels: { app: remote-process-studio, difme/team: process, business.metric: backoffice-ui } }
+    spec: { containers: [{ name: web, image: ghcr.io/pratikmohanty1294/difme-remote-process-studio:0.1.0, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } } }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-process-studio }
+spec: { selector: { app: remote-process-studio }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: remote-form-builder, labels: { app: remote-form-builder } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: remote-form-builder } }
+  template:
+    metadata: { labels: { app: remote-form-builder, difme/team: process, business.metric: backoffice-ui } }
+    spec: { containers: [{ name: web, image: ghcr.io/pratikmohanty1294/difme-remote-form-builder:0.1.0, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } } }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: remote-form-builder }
+spec: { selector: { app: remote-form-builder }, ports: [{ port: 80, targetPort: 8080 }] }

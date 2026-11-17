@@ -3,7 +3,8 @@
 import "./styles.css";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { api, session } from "@difme/auth";
+import { api } from "@difme/auth";
+import { subscribe } from "./sse";
 import { Badge, Card, DataTable, formatMinor } from "@difme/ui";
 
 type Position = { bankPair: string; currency: string; reservedMinor: number; releasedMinor: number; open: number; lagMs: number };
@@ -13,12 +14,7 @@ const client = new QueryClient({ defaultOptions: { queries: { staleTime: 1_000 }
 function useLivePositions() {
   const initial = useQuery({ queryKey: ["positions"], queryFn: () => api<Position[]>("/api/settlements/positions") });
   const [live, setLive] = useState<Position[] | null>(null);
-  useEffect(() => {
-    const token = session.getState().user?.access_token ?? "";
-    const es = new EventSource(`/api/settlements/stream?access_token=${encodeURIComponent(token)}`);
-    es.onmessage = (e) => setLive(JSON.parse(e.data));
-    return () => es.close();
-  }, []);
+  useEffect(() => subscribe<Position[]>("/api/settlements/stream", setLive), []);
   return { rows: live ?? initial.data ?? [], loading: initial.isLoading && !live, error: initial.error };
 }
 

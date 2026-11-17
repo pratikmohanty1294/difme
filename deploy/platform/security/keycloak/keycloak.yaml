@@ -1,0 +1,39 @@
+# ADR-010 — identity provider (OIDC/SAML, LDAP federation, MFA). Realm imported from Git at startup.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: keycloak, labels: { app: keycloak } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: keycloak } }
+  template:
+    metadata: { labels: { app: keycloak } }
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.8.2
+          args: [start, --import-realm, --optimized=false]
+          env:
+            - { name: KC_DB, value: postgres }
+            - { name: KC_DB_URL, value: "jdbc:postgresql://postgres-docdb.database-tier.svc:5432/keycloak" }
+            - { name: KC_DB_USERNAME, value: difme }
+            - { name: KC_DB_PASSWORD, valueFrom: { secretKeyRef: { name: postgres-docdb, key: password } } }
+            - { name: KC_HOSTNAME, value: "https://id.difme.local" }
+            - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: "true" }      # in-cluster callers get in-cluster URLs
+            - { name: KC_HTTP_ENABLED, value: "true" }                      # TLS terminates at Envoy Gateway; mesh mTLS inside
+            - { name: KC_PROXY_HEADERS, value: xforwarded }
+            - { name: KC_HEALTH_ENABLED, value: "true" }
+            - { name: KC_METRICS_ENABLED, value: "true" }
+            - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin }
+            - { name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: keycloak, key: admin-password } } }
+            - { name: APISIX_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: keycloak, key: apisix-client-secret } } }
+            - { name: JAVA_OPTS_KC_HEAP, value: "-Xms256m -Xmx512m" }
+          ports: [{ name: http, containerPort: 8080 }, { name: mgmt, containerPort: 9000 }]
+          readinessProbe: { httpGet: { path: /health/ready, port: 9000 }, initialDelaySeconds: 30 }
+          volumeMounts: [{ name: realm, mountPath: /opt/keycloak/data/import }]
+          resources: { requests: { cpu: 200m, memory: 512Mi }, limits: { memory: 768Mi } }
+      volumes: [{ name: realm, configMap: { name: keycloak-realm } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: keycloak }
+spec: { selector: { app: keycloak }, ports: [{ name: http, port: 8080 }, { name: mgmt, port: 9000 }] }

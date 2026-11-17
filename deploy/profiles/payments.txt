@@ -12,6 +12,7 @@ strimzi
 kafka
 apicurio
 debezium
+risingwave-sql
 risingwave
 flink-operator
 flink-jobs

@@ -1,0 +1,47 @@
+{
+  "realm": "difme",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "bruteForceProtected": true,
+  "passwordPolicy": "length(12) and notUsername and upperCase(1) and digits(1)",
+  "otpPolicyType": "totp",
+  "groups": [
+    { "name": "ops" }, { "name": "settlements" }, { "name": "compliance" }, { "name": "audit" },
+    { "name": "analytics" }, { "name": "process-designers" }
+  ],
+  "clientScopes": [
+    {
+      "name": "groups",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [{
+        "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+        "config": { "full.path": "false", "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true", "claim.name": "groups" }
+      }]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "backoffice",
+      "name": "DIFME Back-Office",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["https://ops.difme.local/*", "http://localhost:3000/*"],
+      "webOrigins": ["https://ops.difme.local", "http://localhost:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "https://ops.difme.local/*" },
+      "defaultClientScopes": ["profile", "email", "groups"]
+    },
+    {
+      "clientId": "apisix",
+      "name": "APISIX token introspection",
+      "publicClient": false,
+      "secret": "${APISIX_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "bearerOnly": false,
+      "defaultClientScopes": ["groups"]
+    }
+  ]
+}

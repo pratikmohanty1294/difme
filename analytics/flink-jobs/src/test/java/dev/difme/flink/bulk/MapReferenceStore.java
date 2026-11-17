@@ -3,6 +3,7 @@ package dev.difme.flink.bulk;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 /** In-memory reference data for tests. */
 class MapReferenceStore implements ReferenceStore {
@@ -13,13 +14,8 @@ class MapReferenceStore implements ReferenceStore {
     @Override public void open() {}
 
     @Override
-    public Map<String, Account> accounts(Collection<String> ids) {
-        Map<String, Account> m = new HashMap<>();
-        for (String id : ids) {
-            int n = Integer.parseInt(id.substring(3));
-            if (n < accounts) m.put(id, new Account(id, "INR", n % 10 == 0 ? "HIGH" : "LOW"));
-        }
-        return m;
+    public void loadAccounts(BiConsumer<String, Account> sink) {
+        for (int n = 0; n < accounts; n++) sink.accept("ACC" + n, new Account("INR", n % 10 == 0 ? "HIGH" : "LOW"));
     }
 
     @Override

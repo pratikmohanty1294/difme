@@ -75,7 +75,7 @@ public final class BulkFileJob {
         String fileId = sha256(o.input()).substring(0, 16);
         RecordParser parser = switch (o.format()) {
             case "fixed" -> RecordParser.fixedWidth(o.layout());
-            case "json" -> RecordParser.json();
+            case "json" -> RecordParser.json(o.columns());
             default -> RecordParser.csv(o.columns(), ',');
         };
         boolean header = o.header() && !"json".equals(o.format());
@@ -86,16 +86,17 @@ public final class BulkFileJob {
                 .returns(BulkRecord.class).name("parse+schema");
 
         DataStream<BulkRecord> deduped = parsed
-                .keyBy(r -> r.valid() ? r.get("external_ref") : r.id, Types.STRING)
+                .keyBy(r -> r.valid() ? r.get(PaymentFileRules.REF) : r.id, Types.STRING)
                 .process(new InFileDuplicates()).returns(BulkRecord.class).name("in-file-duplicates");
 
         DataStream<BulkRecord> validated = AsyncDataStream.unorderedWait(deduped,
-                new LinkedValidation(store, new DmnRules("payment-limits", o.dmnXml()), o.batch()),
+                new LinkedValidation(store, new DmnRules("payment-limits", o.dmnXml()), o.batch(), "accounts@" + fileId),
                 120, TimeUnit.SECONDS, 20_000).returns(BulkRecord.class).name("linked+dmn");
 
-        DataStream<String> valid = validated.filter(BulkRecord::valid).map(BulkFileJob::toJson).returns(String.class);
+        List<String> columns = parser.columns();
+        DataStream<String> valid = validated.filter(BulkRecord::valid).map(r -> toJson(r, columns)).returns(String.class);
         DataStream<String> rejected = validated.filter(r -> !r.valid())
-                .map(r -> r.offset + "," + csv(String.join("; ", r.errors)) + "," + csv(r.raw)).returns(String.class);
+                .map(r -> r.offset + "," + csv(r.errors) + "," + csv(r.line())).returns(String.class);
 
         switch (o.validSink()) {
             case "kafka" -> valid.sinkTo(KafkaSink.<String>builder()
@@ -109,7 +110,10 @@ public final class BulkFileJob {
         }
         rejected.sinkTo(FileSink.forRowFormat(new Path(o.outDir() + "/errors"), new SimpleStringEncoder<String>()).build()).name("errors→file");
 
+        // Counts per partition first (no shuffle of 10M records), then one tiny global sum.
         validated.map(r -> Tuple2.of(r.valid() ? 1L : 0L, r.valid() ? 0L : 1L)).returns(Types.TUPLE(Types.LONG, Types.LONG))
+                .fullWindowPartition()
+                .reduce((a, b) -> Tuple2.of(a.f0 + b.f0, a.f1 + b.f1))
                 .keyBy(t -> 0, Types.INT)
                 .reduce((a, b) -> Tuple2.of(a.f0 + b.f0, a.f1 + b.f1))
                 .map(t -> "{\"fileId\":\"" + fileId + "\",\"valid\":" + t.f0 + ",\"rejected\":" + t.f1 + "}").returns(String.class)
@@ -118,9 +122,13 @@ public final class BulkFileJob {
                 .setParallelism(1).name("report");
     }
 
-    static String toJson(BulkRecord r) {
-        StringBuilder b = new StringBuilder("{\"recordId\":\"").append(r.id).append('"');
-        r.fields.forEach((k, v) -> b.append(",\"").append(k).append("\":\"").append(v.replace("\\", "\\\\").replace("\"", "\\\"")).append('"'));
+    static String toJson(BulkRecord r, List<String> columns) {
+        StringBuilder b = new StringBuilder(160).append("{\"recordId\":\"").append(r.id).append('"');
+        for (int i = 0; i < columns.size(); i++) {
+            String v = r.get(i);
+            if (v == null) continue;
+            b.append(",\"").append(columns.get(i)).append("\":\"").append(v.replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
+        }
         return b.append('}').toString();
     }
 

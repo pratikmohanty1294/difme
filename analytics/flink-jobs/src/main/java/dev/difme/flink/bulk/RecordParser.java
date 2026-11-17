@@ -4,18 +4,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
-/** Parses CSV (RFC 4180 quoting), fixed-width (layout "name:start:length,...") and JSON-lines records. */
+/** Parses CSV (RFC 4180 quoting), fixed-width (layout "name:start:length,...") and JSON-lines into positional values. */
 public final class RecordParser implements Serializable {
     public enum Format { CSV, FIXED, JSON }
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private final Format format;
     private final List<String> columns;
-    private final List<int[]> fixed;   // [start, length] per column
+    private final List<int[]> fixed;
     private final char delimiter;
 
     private RecordParser(Format format, List<String> columns, List<int[]> fixed, char delimiter) {
@@ -26,7 +24,7 @@ public final class RecordParser implements Serializable {
     }
 
     public static RecordParser csv(List<String> columns, char delimiter) { return new RecordParser(Format.CSV, columns, List.of(), delimiter); }
-    public static RecordParser json() { return new RecordParser(Format.JSON, List.of(), List.of(), ','); }
+    public static RecordParser json(List<String> columns) { return new RecordParser(Format.JSON, columns, List.of(), ','); }
 
     public static RecordParser fixedWidth(String layout) {
         List<String> cols = new ArrayList<>();
@@ -39,36 +37,41 @@ public final class RecordParser implements Serializable {
         return new RecordParser(Format.FIXED, cols, spans, ',');
     }
 
+    public List<String> columns() { return columns; }
+
     public void parse(BulkRecord r) {
         try {
+            String[] v = new String[columns.size()];
             switch (format) {
                 case CSV -> {
                     List<String> values = splitCsv(r.raw, delimiter);
                     if (values.size() != columns.size()) { r.reject("expected " + columns.size() + " columns, got " + values.size()); return; }
-                    for (int i = 0; i < columns.size(); i++) r.fields.put(columns.get(i), values.get(i).trim());
+                    for (int i = 0; i < v.length; i++) v[i] = values.get(i).trim();
                 }
                 case FIXED -> {
-                    for (int i = 0; i < columns.size(); i++) {
+                    for (int i = 0; i < v.length; i++) {
                         int s = fixed.get(i)[0], len = fixed.get(i)[1];
                         if (r.raw.length() < s + len) { r.reject("line shorter than layout at " + columns.get(i)); return; }
-                        r.fields.put(columns.get(i), r.raw.substring(s, s + len).trim());
+                        v[i] = r.raw.substring(s, s + len).trim();
                     }
                 }
                 case JSON -> {
                     JsonNode n = JSON.readTree(r.raw);
-                    for (Iterator<Map.Entry<String, JsonNode>> it = n.properties().iterator(); it.hasNext(); ) {
-                        var e = it.next();
-                        r.fields.put(e.getKey(), e.getValue().isValueNode() ? e.getValue().asText() : e.getValue().toString());
+                    for (int i = 0; i < v.length; i++) {
+                        JsonNode f = n.get(columns.get(i));
+                        v[i] = f == null || f.isNull() ? null : f.isValueNode() ? f.asText() : f.toString();
                     }
                 }
             }
+            r.values = v;
+            if (r.valid()) r.raw = null;   // shrink the record before the shuffle
         } catch (Exception e) {
             r.reject("unparseable: " + e.getMessage());
         }
     }
 
     static List<String> splitCsv(String line, char d) {
-        List<String> out = new ArrayList<>();
+        List<String> out = new ArrayList<>(8);
         StringBuilder cur = new StringBuilder();
         boolean quoted = false;
         for (int i = 0; i < line.length(); i++) {

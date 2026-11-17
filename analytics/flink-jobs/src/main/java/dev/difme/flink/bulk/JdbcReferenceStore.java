@@ -8,14 +8,15 @@ import java.sql.ResultSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 /**
- * YugabyteDB YSQL (PostgreSQL wire) implementation. Static reads hit follower replicas; every query takes a whole
- * batch of keys via {@code = ANY(?)}. One connection per lookup kind, used from its BatchLookup thread only.
+ * YugabyteDB YSQL (PostgreSQL wire). Static data: one streamed scan from follower replicas. Live data: every query
+ * takes a whole batch of keys via {@code = ANY(?)}; nothing is queried per record.
  */
 public class JdbcReferenceStore implements ReferenceStore {
     private final String url, user, password;
-    private transient Connection staticConn, liveConn;
+    private transient Connection liveConn;
 
     public JdbcReferenceStore(String url, String user, String password) {
         this.url = url;
@@ -25,26 +26,31 @@ public class JdbcReferenceStore implements ReferenceStore {
 
     @Override
     public void open() throws Exception {
-        staticConn = DriverManager.getConnection(url, user, password);
-        try (var s = staticConn.createStatement()) {
-            s.execute("SET default_transaction_read_only = true");
-            try { s.execute("SET yb_read_from_followers = true"); } catch (Exception notYugabyte) { /* plain PostgreSQL in CI */ }
-        }
         liveConn = DriverManager.getConnection(url, user, password);
     }
 
     @Override
-    public synchronized Map<String, Account> accounts(Collection<String> ids) {
-        Map<String, Account> out = new HashMap<>();
-        query(staticConn, "SELECT account_id, currency, risk_level FROM bulk_ref.account WHERE account_id = ANY(?)", ids,
-                rs -> out.put(rs.getString(1), new Account(rs.getString(1), rs.getString(2), rs.getString(3))));
-        return out;
+    public void loadAccounts(BiConsumer<String, Account> sink) throws Exception {
+        try (Connection c = DriverManager.getConnection(url, user, password)) {
+            c.setAutoCommit(false);   // required for a streaming cursor
+            try (var s = c.createStatement()) {
+                s.execute("SET TRANSACTION READ ONLY");
+                try { s.execute("SET yb_read_from_followers = true"); } catch (Exception notYugabyte) { c.rollback(); c.setAutoCommit(false); }
+            }
+            try (PreparedStatement ps = c.prepareStatement("SELECT account_id, currency, risk_level FROM bulk_ref.account")) {
+                ps.setFetchSize(50_000);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) sink.accept(rs.getString(1), new Account(rs.getString(2).trim(), rs.getString(3)));
+                }
+            }
+            c.commit();
+        }
     }
 
     @Override
     public synchronized Map<String, String> accountStatus(Collection<String> ids) {
-        Map<String, String> out = new HashMap<>();
-        query(liveConn, "SELECT account_id, status FROM bulk_ref.account_status WHERE account_id = ANY(?)", ids,
+        Map<String, String> out = new HashMap<>(ids.size() * 2);
+        query("SELECT account_id, status FROM bulk_ref.account_status WHERE account_id = ANY(?)", ids,
                 rs -> out.put(rs.getString(1), rs.getString(2)));
         return out;
     }
@@ -52,16 +58,15 @@ public class JdbcReferenceStore implements ReferenceStore {
     @Override
     public synchronized Map<String, Boolean> processedRefs(Collection<String> refs) {
         Map<String, Boolean> out = new HashMap<>();
-        query(liveConn, "SELECT external_ref FROM bulk_ref.processed_ref WHERE external_ref = ANY(?)", refs,
-                rs -> out.put(rs.getString(1), Boolean.TRUE));
+        query("SELECT external_ref FROM bulk_ref.processed_ref WHERE external_ref = ANY(?)", refs, rs -> out.put(rs.getString(1), Boolean.TRUE));
         return out;
     }
 
     interface Row { void accept(ResultSet rs) throws Exception; }
 
-    private static void query(Connection c, String sql, Collection<String> keys, Row row) {
-        try (PreparedStatement ps = c.prepareStatement(sql)) {
-            Array arr = c.createArrayOf("text", keys.toArray());
+    private void query(String sql, Collection<String> keys, Row row) {
+        try (PreparedStatement ps = liveConn.prepareStatement(sql)) {
+            Array arr = liveConn.createArrayOf("text", keys.toArray());
             ps.setArray(1, arr);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) row.accept(rs);
@@ -73,7 +78,6 @@ public class JdbcReferenceStore implements ReferenceStore {
 
     @Override
     public void close() throws Exception {
-        if (staticConn != null) staticConn.close();
         if (liveConn != null) liveConn.close();
     }
 }

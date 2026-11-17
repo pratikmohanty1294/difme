@@ -7,3 +7,6 @@ backgroundController:
   rbac: { clusterRole: { extraResources: [{ apiGroups: [cilium.io], resources: [ciliumnetworkpolicies], verbs: [get, list, watch, create, update, patch, delete] }] } }
 cleanupController: { enabled: true }
 reportsController: { enabled: true }
+# Hook jobs: official Kubernetes kubectl image (the chart default was withdrawn from Docker Hub; found live).
+webhooksCleanup: { image: { registry: registry.k8s.io, repository: kubectl, tag: v1.32.3 } }
+policyReportsCleanup: { image: { registry: registry.k8s.io, repository: kubectl, tag: v1.32.3 } }

@@ -32,7 +32,7 @@ jobs:
       - name: Avro schemas parse
         run: for f in api/avro/*.avsc; do python3 -c "import json,sys; json.load(open('$f'))" || exit 1; done
       - name: CloudEvents envelope schema
-        run: npx -y ajv-cli@5.0.0 compile --spec=draft2020 -s api/cloudevents/envelope.schema.json
+        run: npx -y -p ajv-cli@5.0.0 -p ajv-formats@3.0.1 ajv compile --spec=draft2020 -c ajv-formats -s api/cloudevents/envelope.schema.json
       - name: GraphQL SDL validate
         run: npx -y @graphql-inspector/cli@5.0.8 validate 'api/graphql/*.graphql' api/graphql/backoffice.graphql || npx -y graphql@16.10.0 --version
       - uses: bufbuild/buf-action@v1

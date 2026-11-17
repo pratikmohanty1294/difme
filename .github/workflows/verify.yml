@@ -28,7 +28,7 @@ jobs:
       - name: OpenAPI lint
         run: npx -y @stoplight/spectral-cli@6.14.2 lint --ruleset api/openapi/.spectral.yaml --fail-severity error api/openapi/difme.openapi.yaml
       - name: AsyncAPI validate
-        run: npx -y @asyncapi/cli@2.16.0 validate api/asyncapi/difme.asyncapi.yaml
+        run: docker run --rm -v "$PWD/api:/api" -w /api/asyncapi asyncapi/cli:2.16.0 validate difme.asyncapi.yaml
       - name: Avro schemas parse
         run: for f in api/avro/*.avsc; do python3 -c "import json,sys; json.load(open('$f'))" || exit 1; done
       - name: CloudEvents envelope schema
@@ -81,10 +81,11 @@ jobs:
           for c in yaml.safe_load(open("deploy/argocd/catalog.yaml"))["components"]:
               if c["kind"] == "helm": print(c["name"], c["repo"], c["chart"], c["version"], c["ns"])
           PY
+          set +e
           fail=0
           while read name repo chart version ns; do
-            if [[ "$repo" == *docker.io* ]]; then ref="oci://$repo/$chart"; else helm repo add "$name" "$repo" >/dev/null 2>&1; ref="$name/$chart"; fi
-            helm template "$name" "$ref" --version "$version" -n "$ns" -f "deploy/platform/$ns/$name/values.yaml" > /dev/null 2>/tmp/err \
+            if [[ "$repo" == *docker.io* ]]; then ref="oci://$repo/$chart"; else ref="$chart --repo $repo"; fi
+            helm template "$name" $ref --version "$version" -n "$ns" -f "deploy/platform/$ns/$name/values.yaml" > /dev/null 2>/tmp/err \
               && echo "✓ $name $version" || { echo "✗ $name $version: $(head -c 300 /tmp/err)"; fail=1; }
           done < /tmp/charts.txt
           exit $fail

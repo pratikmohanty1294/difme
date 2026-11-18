@@ -70,8 +70,10 @@ class AsyncDispatcherTest {
         FakeDispatcher d = new FakeDispatcher();
         d.gate = new CountDownLatch(1);                    // the single worker blocks on its first job
         AsyncDispatcher a = async(d, 1, 2);
-        assertTrue(a.submit(job(UUID.randomUUID())));      // taken by the worker
-        await(() -> a.submit(job(UUID.randomUUID())) && a.submit(job(UUID.randomUUID())) || true);
+        assertTrue(a.submit(job(UUID.randomUUID())));      // the worker takes it and blocks
+        await(() -> a.pending() == 0);
+        assertTrue(a.submit(job(UUID.randomUUID())));
+        assertTrue(a.submit(job(UUID.randomUUID())));      // queue (capacity 2) is now full
         assertFalse(a.submit(job(UUID.randomUUID())), "a full queue must refuse, so the request dispatches inline");
         d.gate.countDown();
         a.stop();

@@ -53,6 +53,10 @@ public class AsyncDispatcher {
         return queued;
     }
 
+    int pending() {
+        return queue.size();
+    }
+
     private void loop() {
         while (running) {
             try {

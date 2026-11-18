@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>dev.difme</groupId><artifactId>difme-core</artifactId><version>0.1.0</version></parent>
+  <artifactId>exchange-rules</artifactId>
+  <description>Embedded DMN evaluation for vertical packs (ADR-020): each pack's rules/*.dmn are parsed once, compiled and
+    cached; evaluation is in-process (no network call inside the 50 ms auction window). Engine: Fluxnova DMN (FINOS,
+    Apache-2.0), used standalone without the BPMN engine. Kept apart from exchange-kernel, which stays dependency-free.</description>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.finos.fluxnova.bpm.dmn</groupId><artifactId>fluxnova-engine-dmn-bom</artifactId>
+        <version>3.1.1</version><type>pom</type><scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  <dependencies>
+    <dependency><groupId>org.finos.fluxnova.bpm.dmn</groupId><artifactId>fluxnova-engine-dmn</artifactId></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
+</project>

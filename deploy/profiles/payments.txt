@@ -24,4 +24,5 @@ tempo
 pyroscope
 alloy
 dashboards
+canary-gates
 opencost

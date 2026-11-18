@@ -16,6 +16,11 @@ spec:
     - name: scale-container-requests
       match: { any: [{ resources: { kinds: [Pod] } }] }
       exclude: { any: [{ resources: { namespaces: [kube-system, security, argocd] } }] }
+      # Exactly once per pod: Kyverno re-invokes mutations when another webhook also changes the pod, which divided the
+      # requests twice (TigerBeetle got 12m/550Mi and was killed during startup; found live). The marker rule below
+      # sets the annotation, and both rules skip pods that already carry it.
+      preconditions:
+        all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/requests-scaled\" || '' }}", operator: Equals, value: "" }]
       mutate:
         foreach:
           # CPU ÷ 4 and memory ÷ 2, each only where that request is set. divide() keeps Kubernetes quantity units.
@@ -35,3 +40,11 @@ spec:
                 containers:
                   - name: "{{ element.name }}"
                     resources: { requests: { memory: "{{ divide('{{ element.resources.requests.memory }}', `2`) }}" } }
+    - name: mark-scaled
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      exclude: { any: [{ resources: { namespaces: [kube-system, security, argocd] } }] }
+      preconditions:
+        all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/requests-scaled\" || '' }}", operator: Equals, value: "" }]
+      mutate:
+        patchStrategicMerge:
+          metadata: { annotations: { difme.dev/requests-scaled: "cpu/4,memory/2" } }

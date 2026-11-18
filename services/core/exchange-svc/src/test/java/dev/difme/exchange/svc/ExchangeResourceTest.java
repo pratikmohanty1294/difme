@@ -20,6 +20,15 @@ class ExchangeResourceTest {
                  "feeMinor": 100000, "maxPriceMinor": %d}""".formatted(risk, maxPriceMinor);
     }
 
+    /** A bid with an eligible buying partner (flow A, mandate allows A, budget covers A) unless the deposit says otherwise. */
+    static String bid(int node, long ask, int reputation, long latencyMicros, long depositMinor) {
+        return """
+                {"nodeRef": %d, "askMinor": %d, "reputation": %d, "latencyMicros": %d,
+                 "partner": {"flow": "A", "intentAgeDays": 1, "depositMinor": %d, "budgetLeftMinor": 10000000,
+                             "merchantApproved": true, "goodsInScope": true, "maxPerOrderMinor": 10000000, "validityDays": 30}}"""
+                .formatted(node, ask, reputation, latencyMicros, depositMinor);
+    }
+
     @Test
     void ineligibleIntentIsRefusedWithTheRuleFindings() {
         given().contentType(ContentType.JSON).body(intent(700, 9_500_000))
@@ -41,13 +50,18 @@ class ExchangeResourceTest {
         long id = opened.getLong("auctionId");
         // Y_max = d·P − F − 1 = 2,000,000 − 100,000 − 1
         org.junit.jupiter.api.Assertions.assertEquals(1_899_999L, opened.getLong("maxYieldMinor"));
-        String[] bids = {
-                "{\"nodeRef\": 1, \"askMinor\": 600000, \"reputation\": 80, \"latencyMicros\": 20000}",
-                "{\"nodeRef\": 2, \"askMinor\": 400000, \"reputation\": 95, \"latencyMicros\": 5000}",
-                "{\"nodeRef\": 3, \"askMinor\": 2500000, \"reputation\": 99, \"latencyMicros\": 1000}"};  // above Y_max
+        String[] bids = {bid(1, 600_000, 80, 20_000, 3_000_000), bid(2, 400_000, 95, 5_000, 3_000_000)};
         for (String b : bids) {
             given().contentType(ContentType.JSON).body(b).post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
         }
+        // Refused at the door by investor_eligibility: the yield asked exceeds the room (Y_max), ...
+        given().contentType(ContentType.JSON).body(bid(3, 2_500_000, 99, 1_000, 3_000_000))
+                .post("/v1/exchange/auctions/" + id + "/bids")
+                .then().statusCode(422).body("findings.code", hasItem("PRICE_ABOVE_MAX"));
+        // ... and the deposit is below the FR-14 collateral the exchange computes for A (2,880,000).
+        given().contentType(ContentType.JSON).body(bid(4, 300_000, 99, 1_000, 1_000_000))
+                .post("/v1/exchange/auctions/" + id + "/bids")
+                .then().statusCode(422).body("findings.code", hasItem("DEPOSIT_SHORT"));
         long deadline = System.currentTimeMillis() + 10_000;
         while (System.currentTimeMillis() < deadline
                 && given().get("/v1/exchange/auctions/" + id).jsonPath().get("ranked") == null) {

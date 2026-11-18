@@ -26,7 +26,14 @@ public class ExchangeResource {
     public record Intent(double riskScore, boolean offerSanctioned, long listMinor, int discountBps, long feeMinor,
                          long maxPriceMinor, Risk.Tier partnerTier) {}
 
-    public record Bid(int nodeRef, long askMinor, double reputation, long latencyMicros) {}
+    /**
+     * The buying partner's facts for bid-time eligibility (FR-01 investor_eligibility). Minor units; the rule tables
+     * are written in major units, as for the buyer rules.
+     */
+    public record Partner(String flow, int intentAgeDays, long depositMinor, long budgetLeftMinor, boolean merchantApproved,
+                          boolean goodsInScope, long maxPerOrderMinor, int validityDays) {}
+
+    public record Bid(int nodeRef, long askMinor, double reputation, long latencyMicros, Partner partner) {}
 
     @Inject Exchange exchange;
 
@@ -68,6 +75,27 @@ public class ExchangeResource {
     @Path("/auctions/{id}/bids")
     public Response bid(@PathParam("id") long auctionId, Bid b) {
         if (!exchange.isOpen(auctionId)) return Response.status(409).entity(Map.of("error", "auction not open")).build();
+        VerticalPack pack = exchange.pack(exchange.packOf(auctionId));
+        Exchange.Context ctx = exchange.context(auctionId);
+        if (pack != null && ctx != null && pack.rules().decisionIds().contains("investor_eligibility")) {
+            Partner pt = b.partner();
+            if (pt == null) return Response.status(400).entity(Map.of("error", "this vertical needs the partner block on bids")).build();
+            Map<String, Object> in = new java.util.HashMap<>();
+            in.put("flow", pt.flow());
+            in.put("intentAgeDays", pt.intentAgeDays());
+            in.put("validityDays", pt.validityDays());
+            in.put("deposit", pt.depositMinor() / 100.0);
+            in.put("maxDepositNeeded", ctx.depositNeededMinor() / 100.0);   // the exchange's own number, not the bidder's
+            in.put("amountA", ctx.cardPriceMinor() / 100.0);
+            in.put("maxPerOrder", pt.maxPerOrderMinor() / 100.0);
+            in.put("budgetLeft", pt.budgetLeftMinor() / 100.0);
+            in.put("merchantApproved", pt.merchantApproved());
+            in.put("goodsInScope", pt.goodsInScope());
+            in.put("yieldAsk", b.askMinor() / 100.0);
+            in.put("yieldRoom", ctx.yieldRoomMinor() / 100.0);
+            List<Finding> findings = pack.rules().evaluate("investor_eligibility", in);
+            if (!PackRules.allowed(findings)) return Response.status(422).entity(Map.of("findings", findings)).build();
+        }
         if (!exchange.bid(auctionId, b.nodeRef(), b.askMinor(), b.reputation(), b.latencyMicros())) {
             return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         }

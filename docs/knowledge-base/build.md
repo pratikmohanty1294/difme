@@ -18,3 +18,8 @@
 ### `release version 25 not supported` in the Codespace (CI green)
 - **Root cause:** the devcontainer installed only JDK 21 (for Flink), so `make check AREA=core` had never actually run in the Codespace.
 - **Fix:** the devcontainer installs Temurin 25 with 21 as an additional version, and `ci/check.sh` selects the JDK per area (core → 25, flink → 21).
+
+### JVM memory budget in containers (measured 2026-11-18, cmd-svc at 200 req/s)
+- `MaxRAMPercentage=70` with a 320 MiB limit left about 96 MiB for metaspace, code cache, thread stacks and Netty direct buffers, so cmd-svc was OOM-killed under load (exit 137).
+- Now 55% heap, `MaxDirectMemorySize=32m`, and cmd-svc at 448 MiB (it carries Hibernate, the Temporal SDK, gRPC and the Redis client). Re-measure before shrinking.
+- Quarkus Redis client defaults (6 connections, 24 waiters) saturate at a few hundred cache calls per second: `ConnectionPoolTooBusyException`. Size `quarkus.redis.max-pool-size`/`max-pool-waiting` to the call rate.

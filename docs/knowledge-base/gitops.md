@@ -74,3 +74,10 @@
   - A manual `operation.sync` patch must repeat the app's `syncOptions` (`ServerSideApply=true`), or large CRDs fail the 256 KiB annotation limit.
   - Watchers must fail fast on sync or pod errors and have a deadline. Waiting only for "Healthy" hid a hard failure for 50 min.
 - **Python on Windows writes CRLF:** normalize line endings before committing (`sed -i 's/\r$//'`).
+- **Later the same day:**
+  - **Connect image CVEs:** blocked by 5 CRITICAL CVEs. Some came from the Strimzi base image: Cruise Control's Netty and kafka_exporter's Go stdlib (both unused by Connect, so deleted) and ca-certificates (updated). Old Debezium 3.1 and Apicurio 3.0.6 jars brought Netty and Jersey. Fix: Strimzi 0.51 / Kafka 4.2, Debezium 3.7.1, Apicurio 3.3.4; scan locally with the CI Trivy command before pushing.
+  - **Bootstrap Service name:** Strimzi names it `<cluster>-kafka-bootstrap`. The cluster was `difme-kafka`, but 15 clients use `difme-kafka-bootstrap`, so the cluster was renamed `difme`. The rename left the old StrimziPodSet and PVC behind (about 600 MiB) until they were deleted by hand.
+  - **Strimzi entity operator and Kyverno:** it sets env vars that *name* Secrets (`*_SECRET_NAME`). `no-plaintext-secrets` is now a foreach/deny rule that only rejects credential-like names carrying a literal value.
+  - **Apicurio on YugabyteDB:** it works when its first start isn't interrupted. The port clash had interrupted it, which left `idx_versions_8` behind, so the database had to be recreated.
+  - **RisingWave meta store:** it can't run on YugabyteDB, so it moved to the shared Postgres (ADR-019 amendment). SeaweedFS moved into the streaming profile.
+  - **Flink operator webhook:** it requires `execution.checkpointing.savepoint-dir` when `upgradeMode: savepoint`.

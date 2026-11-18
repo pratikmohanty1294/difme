@@ -17,8 +17,8 @@ for start in $(seq 1 500 "$ACCOUNTS"); do
     --command="create_accounts $cmd;" >/dev/null
 done
 
-# Keyed by workload (pod-template hash stripped), so a pod restarted mid-run still lines up with its idle sample.
-top_pods() { kubectl top pods -A --no-headers | grep -vE "^(kube-system|argocd|argo-rollouts) " | awk '{ n=$2; sub(/-[a-z0-9]{8,10}-[a-z0-9]{5}$/, "", n); sub(/-[0-9]+$/, "&", n); print $1, n, $3, $4 }' | sort -k1,2; }
+# Keyed by workload (Deployment pod-template hash and suffix stripped; mawk has no {n,m}, hence split), so a pod restarted mid-run still lines up with its idle sample.
+top_pods() { kubectl top pods -A --no-headers | grep -vE "^(kube-system|argocd|argo-rollouts) " | awk '{ n=split($2, p, "-"); w=$2; if (n > 2 && length(p[n]) == 5 && length(p[n-1]) >= 8) { w=p[1]; for (i=2; i<=n-2; i++) w=w"-"p[i] } print $1, w, $3, $4 }' | sort -k1,2; }
 
 echo "▶ idle snapshot"
 top_pods > "$OUT/idle.txt"; kubectl top node --no-headers > "$OUT/idle-node.txt"

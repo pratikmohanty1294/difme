@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>dev.difme</groupId><artifactId>difme-core</artifactId><version>0.1.0</version></parent>
+  <artifactId>exchange-matching</artifactId>
+  <description>Sealed-bid auction matching (ADR-020, PRD NFR-02): single-writer engine over the kernel's BidBook, fed by a
+    lock-free many-to-one ring buffer in off-heap memory (Agrona, Apache-2.0). No locks and no allocation on the hot
+    path; Aeron IPC/UDP transport attaches to the same ring later.</description>
+  <dependencies>
+    <dependency><groupId>dev.difme</groupId><artifactId>exchange-kernel</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.agrona</groupId><artifactId>agrona</artifactId><version>2.7.0</version></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
+</project>

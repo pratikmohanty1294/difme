@@ -19,6 +19,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /** POST /v1/acquire — CRDT sliding-window limiter. Window position comes from the caller's event time (replayable). */
 @Path("/v1/acquire")
+@jakarta.inject.Singleton
+@io.quarkus.runtime.Startup   // load the script at boot: a missing resource fails startup (readiness), not the first request
 @RunOnVirtualThread
 public class RateLimitResource {
     public record Acquire(String subject, String scope, long eventTimeMs) {}
@@ -32,6 +34,7 @@ public class RateLimitResource {
     @PostConstruct
     void load() throws IOException {
         try (InputStream in = getClass().getResourceAsStream("/pn_counter.lua")) {
+            if (in == null) throw new IllegalStateException("pn_counter.lua missing from the image (quarkus.native.resources.includes)");
             script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
     }

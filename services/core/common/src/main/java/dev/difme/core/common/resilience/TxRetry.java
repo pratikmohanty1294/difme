@@ -13,6 +13,9 @@ import java.util.concurrent.Callable;
 public final class TxRetry {
     static final Set<String> RETRYABLE = Set.of("40001", "40P01");
     public static final int DEFAULT_ATTEMPTS = 5;
+    // Process-wide counters (no metrics dependency in common); services expose them as gauges.
+    private static final java.util.concurrent.atomic.LongAdder RETRIES = new java.util.concurrent.atomic.LongAdder();
+    private static final java.util.concurrent.atomic.LongAdder EXHAUSTED = new java.util.concurrent.atomic.LongAdder();
 
     private TxRetry() {}
 
@@ -25,11 +28,22 @@ public final class TxRetry {
             try {
                 return transaction.call();
             } catch (Exception e) {
-                if (attempt + 1 >= maxAttempts || !isTransient(e)) throw rethrow(e);
+                boolean transientError = isTransient(e);
+                if (attempt + 1 >= maxAttempts || !transientError) {
+                    if (transientError) EXHAUSTED.increment();
+                    throw rethrow(e);
+                }
+                RETRIES.increment();
                 backoff.sleep(attempt);
             }
         }
     }
+
+    /** Transient conflicts retried so far (each retry also sleeps a backoff). */
+    public static long retries() { return RETRIES.sum(); }
+
+    /** Transactions that still conflicted after the last attempt. */
+    public static long exhausted() { return EXHAUSTED.sum(); }
 
     /** True if any cause in the chain is a SQL error with a retryable SQLSTATE. */
     public static boolean isTransient(Throwable t) {

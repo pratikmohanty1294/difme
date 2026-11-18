@@ -403,3 +403,84 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: rate-limiter
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exchange-svc
+  labels:
+    app: exchange-svc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exchange-svc
+  template:
+    metadata:
+      labels:
+        app: exchange-svc
+        version: stable
+        difme/team: exchange
+        business.metric: exchange-matching
+    spec:
+      serviceAccountName: exchange-svc
+      containers:
+      - name: app
+        image: ghcr.io/pratikmohanty1294/difme-exchange-svc:0.1.0
+        ports:
+        - name: http
+          containerPort: 8089
+        - name: grpc
+          containerPort: 9000
+        env:
+        - name: QUARKUS_HTTP_PORT
+          value: '8089'
+        - name: QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://alloy.observability.svc:4317
+        - name: QUARKUS_OTEL_SDK_DISABLED
+          value: 'true'
+        - name: FLAGD_HOST
+          value: flagd.core-platform.svc
+        readinessProbe:
+          httpGet:
+            path: /q/health/ready
+            port: 8089
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /q/health/live
+            port: 8089
+          initialDelaySeconds: 30
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 256Mi
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exchange-svc
+  labels:
+    app: exchange-svc
+spec:
+  selector:
+    app: exchange-svc
+  ports:
+  - name: http
+    port: 8089
+  - name: grpc
+    port: 9000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: exchange-svc

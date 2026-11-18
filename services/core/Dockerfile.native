@@ -7,4 +7,6 @@ ARG MODULE
 WORKDIR /app
 COPY --chown=1001 services/core/${MODULE}/target/*-runner /app/application
 USER 1001
-ENTRYPOINT ["/app/application", "-Dquarkus.http.host=0.0.0.0", "-Xmx64m"]
+# Same thread/native-memory limits as Dockerfile.jvm (Netty arenas, event loops, malloc arenas).
+ENV MALLOC_ARENA_MAX=2 QUARKUS_VERTX_EVENT_LOOPS_POOL_SIZE=2
+ENTRYPOINT ["/app/application", "-Dquarkus.http.host=0.0.0.0", "-Xmx64m", "-Dio.netty.allocator.numDirectArenas=2", "-Dio.netty.allocator.numHeapArenas=2", "-Dio.netty.allocator.maxOrder=7"]

@@ -41,6 +41,8 @@ public class Exchange {
     @ConfigProperty(name = "difme.exchange.bids-per-auction") int bidsPerAuction;
     @ConfigProperty(name = "difme.exchange.ring-bytes") int ringBytes;
     @ConfigProperty(name = "difme.exchange.results-kept") int resultsKept;
+    /** Overrides every pack's auction window when > 0 (tests: HTTP round trips on a cold JVM exceed 50 ms). */
+    @ConfigProperty(name = "difme.exchange.window-override-ms", defaultValue = "0") long windowOverrideMs;
     @Inject MeterRegistry metrics;
 
     private final Map<String, VerticalPack> packs = new ConcurrentHashMap<>();
@@ -88,7 +90,8 @@ public class Exchange {
         long id = ids.incrementAndGet();
         VerticalPack p = packs.get(pack);
         openAuctions.put(id, pack);
-        if (!intakes.get(pack).open(id, maxAcceptableMinor, p.windowNanos())) {
+        long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
+        if (!intakes.get(pack).open(id, maxAcceptableMinor, window)) {
             openAuctions.remove(id);
             return -1;
         }

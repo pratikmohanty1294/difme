@@ -113,3 +113,9 @@
 - **What changed:** install `acl` (`setfacl` was missing before, and `|| true` hid that), then clear the ACL on `/tmp/difme-containerd`. Verified on a throwaway cluster: CoreDNS and a non-root (uid 1000) busybox both run.
 - **Restart case:** a Codespace restart empties `/tmp`, and Docker recreates the bind source with the bad ACL. `postStartCommand: ci/image-disk.sh heal` fixes the ACL and restarts the node; images re-pull from the registry caches, or from upstream if those were wiped too.
 - **Gain:** about 8.4 GB off the 32 GB root disk (core alone), which leaves room for the streaming and observability profiles.
+
+### Trial image builds in the Codespace filled the root disk and evicted the cluster (found 2026-11-18)
+- Docker's data root (`/var/lib/docker`) is on the 32 GB root disk. Three trial builds of the 1.3 GB Connect image plus the Trivy image left 2.8 GB of build cache and about 1 GB of images. The root disk reached 95%.
+- The kubelet then evicted pods for `ephemeral-storage`, including all of Kyverno. Kyverno is fail-closed, so every API write was rejected until it returned. The disk-pressure taint only lifts about 5 min after free space recovers.
+- **Rule:** after any local `docker build`/scan, run `docker builder prune -af && docker image prune -f`. Better: build images in CI and only scan locally.
+- The cluster's own volumes (about 8 GB of database PVCs) are the bulk of the remaining root-disk use.

@@ -1,2 +1,9 @@
 watchNamespaces: [streaming]
 resources: { requests: { cpu: 50m, memory: 256Mi } }
+# Low-footprint control-plane JVM profile (Tier 2; same as the Flink operator, see flink-operator/values.yaml):
+# measured 269 Mi RSS with Strimzi's defaults. The operator reconciles CRs and is not a hot path.
+extraEnvs:
+  - name: JAVA_OPTS
+    value: "-Xms64m -Xmx160m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k -XX:+ExitOnOutOfMemoryError"
+  - name: MALLOC_ARENA_MAX
+    value: "2"

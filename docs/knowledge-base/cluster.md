@@ -126,3 +126,16 @@
 - `postStartCommand` (`ci/image-disk.sh heal`) did not run. `/workspaces/.codespaces/.persistedshare/repo_devcontainer.json` holds the config from creation time, which predates the hook, and a Codespace only re-reads `devcontainer.json` on **Rebuild container**.
 - **Until the Codespace is rebuilt** (which also recreates the cluster), run `ci/cs.sh bg heal 'bash ci/image-disk.sh heal'` after any restart. Check with `uptime` and `getfacl -p /tmp/difme-containerd | grep default`.
 - After a restart, image pulls come from the internet again (the caches lived on `/tmp`), so recovery takes about 15 min.
+
+### The Codespaces host runs earlyoom: the real memory ceiling is ~90% of 16 GB (found 2026-11-18)
+- **Symptom:** containers exit with SIGTERM (exit 143, or a "clean shutdown") about 8–10 s after start. The kubelet, containerd and Kubernetes events give no reason, and there are no probes.
+  - Hit: the Argo CD application controller (restart loop for hours) and TigerBeetle (the largest process, about 2.1 GiB allocated at start).
+  - The earlier Argo CD reinstall and the Codespace rebuild only helped while memory was lower.
+- **Found with the kernel signal tracepoint**, as root in the Codespace:
+  `echo 'sig==15' > /sys/kernel/tracing/events/signal/signal_generate/filter; echo 1 > .../enable`, then read `/sys/kernel/tracing/trace`. It shows `earlyoom-689 ... signal_generate: sig=15 comm=tigerbeetle`.
+- **What earlyoom is:** it runs on the host VM, not in the Codespace container, so it is not visible in `ps` and not configurable from here. When available memory drops below about 10%, it SIGTERMs the process with the highest `oom_score`. That score is RSS share plus the `oom_score_adj` Kubernetes sets from the pod's QoS.
+- **Consequences:**
+  - The usable budget is about 14 GB used, not 16 GB.
+  - Large processes that allocate at startup (TigerBeetle, JVMs) are killed first.
+  - Lower memory *requests* raise a pod's `oom_score_adj`, which makes it a likelier victim.
+- **Check memory headroom before** installing a profile or starting a load test. `free -m` "available" must stay above about 2 GB.

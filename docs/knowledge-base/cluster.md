@@ -156,3 +156,20 @@
 
 - **Why it matters:** the host's earlyoom only fires when RAM *and* swap are both below ~10%, so the effective ceiling rises by the swap headroom.
 - **Check zswap:** `mount -t debugfs none /sys/kernel/debug`, then read `/sys/kernel/debug/zswap/{pool_total_size,stored_pages,written_back_pages}`.
+
+### Tier 2: low-footprint JVM profile for control-plane JVMs (measured 2026-11-19)
+- **Problem:** with the heap capped, a Java operator still had about 150 Mi of non-heap memory: JIT compilers and code cache, metaspace, thread stacks, and glibc malloc arenas (up to 8 per core).
+- **Profile** for JVMs that are not on a hot path:
+  `-XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k`, plus env `MALLOC_ARENA_MAX=2`.
+  - SerialGC: no G1 remembered sets and no parallel GC threads.
+  - `TieredStopAtLevel=1`: only the small C1 compiler.
+- **Flink operator (Java 17):**
+
+| Container | Before | After | Change |
+|---|---|---|---|
+| operator | 369 Mi | 204 Mi | −45% |
+| webhook | 218 Mi | 88 Mi | −60% |
+
+- **Also applied to:** the Strimzi cluster operator (`extraEnvs` JAVA_OPTS), the topic operator (`jvmOptions."-XX"`) and Apicurio (`JAVA_OPTS_APPEND`).
+- **Data-path JVMs** (Kafka broker, Connect, our Quarkus services) keep G1 and full JIT and only get `MALLOC_ARENA_MAX=2`. Our services already use compact object headers, the Java 25 AOT cache and 512k stacks.
+- **TigerBeetle:** 0.16.78 exposes its big static allocations as start flags (`--memory-lsm-compaction`, `--limit-pipeline-requests`, `--cache-grid`; `--development` uses the minimums). No custom build is needed. Measure with a throwaway instance before changing the live one.

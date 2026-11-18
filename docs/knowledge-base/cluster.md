@@ -187,3 +187,22 @@
 
   - **TigerBeetle in a plain `docker run`** needs `--security-opt seccomp=unconfined`. Docker's default seccomp profile blocks io_uring ("io_uring is not available"). The k3d node is privileged, so the in-cluster TigerBeetle is unaffected.
 
+
+### TigerBeetle memory: what the flags do, and zswap (measured 2026-11-19 on a throwaway 0.16.78 instance)
+- **RSS by flag set:**
+
+| Flags | RSS |
+|---|---|
+| Cluster flags | 2.12 GiB |
+| `--limit-pipeline-requests=0` | 2.02 GiB |
+| … plus `--cache-grid=64MiB` | 1.92 GiB |
+| `--development` (32 KiB requests, minimal caches) | 1.45 GiB |
+| `--memory-lsm-compaction` | no measurable effect |
+
+- **Model:** most of the static allocation is LSM table memory, sized by the maximum batch (request size) × 32 compaction ops across all trees. `--limit-request` at start is the production-safe lever; it is being measured.
+- **With zswap on (Tier 1):** the live TigerBeetle shows **~48 Mi resident** at idle. Its untouched static buffers sit compressed in zswap. Under heavy load they are touched and decompressed again, so a smaller batch size still helps the hot path.
+- **Throwaway runs** need `docker run --security-opt seccomp=unconfined` (io_uring). Clean up the image afterwards so the root disk doesn't grow.
+
+### ysql_bench aborts silently on serialization failures
+- **Symptom:** a SERIALIZABLE multi-statement script under concurrency ends with `Run was aborted; the above results are incomplete` and no error text. pgbench 15 aborts a client on the first serialization failure.
+- **Fix:** add `--max-tries=10 --failures-detailed`. Add `-r` for per-statement latency.

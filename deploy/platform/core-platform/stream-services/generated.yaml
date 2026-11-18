@@ -6,7 +6,6 @@ metadata:
   labels:
     app: rehydration-svc
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: rehydration-svc
@@ -87,7 +86,6 @@ metadata:
   labels:
     app: projection-svc
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: projection-svc

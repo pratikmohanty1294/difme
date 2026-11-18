@@ -27,6 +27,12 @@ if kubectl -n argocd get applications --no-headers 2>/dev/null | grep -q .; then
   wait_for "$WAVE_TIMEOUT" || echo "  continuing anyway"
 fi
 
+# Codespace-only request scaling (deploy/bootstrap/dev-sizing.yaml). Needs Kyverno's CRDs, which the base profile
+# installs, so it is applied here rather than in `make cluster`. Idempotent.
+if kubectl get crd clusterpolicies.kyverno.io >/dev/null 2>&1; then
+  kubectl apply -f deploy/bootstrap/dev-sizing.yaml >/dev/null && echo "▶ dev request scaling active"
+fi
+
 # Apps of this profile grouped by sync wave (ascending).
 waves=$(python3 - "$PROFILE" <<'PY'
 import sys, yaml

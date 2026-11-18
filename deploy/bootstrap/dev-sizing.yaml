@@ -1,4 +1,4 @@
-# Codespace-only request scaling (owner-approved 2026-11-18). Applied by `make cluster` like dev-secrets.sh, never by
+# Codespace-only request scaling (owner-approved 2026-11-18). Applied by ci/up.sh (`make up`) once Kyverno is installed, never by
 # Argo CD, so the manifests keep their production requests.
 #
 # Why: with core + streaming the node had 3,980m of 4,000m CPU and 90% of memory *requested* while real use was

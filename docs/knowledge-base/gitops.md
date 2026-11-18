@@ -60,3 +60,17 @@
 - So the Rollout stayed on its first template (from before `/tmp` was added; it crash-looped on a read-only FS) and the Deployment kept running beside it. Two controllers ran one service, and ReplicaSets piled up with each restart.
 - Fix: the Rollouts moved into a `canary-gates` component in the observability profile.
 - Also: `kubectl rollout restart` on an Argo-managed Deployment adds an annotation that self-heal reverts, which leaves another ReplicaSet behind. Delete the pods instead.
+
+### First real streaming install: seven defects, about 50 min lost (found 2026-11-18)
+- **Kyverno cost labels:** `require-labels-and-limits` rejected every third-party operator in `streaming` (Strimzi, KEDA, Apicurio, Flink, RisingWave). Fix: a mutate rule in `mutate-defaults.yaml` adds `difme/team: platform`, `business.metric: shared-infra` only where missing.
+- **`$(VAR)` env references:** `no-plaintext-secrets` treated `RW_SQL_PASSWORD: $(RW_POSTGRES_PASSWORD)` (a reference to a Secret-backed variable) as a literal. The pattern now allows `'\$(*)'`. The `\$` escapes Kyverno's own `$(...)` syntax.
+- **Strimzi and Kafka versions:** Strimzi 0.45 supports Kafka only up to 3.9, but `kafka.yaml` asks for 4.0.0. Moved to 0.47.0, the newest that still supports 4.0.0.
+- **Uncommitted config:** `kafka.yaml` referenced a `kafka-metrics` ConfigMap that was never committed (now `kafka-metrics.yaml`).
+- **Missing `username` key:** `risingwave-db` lacked it (fixed in `dev-secrets.sh`). Its first crash left a half-applied meta migration in YugabyteDB ("Table `cluster` already exists"), so the database had to be dropped and recreated.
+- **Apicurio:** the registry and UI images both default to port 8080 in one pod; the registry now uses 8081. With no datasource username it defaults to `sa`; it now uses `apicurio`.
+- **Debezium:** Strimzi's in-cluster `build:` needs a push registry and credentials, which a dev cluster doesn't have. The Connect image is now built in CI (`deploy/images/debezium-connect`).
+- **Operational lessons:**
+  - Manual `kubectl apply` on an Argo-managed object is reverted by self-heal. Change it in git and sync its app, policies first.
+  - A manual `operation.sync` patch must repeat the app's `syncOptions` (`ServerSideApply=true`), or large CRDs fail the 256 KiB annotation limit.
+  - Watchers must fail fast on sync or pod errors and have a deadline. Waiting only for "Healthy" hid a hard failure for 50 min.
+- **Python on Windows writes CRLF:** normalize line endings before committing (`sed -i 's/\r$//'`).

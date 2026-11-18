@@ -11,6 +11,11 @@ t0=$(date +%s)
 use_jdk() { local d; d=$(ls -d /usr/local/sdkman/candidates/java/"$1"* 2>/dev/null | head -1); [ -n "$d" ] && export JAVA_HOME=$d PATH=$d/bin:$PATH; return 0; }
 
 if want core; then
+  # .properties files have no inline comments: "key=8015   # note" keeps the note in the value, and the service
+  # fails at startup, which unit tests never reach (cmd-svc crash-looped on difme.flagd.port, 2026-11-19).
+  if grep -nE '^[^#!][^=]*=.*[^\]\s+#' services/*/*/src/main/resources/application.properties; then
+    echo "✗ inline comment in an application.properties value (put the comment on its own line)"; exit 1
+  fi
   use_jdk 25
   pl=${MODULES:+-pl $MODULES -am}
   mvn -q -B -ntp -f services/core/pom.xml $pl verify

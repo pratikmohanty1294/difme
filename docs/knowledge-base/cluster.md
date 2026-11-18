@@ -206,3 +206,17 @@
 ### ysql_bench aborts silently on serialization failures
 - **Symptom:** a SERIALIZABLE multi-statement script under concurrency ends with `Run was aborted; the above results are incomplete` and no error text. pgbench 15 aborts a client on the first serialization failure.
 - **Fix:** add `--max-tries=10 --failures-detailed`. Add `-r` for per-statement latency.
+
+### Kubernetes service-link env collided with flagd's own config: every payment waited 500 ms (found 2026-11-19)
+- **Symptom:** a fixed ~520 ms per payment, even one request at a time with no concurrency. Load tests showed p50 ~550 ms at only 15 req/s and limiter shedding.
+- **Cause:**
+  - Kubernetes injects `<SERVICE>_PORT=tcp://<ip>:<port>` for every Service in the namespace. For the `flagd` Service that is `FLAGD_PORT=tcp://…:8013`, and flagd reads `FLAGD_*` env as its own config.
+  - flagd therefore served on a random port (`Flag IResolver listening at [::]:43015`), and :8013 refused connections.
+  - cmd-svc used flagd's default **RPC** resolver: one remote call per flag lookup with a 500 ms deadline, paid in full on every payment.
+- **Fix:**
+  - flagd: `enableServiceLinks: false` and explicit `--port/--sync-port/--ofrep-port`.
+  - cmd-svc: the **in-process** resolver (flags sync on :8015 and are evaluated locally in µs), which is what the code comment always claimed.
+- **How it was found:** sequential `curl` timings from an in-cluster pod (constant ~520 ms), then `curl` to flagd:8013 (exit 7, connection refused), then flagd's own startup log.
+- **Rule:**
+  - Any image that reads `<NAME>_*` env (flagd, many Kafka/Redis images) must run with `enableServiceLinks: false` when a Service of the same name exists.
+  - Feature-flag lookups on a hot path must be in-process.

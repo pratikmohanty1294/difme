@@ -1,6 +1,8 @@
 package dev.difme.exchange.svc;
 
 import dev.difme.exchange.kernel.BidBook;
+import dev.difme.exchange.kernel.CommerceSplit;
+import dev.difme.exchange.kernel.Risk;
 import dev.difme.exchange.matching.MatchingEngine;
 import dev.difme.exchange.matching.MatchingIntake;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,7 +36,17 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class Exchange {
     public record Ranked(int nodeRef, long askMinor, double score) {}
 
-    public record Result(long auctionId, String pack, int ranked, List<Ranked> top) {}
+    /** Commercial terms of the intent, needed to settle the award (all minor units). */
+    public record Terms(long listMinor, int discountBps, long feeMinor, Risk.Tier partnerTier) {}
+
+    /**
+     * The award: the winner's split under the conservation identity (A, Y, F, B, buyer saving; FR-01 v4.1) and the
+     * collateral the winner must lock before execution (FR-14, D_req = max(D_min, V·α·γ·φ)). Open owner questions:
+     * V is taken as A (what the partner pays the merchant) and the partner tier defaults to ESTABLISHED.
+     */
+    public record Award(Ranked winner, CommerceSplit split, long collateralMinor) {}
+
+    public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
 
     @ConfigProperty(name = "difme.exchange.packs") List<String> packIds;
     @ConfigProperty(name = "difme.exchange.max-auctions") int maxAuctions;
@@ -49,6 +61,7 @@ public class Exchange {
     private final Map<String, MatchingIntake> intakes = new ConcurrentHashMap<>();
     private final List<AgentRunner> runners = new ArrayList<>();
     private final Map<Long, String> openAuctions = new ConcurrentHashMap<>();
+    private final Map<Long, Terms> terms = new ConcurrentHashMap<>();
     // Ids stay below 2^53 so JSON clients (JavaScript, the PWAs) read them exactly; millis x 1000 also keeps them
     // increasing across restarts. (millis << 16 exceeded 2^53 and the bids went to a rounded id; found by the test.)
     private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1000L);
@@ -88,13 +101,15 @@ public class Exchange {
     }
 
     /** Opens an auction; returns its id, or -1 when the pack's ring is full (backpressure). */
-    public long open(String pack, long maxAcceptableMinor) {
+    public long open(String pack, long maxAcceptableMinor, Terms t) {
         long id = ids.incrementAndGet();
         VerticalPack p = packs.get(pack);
         openAuctions.put(id, pack);
+        terms.put(id, t);
         long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
         if (!intakes.get(pack).open(id, maxAcceptableMinor, window)) {
             openAuctions.remove(id);
+            terms.remove(id);
             return -1;
         }
         return id;
@@ -122,7 +137,17 @@ public class Exchange {
             int b = book.atRank(r);
             top.add(new Ranked(book.node(b), book.ask(b), book.score(b)));
         }
-        results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top)));
+        Terms t = terms.remove(auctionId);
+        Award award = null;
+        if (!top.isEmpty() && t != null) {
+            VerticalPack p = packs.get(pack);
+            Ranked w = top.get(0);
+            CommerceSplit split = CommerceSplit.of(t.listMinor(), t.discountBps(), w.askMinor(), t.feeMinor(), p.guaranteeFundBps());
+            long collateral = Risk.requiredCollateral(split.a(), p.collateral().alpha(), p.collateral().gammaRev(),
+                    t.partnerTier(), p.collateral().minMinor());
+            award = new Award(w, split, collateral);
+        }
+        results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award));
         openAuctions.remove(auctionId);
         metrics.counter("difme_exchange_auctions_closed_total", "pack", pack, "matched", ranked > 0 ? "yes" : "no").increment();
     }

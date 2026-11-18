@@ -11,7 +11,11 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /** One vertical pack as served: its FR-17 weights and auction parameters from vertical.yaml, plus compiled rules. */
-public record VerticalPack(String id, Weights weights, long windowNanos, long latencyMaxMicros, int backups, PackRules rules) {
+public record VerticalPack(String id, Weights weights, long windowNanos, long latencyMaxMicros, int backups, PackRules rules,
+                           Collateral collateral, int guaranteeFundBps) {
+    /** FR-14 inputs from vertical.yaml {@code collateral:} (alpha, gamma_rev, min_minor). */
+    public record Collateral(double alpha, double gammaRev, long minMinor) {}
+
 
     @SuppressWarnings("unchecked")
     static VerticalPack fromClasspath(String id, ClassLoader cl) throws IOException {
@@ -24,13 +28,17 @@ public record VerticalPack(String id, Weights weights, long windowNanos, long la
         Map<String, Object> w = (Map<String, Object>) v.get("weights");
         Map<String, Object> a = (Map<String, Object>) v.get("auction");
         List<String> rules = (List<String>) v.getOrDefault("rules", List.of());
+        Map<String, Object> c = (Map<String, Object>) v.get("collateral");
+        Map<String, Object> st = (Map<String, Object>) v.getOrDefault("settlement", Map.of());
         PackRules compiled = PackRules.load(id, rules, f -> cl.getResourceAsStream(base + f));
         return new VerticalPack(id,
                 new Weights(num(w, "price"), num(w, "reputation"), num(w, "latency")),
                 (long) num(a, "window_ms") * 1_000_000L,
                 (long) num(a, "latency_max_ms") * 1_000L,
                 (int) num(a, "backups"),
-                compiled);
+                compiled,
+                new Collateral(num(c, "alpha"), num(c, "gamma_rev"), (long) num(c, "min_minor")),
+                st.get("guarantee_fund_bps_of_fee") instanceof Number n ? n.intValue() : 0);
     }
 
     private static double num(Map<String, Object> m, String key) {

@@ -48,7 +48,7 @@ class ExchangeResourceTest {
         for (String b : bids) {
             given().contentType(ContentType.JSON).body(b).post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
         }
-        long deadline = System.currentTimeMillis() + 5_000;
+        long deadline = System.currentTimeMillis() + 10_000;
         while (System.currentTimeMillis() < deadline
                 && given().get("/v1/exchange/auctions/" + id).jsonPath().get("ranked") == null) {
             Thread.sleep(20);

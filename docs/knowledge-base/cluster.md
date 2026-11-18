@@ -97,3 +97,9 @@
 - **Fix:** `k8sServiceHost: 127.0.0.1` (single-server; agent and operator use the host network). One value in the Cilium values file serves both Helm bootstrap and Argo CD. Their earlier disagreement was the cause of the `cilium` OutOfSync flapping.
 - **Recovery:** after the CNI is back, force-delete `Unknown`/`Error` pods so controllers recreate them, starting with `security` (Kyverno).
 - **Prevention:** never bake an IP that can change into config. Also raise the Codespace idle timeout (account setting, up to 240 min) so long background jobs don't lose their host.
+
+### Disk: 32 GB root vs 118 GB /tmp (measured 2026-11-18)
+- Codespace root (`/`, `/workspaces`) is 32 GB; `/tmp` is a separate ~118 GB ephemeral disk (emptied on Codespace restart).
+- At ~86% root use the kubelet (nodefs 8% threshold) evicted pods; they restarted, re-pulled and refilled the disk — an eviction loop that also killed Temporal's schema Job midway (half-migrated DB).
+- Each image existed three times: registry cache (~4.9 GB), containerd content (~2.3 GB), unpacked snapshots (~6.2 GB).
+- Fix: registry pull-through caches are bind mounts under `/tmp/difme-registry/` (pure caches, safe to lose). Node containerd stays on root (moving it to /tmp broke non-root pods earlier).

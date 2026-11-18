@@ -16,11 +16,12 @@ help:            ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n",$$1,$$2}'
 	@echo "  Profiles: $$(ls deploy/profiles | sed 's/.txt//' | tr '\n' ' ')"
 
-registries:      ## Persistent pull-through image caches (survive `make destroy`)
+registries:      ## Pull-through image caches on the Codespace's 118 GB /tmp disk (survive `make destroy`; a Codespace
+                 ## restart empties /tmp and they refill from upstream). Keeps ~5 GB off the 32 GB root disk.
 	@for r in dockerio=https://registry-1.docker.io ghcr=https://ghcr.io quay=https://quay.io k8s=https://registry.k8s.io; do \
 	  name=difme-$${r%%=*}; url=$${r#*=}; \
 	  if k3d registry list -o json 2>/dev/null | grep -q "k3d-$$name\""; then echo "registry cache: $$name (exists)"; \
-	  else k3d registry create $$name --port 0 --proxy-remote-url $$url -v $$name-cache:/var/lib/registry >/dev/null && echo "registry cache: $$name -> $$url (created)"; fi; \
+	  else k3d registry create $$name --port 0 --proxy-remote-url $$url -v /tmp/difme-registry/$$name:/var/lib/registry >/dev/null && echo "registry cache: $$name -> $$url (created)"; fi; \
 	done
 
 cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (images via local caches)

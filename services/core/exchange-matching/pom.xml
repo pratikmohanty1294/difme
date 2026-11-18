@@ -7,6 +7,11 @@
   <description>Sealed-bid auction matching (ADR-020, PRD NFR-02): single-writer engine over the kernel's BidBook, fed by a
     lock-free many-to-one ring buffer in off-heap memory (Agrona, Apache-2.0). No locks and no allocation on the hot
     path; Aeron IPC/UDP transport attaches to the same ring later.</description>
+  <properties>
+    <!-- Agrona 2.x reads off-heap memory through jdk.internal.misc.Unsafe; any JVM running this module (tests and the
+         matching service) needs this export. -->
+    <argLine>--add-exports java.base/jdk.internal.misc=ALL-UNNAMED</argLine>
+  </properties>
   <dependencies>
     <dependency><groupId>dev.difme</groupId><artifactId>exchange-kernel</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.agrona</groupId><artifactId>agrona</artifactId><version>2.7.0</version></dependency>

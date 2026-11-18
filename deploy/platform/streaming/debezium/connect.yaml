@@ -16,11 +16,6 @@ spec:
     status.storage.replication.factor: 1
     # Lets connectors set producer.override.* (idempotent, acks=all for the outbox relay — ADR-017).
     connector.client.config.override.policy: All
-  build:
-    output: { type: docker, image: ghcr.io/pratikmohanty1294/difme-debezium-connect:3.1.0 }
-    plugins:
-      - name: debezium-postgres
-        artifacts: [{ type: maven, group: io.debezium, artifact: debezium-connector-postgres, version: 3.1.0.Final }]
-      - name: apicurio-converters
-        artifacts: [{ type: maven, group: io.apicurio, artifact: apicurio-registry-utils-converter, version: 3.0.6 }]
+  # Prebuilt in CI (deploy/images/debezium-connect): Debezium Postgres connector + Apicurio converters.
+  image: ghcr.io/pratikmohanty1294/difme-debezium-connect:3.1.0
   resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }

@@ -13,6 +13,7 @@ spec:
         - name: registry
           image: quay.io/apicurio/apicurio-registry:3.0.6
           env:
+            - { name: QUARKUS_HTTP_PORT, value: "8081" }   # the UI image listens on 8080 in 3.x; they share the pod
             - { name: APICURIO_STORAGE_KIND, value: sql }
             - { name: APICURIO_STORAGE_SQL_KIND, value: postgresql }
             - { name: APICURIO_DATASOURCE_URL, value: "jdbc:postgresql://yb-tservers.database-tier.svc:5433/apicurio" }
@@ -20,15 +21,15 @@ spec:
             - { name: APICURIO_REST_DELETION_ARTIFACT_ENABLED, value: "false" }
             - { name: APICURIO_RULES_GLOBAL_COMPATIBILITY, value: BACKWARD_TRANSITIVE }
             - { name: APICURIO_RULES_GLOBAL_VALIDITY, value: FULL }
-          ports: [{ containerPort: 8080 }]
+          ports: [{ containerPort: 8081 }]
           resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
         - name: ui
           image: quay.io/apicurio/apicurio-registry-ui:3.0.6
-          env: [{ name: REGISTRY_API_URL, value: "http://localhost:8080/apis/registry/v3" }]
-          ports: [{ containerPort: 8888 }]
+          env: [{ name: REGISTRY_API_URL, value: "http://localhost:8081/apis/registry/v3" }]
+          ports: [{ containerPort: 8080 }]
           resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } }
 ---
 apiVersion: v1
 kind: Service
 metadata: { name: apicurio-registry }
-spec: { selector: { app: apicurio-registry }, ports: [{ name: api, port: 8080 }, { name: ui, port: 8888 }] }
+spec: { selector: { app: apicurio-registry }, ports: [{ name: api, port: 8080, targetPort: 8081 }, { name: ui, port: 8888, targetPort: 8080 }] }

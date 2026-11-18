@@ -74,3 +74,11 @@ jobs:
       name: difme-formio
       context: vendor/formio/server
       dockerfile: deploy/images/formio/Dockerfile
+
+  debezium-connect:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-debezium-connect
+      context: deploy/images/debezium-connect
+      dockerfile: deploy/images/debezium-connect/Dockerfile
+      version: "3.1.0"

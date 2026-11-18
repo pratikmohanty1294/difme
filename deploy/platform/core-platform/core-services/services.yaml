@@ -14,4 +14,5 @@ data:
     - { name: rate-limiter,        port: 8084, image: difme-rate-limiter,       team: platform,   metric: rate-limiting,      cpu: 20m,  mem: 64Mi }
     - { name: rehydration-svc,     port: 8085, image: difme-rehydration-svc,    team: edge,       metric: offline-rehydration, cpu: 50m, mem: 224Mi, group: streaming, autoscaled: true }   # KEDA (keda-scalers)
     - { name: projection-svc,      port: 8086, image: difme-projection-svc,     team: payments,   metric: payment-processing, cpu: 20m,  mem: 96Mi,  group: streaming, autoscaled: true }    # KEDA (keda-scalers)
+    - { name: exchange-svc,        port: 8089, image: difme-exchange-svc,       team: exchange,   metric: exchange-matching,  cpu: 50m,  mem: 256Mi }   # ADR-020 (DiscountAI and later verticals)
     - { name: replay-engine,       port: 8087, image: difme-replay-engine,      team: compliance, metric: audit-replay,       cpu: 20m,  mem: 96Mi,  group: streaming }

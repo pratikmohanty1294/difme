@@ -53,6 +53,30 @@ public final class PackRules {
         return new PackRules(packDir.getFileName().toString(), byId);
     }
 
+    /** Opens a resource by its pack-relative name (e.g. {@code rules/x.dmn}); used to load packs from a classpath. */
+    @FunctionalInterface
+    public interface Opener {
+        InputStream open(String relativeName) throws IOException;
+    }
+
+    /**
+     * Loads the listed rule files through {@code opener}. This is how a service loads packs from its classpath, where a
+     * directory cannot be listed; the file names come from the pack's {@code vertical.yaml} {@code rules:} list.
+     */
+    public static PackRules load(String pack, java.util.List<String> ruleFiles, Opener opener) throws IOException {
+        Map<String, DmnDecision> byId = new HashMap<>();
+        for (String f : ruleFiles) {
+            try (InputStream in = opener.open(f)) {
+                if (in == null) throw new IOException("missing rule file " + f + " in pack " + pack);
+                for (DmnDecision d : ENGINE.parseDecisions(in)) {
+                    if (byId.put(d.getKey(), d) != null) throw new IllegalStateException("duplicate decision id " + d.getKey());
+                }
+            }
+        }
+        if (byId.isEmpty()) throw new IllegalStateException("no decisions in pack " + pack);
+        return new PackRules(pack, byId);
+    }
+
     public String pack() {
         return pack;
     }

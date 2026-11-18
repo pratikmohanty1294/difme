@@ -13,6 +13,7 @@
     <module>exchange-kernel</module>
     <module>exchange-rules</module>
     <module>exchange-matching</module>
+    <module>exchange-svc</module>
     <module>consistency</module>
     <module>cmd-svc</module>
     <module>qry-svc</module>

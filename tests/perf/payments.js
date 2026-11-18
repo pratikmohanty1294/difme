@@ -20,7 +20,11 @@ export const options = {
     steady: { executor: 'constant-arrival-rate', rate: RATE, timeUnit: '1s', duration: DURATION, startTime: '15s',
               preAllocatedVUs: 50, maxVUs: 1000, tags: { phase: 'steady' } },
   },
-  thresholds: { 'http_req_duration{phase:steady}': ['p(99)<1000'] },
+  thresholds: {
+    'http_req_duration{phase:steady}': ['p(99)<1000'],
+    // count>=0 never fails; it only makes k6 print the per-status breakdown in the summary.
+    ...Object.fromEntries(['202', '200', '400', '409', '422', '429', '500', '503', '0'].map((s) => [`http_reqs{status:${s}}`, ['count>=0']])),
+  },
 };
 
 const outcomes = new Counter('payment_outcomes');

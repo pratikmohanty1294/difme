@@ -17,7 +17,8 @@ for start in $(seq 1 500 "$ACCOUNTS"); do
     --command="create_accounts $cmd;" >/dev/null
 done
 
-top_pods() { kubectl top pods -A --no-headers | grep -vE "^(kube-system|argocd|argo-rollouts) " | sort -k1,2; }
+# Keyed by workload (pod-template hash stripped), so a pod restarted mid-run still lines up with its idle sample.
+top_pods() { kubectl top pods -A --no-headers | grep -vE "^(kube-system|argocd|argo-rollouts) " | awk '{ n=$2; sub(/-[a-z0-9]{8,10}-[a-z0-9]{5}$/, "", n); sub(/-[0-9]+$/, "&", n); print $1, n, $3, $4 }' | sort -k1,2; }
 
 echo "▶ idle snapshot"
 top_pods > "$OUT/idle.txt"; kubectl top node --no-headers > "$OUT/idle-node.txt"
@@ -48,7 +49,7 @@ EOF
 # `kubectl wait -l` fails at once when no pod exists yet (found live), so wait for the pod to appear.
 timeout 180 sh -c "until kubectl -n k6 get pods -l job-name=payments-baseline -o name | grep -q .; do sleep 2; done"
 
-: > "$OUT/load.txt"
+: > "$OUT/load.txt"; : > "$OUT/load-node.txt"
 while ! kubectl -n k6 get job payments-baseline -o jsonpath='{.status.conditions[*].type}' | grep -qE 'Complete|Failed'; do
   top_pods >> "$OUT/load.txt" 2>/dev/null || true
   kubectl top node --no-headers >> "$OUT/load-node.txt" 2>/dev/null || true
@@ -56,7 +57,7 @@ while ! kubectl -n k6 get job payments-baseline -o jsonpath='{.status.conditions
 done
 
 echo; echo "════════ RESULTS ($RATE req/s, $DURATION) ════════"
-kubectl -n k6 logs job/payments-baseline | grep -E "http_req_duration|http_reqs|http_req_failed|payment_outcomes|checks|iterations|dropped_iterations|steady" | sed 's/^ *//'
+kubectl -n k6 logs job/payments-baseline | grep -E "http_req_duration|http_reqs|http_req_failed|payment_outcomes|checks|iterations|dropped_iterations|steady|status:" | sed 's/^ *//'
 echo; echo "── per-pod CPU (m) / RAM (Mi): idle → peak under load ──"
 awk 'NR==FNR { cpu[$1"/"$2]=$3; mem[$1"/"$2]=$4; next }
      { k=$1"/"$2; c=$3+0; m=$4+0; if (c>pc[k]) pc[k]=c; if (m>pm[k]) pm[k]=m }
@@ -64,3 +65,5 @@ awk 'NR==FNR { cpu[$1"/"$2]=$3; mem[$1"/"$2]=$4; next }
      "$OUT/idle.txt" "$OUT/load.txt" | sort -t'>' -k3 -rn | head -25
 echo; echo "── node: idle → peak ──"
 cat "$OUT/idle-node.txt"; sort -k2 -rn "$OUT/load-node.txt" | head -1
+echo; echo "── restarts during the run ──"
+kubectl get pods -A --no-headers | awk '$5+0 > 0 { print $1"/"$2, "restarts="$5 }' | grep -vE "^(kube-system|argocd)" || echo none

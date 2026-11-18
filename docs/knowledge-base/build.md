@@ -56,3 +56,8 @@
 |---|---|---|
 | Per bid, end to end (off-heap MPSC ring + single-writer engine) | 117 ns | < 100 µs |
 | Rank + close of a 61-bid auction | p50 1.6 µs, p99 3.0 µs | p99 < 5 ms |
+
+### `.properties` files have no inline comments (2026-11-19)
+- **What happened:** `difme.flagd.port=8015   # flagd sync port` made the whole remainder the value. cmd-svc crash-looped with `Failed to load config value of type int for: difme.flagd.port`. Unit tests passed because they never start Quarkus.
+- **Rule:** comments go on their own `#` line.
+- **Guard:** `ci/check.sh core` now fails on `key=value   # …` in any `application.properties`.

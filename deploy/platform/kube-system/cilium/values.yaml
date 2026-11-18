@@ -2,7 +2,10 @@
 # Codespace (k3d, Kubernetes-in-Docker): Cilium runs alongside kube-proxy; ADR-013. Real clusters (RKE2 on VMs or
 # bare metal, deploy/fleet/rke2-config.yaml) set kubeProxyReplacement: true for the full eBPF data path (PDF §4.6).
 kubeProxyReplacement: false
-k8sServiceHost: ""          # set by bootstrap/install.sh
+# Single-server k3d: the agent and operator use the host network, and the API server listens on the node itself.
+# The node IP changes when the Codespace restarts (found live), so a fixed IP breaks all pod networking.
+# Multi-node overlays set this to the API load-balancer name instead.
+k8sServiceHost: 127.0.0.1
 k8sServicePort: 6443
 routingMode: tunnel
 tunnelProtocol: vxlan

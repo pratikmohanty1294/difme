@@ -90,3 +90,10 @@
 - **flagd blocked by `restrict-registries`:** the rule ported from Gatekeeper (ADR-015) lacked the upstream allowlist. **Fix:** explicitly allow pinned upstream images, plus `docker.io/library/*` as before.
 - **Kyverno reports controller OOMKilled at 128 Mi:** **fix:** limit 320 Mi, to be refined from the baseline.
 - **Lesson:** a policy port must be checked against every live workload it matches. Server dry runs of the policy alone pass, so dry-run the *workloads* against the new policy as well.
+
+### Codespace restart: the whole cluster down, pods stuck `Unknown`
+- **Trigger:** the Codespace stopped on its idle timeout and restarted. The k3d node came back with a new IP (172.18.0.6 → .3).
+- **Root cause:** `install.sh` pinned Cilium's `k8sServiceHost` to the node IP at install time, so the agent kept dialing the old address. No CNI means no pod starts, and Kyverno's fail-closed webhooks then blocked everything else.
+- **Fix:** `k8sServiceHost: 127.0.0.1` (single-server; agent and operator use the host network). One value in the Cilium values file serves both Helm bootstrap and Argo CD. Their earlier disagreement was the cause of the `cilium` OutOfSync flapping.
+- **Recovery:** after the CNI is back, force-delete `Unknown`/`Error` pods so controllers recreate them, starting with `security` (Kyverno).
+- **Prevention:** never bake an IP that can change into config. Also raise the Codespace idle timeout (account setting, up to 240 min) so long background jobs don't lose their host.

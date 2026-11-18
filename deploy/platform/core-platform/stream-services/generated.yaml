@@ -18,6 +18,7 @@ spec:
         business.metric: offline-rehydration
     spec:
       serviceAccountName: rehydration-svc
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-rehydration-svc:0.1.0
@@ -98,6 +99,7 @@ spec:
         business.metric: payment-processing
     spec:
       serviceAccountName: projection-svc
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-projection-svc:0.1.0
@@ -179,6 +181,7 @@ spec:
         business.metric: audit-replay
     spec:
       serviceAccountName: replay-engine
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-replay-engine:0.1.0

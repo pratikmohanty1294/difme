@@ -19,6 +19,7 @@ spec:
         business.metric: payment-processing
     spec:
       serviceAccountName: quarkus-cmd-svc
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-cmd-svc:0.1.0
@@ -100,6 +101,7 @@ spec:
         business.metric: account-query
     spec:
       serviceAccountName: quarkus-qry-svc
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-qry-svc:0.1.0
@@ -181,6 +183,7 @@ spec:
         business.metric: settlement-saga
     spec:
       serviceAccountName: saga-orchestrator
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-saga-orchestrator:0.1.0
@@ -262,6 +265,7 @@ spec:
         business.metric: payment-processing
     spec:
       serviceAccountName: consistency-router
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-consistency-router:0.1.0
@@ -343,6 +347,7 @@ spec:
         business.metric: rate-limiting
     spec:
       serviceAccountName: rate-limiter
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-rate-limiter:0.1.0
@@ -424,6 +429,7 @@ spec:
         business.metric: exchange-matching
     spec:
       serviceAccountName: exchange-svc
+      enableServiceLinks: false
       containers:
       - name: app
         image: ghcr.io/pratikmohanty1294/difme-exchange-svc:0.1.0

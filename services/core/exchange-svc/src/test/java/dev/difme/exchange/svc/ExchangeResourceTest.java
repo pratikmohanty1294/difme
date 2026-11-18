@@ -65,5 +65,17 @@ class ExchangeResourceTest {
                 .body("award.collateralMinor", equalTo(2_880_000));
         given().contentType(ContentType.JSON).body(bids[0])
                 .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(409);
+        // Evidence: intent + authorization, hash-linked, operator-sealed with a witness, and it verifies.
+        given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200)
+                .body("sealed", equalTo(true))
+                .body("artifacts.type", org.hamcrest.Matchers.contains("intent", "authorization"))
+                .body("artifacts[1].payload.amount", equalTo(8_500_000))
+                .body("artifacts[1].payload.winnerNode", equalTo(2))
+                .body("verdict.hashes", equalTo(true))
+                .body("verdict.links", equalTo(true))
+                .body("verdict.seal", equalTo(true))
+                .body("verdict.witnesses", equalTo(true));
+        given().get("/v1/exchange/keys").then().statusCode(200)
+                .body("'exchange-svc'", org.hamcrest.Matchers.notNullValue());
     }
 }

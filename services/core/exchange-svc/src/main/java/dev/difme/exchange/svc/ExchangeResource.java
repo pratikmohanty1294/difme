@@ -1,5 +1,6 @@
 package dev.difme.exchange.svc;
 
+import dev.difme.exchange.kernel.EvidenceChain;
 import dev.difme.exchange.kernel.Risk;
 import dev.difme.exchange.rules.Finding;
 import dev.difme.exchange.rules.PackRules;
@@ -9,6 +10,8 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Response;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,7 +50,16 @@ public class ExchangeResource {
         long maxYield = discount - in.feeMinor() - 1;
         if (maxYield <= 0) return Response.status(422).entity(Map.of("error", "the fee leaves no yield inside the discount")).build();
         Risk.Tier tier = in.partnerTier() == null ? Risk.Tier.ESTABLISHED : in.partnerTier();
-        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor(), tier));
+        Map<String, Object> evidence = new LinkedHashMap<>();       // canonical JSON: integers, strings, booleans
+        evidence.put("riskScore", Math.round(in.riskScore()));
+        evidence.put("offerSanctioned", in.offerSanctioned());
+        evidence.put("listMinor", in.listMinor());
+        evidence.put("discountBps", in.discountBps());
+        evidence.put("feeMinor", in.feeMinor());
+        evidence.put("maxPriceMinor", in.maxPriceMinor());
+        evidence.put("partnerTier", tier.name());
+        evidence.put("findings", findings.stream().map(Finding::code).toList());
+        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor(), tier), evidence);
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings)).build();
     }
@@ -60,6 +72,26 @@ public class ExchangeResource {
             return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         }
         return Response.accepted().build();
+    }
+
+    /** The auction's B-chain (hash-linked, Ed25519-sealed at close) and a fresh verification verdict. */
+    @GET
+    @Path("/auctions/{id}/evidence")
+    public Response evidence(@PathParam("id") long auctionId) {
+        EvidenceChain chain = exchange.evidence(auctionId);
+        if (chain == null) return Response.status(404).build();
+        Map<String, java.security.PublicKey> keys = exchange.publicKeys();
+        return Response.ok(Map.of("chain", chain.id(), "artifacts", chain.artifacts(),
+                "sealed", chain.seal() != null, "verdict", chain.verify(keys::get))).build();
+    }
+
+    /** Public keys for independent verification of the evidence seals (X.509 SubjectPublicKeyInfo, base64). */
+    @GET
+    @Path("/keys")
+    public Map<String, String> keys() {
+        Map<String, String> out = new LinkedHashMap<>();
+        exchange.publicKeys().forEach((name, k) -> out.put(name, Base64.getEncoder().encodeToString(k.getEncoded())));
+        return out;
     }
 
     @GET

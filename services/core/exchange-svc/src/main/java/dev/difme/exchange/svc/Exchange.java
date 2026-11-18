@@ -2,6 +2,7 @@ package dev.difme.exchange.svc;
 
 import dev.difme.exchange.kernel.BidBook;
 import dev.difme.exchange.kernel.CommerceSplit;
+import dev.difme.exchange.kernel.EvidenceChain;
 import dev.difme.exchange.kernel.Risk;
 import dev.difme.exchange.matching.MatchingEngine;
 import dev.difme.exchange.matching.MatchingIntake;
@@ -13,6 +14,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.security.GeneralSecurityException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -62,6 +67,13 @@ public class Exchange {
     private final List<AgentRunner> runners = new ArrayList<>();
     private final Map<Long, String> openAuctions = new ConcurrentHashMap<>();
     private final Map<Long, Terms> terms = new ConcurrentHashMap<>();
+    private Map<Long, EvidenceChain> chains;
+
+    // Evidence signing (B-chain per auction, ADR-020). Dev: both keys are generated at start and published at
+    // GET /v1/exchange/keys. Open owner question: who witnesses in production (an independent notary service or an
+    // HSM-held key) and where the operator key lives (OpenBao transit).
+    static final String OPERATOR = "exchange-svc", WITNESS = "exchange-witness";
+    private final KeyPair operatorKey = ed25519(), witnessKey = ed25519();
     // Ids stay below 2^53 so JSON clients (JavaScript, the PWAs) read them exactly; millis x 1000 also keeps them
     // increasing across restarts. (millis << 16 exceeded 2^53 and the bids went to a rounded id; found by the test.)
     private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1000L);
@@ -73,6 +85,12 @@ public class Exchange {
         results = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<Long, Result> e) {
+                return size() > keep;
+            }
+        });
+        chains = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Long, EvidenceChain> e) {
                 return size() > keep;
             }
         });
@@ -101,9 +119,16 @@ public class Exchange {
     }
 
     /** Opens an auction; returns its id, or -1 when the pack's ring is full (backpressure). */
-    public long open(String pack, long maxAcceptableMinor, Terms t) {
+    public long open(String pack, long maxAcceptableMinor, Terms t, Map<String, Object> intentEvidence) {
         long id = ids.incrementAndGet();
         VerticalPack p = packs.get(pack);
+        EvidenceChain chain = new EvidenceChain("auction-" + id, EvidenceChain.Kind.B);
+        Map<String, Object> intent = new LinkedHashMap<>(intentEvidence);
+        intent.put("pack", pack);
+        intent.put("auctionId", id);
+        intent.put("maxYieldMinor", maxAcceptableMinor);
+        chain.append(EvidenceChain.Type.intent, EvidenceChain.Signal.Deterministic, intent);
+        chains.put(id, chain);
         openAuctions.put(id, pack);
         terms.put(id, t);
         long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
@@ -119,6 +144,22 @@ public class Exchange {
     public boolean bid(long auctionId, int nodeRef, long askMinor, double reputation, long latencyMicros) {
         String pack = openAuctions.get(auctionId);
         return pack != null && intakes.get(pack).bid(auctionId, nodeRef, askMinor, reputation, latencyMicros);
+    }
+
+    public EvidenceChain evidence(long auctionId) {
+        return chains.get(auctionId);
+    }
+
+    public Map<String, PublicKey> publicKeys() {
+        return Map.of(OPERATOR, operatorKey.getPublic(), WITNESS, witnessKey.getPublic());
+    }
+
+    private static KeyPair ed25519() {
+        try {
+            return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public Result result(long auctionId) {
@@ -146,6 +187,27 @@ public class Exchange {
             long collateral = Risk.requiredCollateral(split.a(), p.collateral().alpha(), p.collateral().gammaRev(),
                     t.partnerTier(), p.collateral().minMinor());
             award = new Award(w, split, collateral);
+        }
+        EvidenceChain chain = chains.get(auctionId);
+        if (chain != null) {
+            Map<String, Object> auth = new LinkedHashMap<>();
+            auth.put("ranked", ranked);
+            List<Object> ranking = new ArrayList<>();
+            for (Ranked r : top) ranking.add(Map.of("nodeRef", r.nodeRef(), "askMinor", r.askMinor(),
+                    "scoreMicros", Math.round(r.score() * 1_000_000)));          // canonical JSON is integers only
+            auth.put("ranking", ranking);
+            if (award != null) {
+                auth.put("winnerNode", award.winner().nodeRef());
+                auth.put("a", award.split().a());
+                auth.put("yield", award.split().yield());
+                auth.put("fee", award.split().fee());
+                auth.put("amount", award.split().b());                          // B, what the buyer authorises
+                auth.put("currency", "INR");
+                auth.put("buyerSaves", award.split().buyerSaves());
+                auth.put("collateralMinor", award.collateralMinor());
+            }
+            chain.append(EvidenceChain.Type.authorization, EvidenceChain.Signal.Deterministic, auth);
+            chain.seal(OPERATOR, operatorKey.getPrivate(), Map.of(WITNESS, witnessKey.getPrivate()));
         }
         results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award));
         openAuctions.remove(auctionId);

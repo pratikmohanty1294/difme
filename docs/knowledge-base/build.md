@@ -40,3 +40,19 @@
   - YugabyteDB WAL fsync averages 8.2 ms on the Codespace disk.
   - Colocation would gain little here, because every table is already a single tablet on the single node.
 - **How to profile:** `CREATE EXTENSION pg_stat_statements` and `SELECT pg_stat_statements_reset()`, run light load (`ci/measure.sh 15 45s`), then sort by `total_exec_time`. Read the cmd-svc metrics through the API server: `kubectl get --raw /api/v1/namespaces/core-platform/services/<svc>:http/proxy/q/metrics` (the image has no curl).
+
+### Image workflow: attestation/provenance steps fail on Sigstore network timeouts (2026-11-19)
+- **Symptom:** `InternalError: error fetching tlog entry ... network timeout at: https://rekor.sigstore.dev`, in "Attest SBOM" or "SLSA provenance".
+- **What it means:** the image was already built, scanned and pushed by then, so deployments are unaffected. Only the attestation is missing.
+- **Fix:** `gh run rerun <run> --failed` re-runs only the failed jobs and restores the attestation.
+
+### Agrona 2.x on Java 25 needs `--add-exports java.base/jdk.internal.misc=ALL-UNNAMED`
+- **Symptom:** `IllegalAccess ... cannot access class jdk.internal.misc.Unsafe` / `NoClassDefFound: Could not initialize class org.agrona.BufferUtil`.
+- **Fix:** set the export in the module's surefire `argLine` (`exchange-matching/pom.xml`) and in any service JVM that loads Agrona.
+
+### Matching engine vs PRD NFR-02 (measured 2026-11-19, Codespace, `MatchingPerfTest`)
+
+| Measure | Result | NFR-02 target |
+|---|---|---|
+| Per bid, end to end (off-heap MPSC ring + single-writer engine) | 117 ns | < 100 µs |
+| Rank + close of a 61-bid auction | p50 1.6 µs, p99 3.0 µs | p99 < 5 ms |

@@ -18,7 +18,8 @@ spec:
             # The image's run-java already sets a GC (ParallelGC); a second one in JAVA_OPTS_APPEND stops the JVM
             # ("multiple GCs", found live), so the GC is replaced through GC_CONTAINER_OPTIONS instead.
             - { name: GC_CONTAINER_OPTIONS, value: "-XX:+UseSerialGC" }
-            - { name: JAVA_OPTS_APPEND, value: "-XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k" }
+            # Explicit heap cap: run-java sizes the heap at 80% of the limit, and SerialGC never returns it (189 Mi measured).
+            - { name: JAVA_OPTS_APPEND, value: "-Xms32m -Xmx160m -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k" }
             - { name: MALLOC_ARENA_MAX, value: "2" }   # the UI image listens on 8080 in 3.x; they share the pod
             - { name: APICURIO_STORAGE_KIND, value: sql }
             - { name: APICURIO_STORAGE_SQL_KIND, value: postgresql }

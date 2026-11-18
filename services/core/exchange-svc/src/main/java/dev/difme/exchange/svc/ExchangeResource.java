@@ -35,7 +35,47 @@ public class ExchangeResource {
 
     public record Bid(int nodeRef, long askMinor, double reputation, long latencyMicros, Partner partner) {}
 
+    /** A buying partner's standing mandate (FR-01 v4.1): minor units except the yield floor (percent) and counts. */
+    public record Mandate(String partnerRef, long limitMinor, long maxPerOrderMinor, double minYieldPct, long depositMinor,
+                          long budgetTotalMinor, int merchantCount, int goodsCount, int validityDays, String cardJurisdiction) {}
+
     @Inject Exchange exchange;
+    private final java.util.concurrent.atomic.AtomicLong mandateIds = new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis() * 1000L);
+    private static final Map<Long, Map<String, Object>> MANDATES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Registers a mandate after the pack's mandate_validation rules. The required security deposit is computed by the
+     * exchange (vertical.yaml collateral.mandate_deposit_bps of the budget), never taken from the partner.
+     */
+    @POST
+    @Path("/{pack}/mandates")
+    public Response mandate(@PathParam("pack") String packId, Mandate m) {
+        VerticalPack pack = exchange.pack(packId);
+        if (pack == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        if (!pack.rules().decisionIds().contains("mandate_validation")) {
+            return Response.status(400).entity(Map.of("error", "this vertical takes no mandates")).build();
+        }
+        long depositRequired = Math.round(m.budgetTotalMinor() * (pack.collateral().mandateDepositBps() / 10_000.0));
+        Map<String, Object> in = new java.util.HashMap<>();
+        in.put("maxPerOrder", m.maxPerOrderMinor() / 100.0);
+        in.put("limit", m.limitMinor() / 100.0);
+        in.put("minYieldPct", m.minYieldPct());
+        in.put("deposit", m.depositMinor() / 100.0);
+        in.put("depositRequired", depositRequired / 100.0);
+        in.put("budgetTotal", m.budgetTotalMinor() / 100.0);
+        in.put("merchantCount", m.merchantCount());
+        in.put("goodsCount", m.goodsCount());
+        in.put("validityDays", m.validityDays());
+        in.put("cardJurisdiction", m.cardJurisdiction());
+        List<Finding> findings = pack.rules().evaluate("mandate_validation", in);
+        if (!PackRules.allowed(findings)) {
+            return Response.status(422).entity(Map.of("findings", findings, "depositRequiredMinor", depositRequired)).build();
+        }
+        long id = mandateIds.incrementAndGet();
+        MANDATES.put(id, Map.of("pack", packId, "partnerRef", m.partnerRef(), "budgetTotalMinor", m.budgetTotalMinor(),
+                "maxPerOrderMinor", m.maxPerOrderMinor(), "validityDays", m.validityDays()));
+        return Response.status(201).entity(Map.of("mandateId", id, "depositRequiredMinor", depositRequired, "findings", findings)).build();
+    }
 
     @POST
     @Path("/{pack}/intents")

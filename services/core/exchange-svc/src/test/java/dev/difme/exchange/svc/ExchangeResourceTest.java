@@ -36,6 +36,26 @@ class ExchangeResourceTest {
                 .then().statusCode(422).body("findings.code", hasItem("RISK_TOO_LOW"));
     }
 
+    static String mandate(long depositMinor, int validityDays) {
+        return """
+                {"partnerRef": "bp-7", "limitMinor": 5000000, "maxPerOrderMinor": 2000000, "minYieldPct": 4,
+                 "depositMinor": %d, "budgetTotalMinor": 4000000, "merchantCount": 3, "goodsCount": 12,
+                 "validityDays": %d, "cardJurisdiction": "IN_DOMESTIC_AFA"}""".formatted(depositMinor, validityDays);
+    }
+
+    @Test
+    void mandateIsValidatedWithTheExchangesOwnDepositRequirement() {
+        // depositRequired = 5 % of the 40,000 budget = 2,000 (200,000 paise), computed by the exchange
+        given().contentType(ContentType.JSON).body(mandate(200_000, 5))
+                .post("/v1/exchange/fr01-buy/mandates")
+                .then().statusCode(201).body("depositRequiredMinor", equalTo(200_000))
+                .body("findings.code", hasItem("INDIA_PREAUTH_MANDATE"));
+        given().contentType(ContentType.JSON).body(mandate(100_000, 10))
+                .post("/v1/exchange/fr01-buy/mandates")
+                .then().statusCode(422).body("findings.code", hasItem("DEPOSIT_SHORT"))
+                .body("findings.code", hasItem("VALIDITY_TOO_LONG"));
+    }
+
     @Test
     void unknownPackIs404() {
         given().contentType(ContentType.JSON).body(intent(900, 9_500_000))

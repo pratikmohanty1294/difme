@@ -14,7 +14,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 public record VerticalPack(String id, Weights weights, long windowNanos, long latencyMaxMicros, int backups, PackRules rules,
                            Collateral collateral, int guaranteeFundBps) {
     /** FR-14 inputs from vertical.yaml {@code collateral:} (alpha, gamma_rev, min_minor). */
-    public record Collateral(double alpha, double gammaRev, long minMinor) {}
+    public record Collateral(double alpha, double gammaRev, long minMinor, int mandateDepositBps) {}
 
 
     @SuppressWarnings("unchecked")
@@ -37,7 +37,8 @@ public record VerticalPack(String id, Weights weights, long windowNanos, long la
                 (long) num(a, "latency_max_ms") * 1_000L,
                 (int) num(a, "backups"),
                 compiled,
-                new Collateral(num(c, "alpha"), num(c, "gamma_rev"), (long) num(c, "min_minor")),
+                new Collateral(num(c, "alpha"), num(c, "gamma_rev"), (long) num(c, "min_minor"),
+                        c.get("mandate_deposit_bps") instanceof Number md ? md.intValue() : 0),
                 st.get("guarantee_fund_bps_of_fee") instanceof Number n ? n.intValue() : 0);
     }
 

@@ -51,6 +51,9 @@ public class Exchange {
      */
     public record Award(Ranked winner, CommerceSplit split, long collateralMinor) {}
 
+    /** What the exchange (not the bidder) knows about an open auction; the facts bid-time rules are checked against. */
+    public record Context(long cardPriceMinor, long yieldRoomMinor, long depositNeededMinor) {}
+
     public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
 
     @ConfigProperty(name = "difme.exchange.packs") List<String> packIds;
@@ -67,6 +70,7 @@ public class Exchange {
     private final List<AgentRunner> runners = new ArrayList<>();
     private final Map<Long, String> openAuctions = new ConcurrentHashMap<>();
     private final Map<Long, Terms> terms = new ConcurrentHashMap<>();
+    private final Map<Long, Context> contexts = new ConcurrentHashMap<>();
     private Map<Long, EvidenceChain> chains;
 
     // Evidence signing (B-chain per auction, ADR-020). Dev: both keys are generated at start and published at
@@ -129,12 +133,16 @@ public class Exchange {
         intent.put("maxYieldMinor", maxAcceptableMinor);
         chain.append(EvidenceChain.Type.intent, EvidenceChain.Signal.Deterministic, intent);
         chains.put(id, chain);
+        long cardPrice = t.listMinor() - Math.round(t.listMinor() * (t.discountBps() / 10_000.0));
+        contexts.put(id, new Context(cardPrice, maxAcceptableMinor, Risk.requiredCollateral(cardPrice,
+                p.collateral().alpha(), p.collateral().gammaRev(), t.partnerTier(), p.collateral().minMinor())));
         openAuctions.put(id, pack);
         terms.put(id, t);
         long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
         if (!intakes.get(pack).open(id, maxAcceptableMinor, window)) {
             openAuctions.remove(id);
             terms.remove(id);
+            contexts.remove(id);
             return -1;
         }
         return id;
@@ -144,6 +152,14 @@ public class Exchange {
     public boolean bid(long auctionId, int nodeRef, long askMinor, double reputation, long latencyMicros) {
         String pack = openAuctions.get(auctionId);
         return pack != null && intakes.get(pack).bid(auctionId, nodeRef, askMinor, reputation, latencyMicros);
+    }
+
+    public Context context(long auctionId) {
+        return contexts.get(auctionId);
+    }
+
+    public String packOf(long auctionId) {
+        return openAuctions.get(auctionId);
     }
 
     public EvidenceChain evidence(long auctionId) {
@@ -179,6 +195,7 @@ public class Exchange {
             top.add(new Ranked(book.node(b), book.ask(b), book.score(b)));
         }
         Terms t = terms.remove(auctionId);
+        contexts.remove(auctionId);
         Award award = null;
         if (!top.isEmpty() && t != null) {
             VerticalPack p = packs.get(pack);

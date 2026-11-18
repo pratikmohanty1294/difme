@@ -20,7 +20,7 @@ Nothing needs a local machine.
 | Recreate the cluster | `ci/cs.sh bg cluster 'make destroy; make cluster && make up PROFILE=core'` |
 
 Long jobs always go through `bg`: they keep running if the caller disconnects. A keep-alive bound to the job stops the
-60-minute idle timeout from interrupting it. One-time setup inside the Codespace: `gh auth login -s codespace`.
+60-minute idle timeout from interrupting it. One-time setup in the Codespace: put a token with the `codespace` scope in `~/.config/difme/gh-token` (mode 600).
 
 ## Change flow
 1. Branch `wip-<topic>`, commit, push the branch.

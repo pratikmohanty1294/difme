@@ -10,6 +10,9 @@ server:
       visibility:
         driver: sql
         sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal_visibility, user: temporal, existingSecret: temporal-db, maxConns: 10 }
+    # The schema job also registers the namespace the services use (otherwise cmd-svc/saga-orchestrator fail with
+    # "Namespace default is not found" on a fresh database; found live). Retention 3d keeps visibility rows small.
+    namespaces: { create: true, namespace: [{ name: default, retention: 3d }] }
   frontend: { resources: { requests: { cpu: 50m, memory: 128Mi } } }
   history:  { replicaCount: 1, resources: { requests: { cpu: 100m, memory: 256Mi } } }   # ×3 in production overlay
   matching: { resources: { requests: { cpu: 50m, memory: 128Mi } } }

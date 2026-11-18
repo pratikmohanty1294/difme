@@ -45,7 +45,8 @@ spec:
           resources: { requests: { cpu: 500m, memory: 256Mi }, limits: { memory: 1Gi } }
       volumes: [{ name: scripts, configMap: { name: perf-scripts } }]
 EOF
-kubectl -n k6 wait --for=condition=ready pod -l job-name=payments-baseline --timeout=180s >/dev/null
+# `kubectl wait -l` fails at once when no pod exists yet (found live), so wait for the pod to appear.
+timeout 180 sh -c "until kubectl -n k6 get pods -l job-name=payments-baseline -o name | grep -q .; do sleep 2; done"
 
 : > "$OUT/load.txt"
 while ! kubectl -n k6 get job payments-baseline -o jsonpath='{.status.conditions[*].type}' | grep -qE 'Complete|Failed'; do

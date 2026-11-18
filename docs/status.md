@@ -60,7 +60,20 @@ Details are in docs/knowledge-base/.
   - 6.6 req/s accepted (202), 154 req/s shed (503); p50 32 ms, p95 259 ms.
   - Node CPU was **64% at idle**, peaking at 89%.
   - No swap thrashing (si/so ≈ 0).
-- **The limiting factor is now control-plane CPU at idle:** `k3s` (API server, datastore, controllers) ~1.1 cores and 1.8 GB RSS; Argo CD controller ~0.5 cores.
+- **Argo CD churn fixed (2026-11-19):**
+  - **Causes:** two apps owned the Flink job RBAC, so each sync re-triggered the other about every 2 s. Separately, `replicas: 1` on KEDA-scaled Deployments fought the HPA.
+  - **Effect at idle:**
+
+| Measure | Before | After |
+|---|---|---|
+| Node CPU | 2.4–2.9 cores | 0.6–0.9 cores |
+| k3s | up to 260% | under 20% |
+| Argo CD controller | 550m | ~10m |
+| Reconciles per 5 min | 313 | 46 |
+| Automated syncs per 5 min | 166 | 8 |
+
+  - **Load test afterwards:** **10.3 req/s accepted** (from 6.6); p50 3.1 ms; node idle 19%, peak 86%; no pod restarts during the run.
+- **Previously the limiting factor was control-plane CPU at idle:** `k3s` (API server, datastore, controllers) ~1.1 cores and 1.8 GB RSS; Argo CD controller ~0.5 cores.
   - Suspects: Argo CD reconcile churn, with server-side diff on every pass and 4 apps stuck OutOfSync (envoy-gateway, flink-operator, stream-services, flink-jobs).
   - Proposed next: fix the OutOfSync diffs, lengthen the resync period, and measure k3s CPU before and after.
 - **Memory plan, still to do:** Tier 2 (JVM/Go runtime flags); Tier 3 (Kafka native image, more native services); Tier 4 (TigerBeetle dev build plus matching Java client).

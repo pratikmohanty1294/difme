@@ -91,3 +91,16 @@
   - force-sync every app (`syncStrategy.apply.force: true`). Kyverno now owns the mutated request fields, so a normal server-side sync does not take them back.
 - **Rule:** any mutate policy that does arithmetic on existing values must be idempotent and pods-only.
 - **Separate finding from the same rebuild:** the Argo CD controller SIGTERM loop (about 8 s after each start, with no kubelet, containerd or Argo reason) did not survive a Codespace container rebuild. The cause was leftover node/Codespace state; a reinstall of Argo CD alone did not help.
+
+### Argo CD sync ping-pong burned ~1.8 cores at idle (found 2026-11-19)
+- **Two causes:**
+  - **Shared resources:** two Applications declared the same resources (`ServiceAccount/flink` and `Role/flink` in `flink-jobs` *and* the flink-operator chart). Each app's auto-sync re-applied them, and the other app went OutOfSync.
+  - **Autoscaled replicas:** `replicas: 1` on Deployments that KEDA scales to 2.
+- **How it showed up:** idle node CPU 64%; k3s up to 260%; Argo CD controller 550m; 166 automated syncs per 5 min.
+- **How to find it:**
+  - count reconciles per app: `kubectl -n argocd logs argocd-application-controller-0 --since=5m | grep "Reconciliation completed" | grep -o "application=[a-z0-9-]*" | sort | uniq -c`;
+  - see the drift: `kubectl -n argocd exec argocd-application-controller-0 -- argocd app diff <app> --core`.
+- **Fix:**
+  - exactly one owner per resource (the chart keeps the Flink RBAC);
+  - no `replicas` on autoscaled workloads (the `autoscaled: true` flag in `services.yaml`).
+- **Effect:** idle CPU 0.6–0.9 cores; accepted payments 6.6 → 10.3 req/s.

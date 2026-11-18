@@ -4,7 +4,7 @@ metadata:
   name: seaweedfs
   namespace: argocd
   labels:
-    difme/profile: lakehouse
+    difme/profile: streaming
     difme/pdf-section: '5.6'
   annotations:
     argocd.argoproj.io/sync-wave: '-2'

@@ -18,6 +18,7 @@ flink-operator
 flink-jobs
 keda
 keda-scalers
+seaweedfs
 victoria-metrics
 loki
 tempo

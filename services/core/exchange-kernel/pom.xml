@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>dev.difme</groupId><artifactId>difme-core</artifactId><version>0.1.0</version></parent>
+  <artifactId>exchange-kernel</artifactId>
+  <description>DIFME vertical kernel (ADR-020): the pipeline every vertical shares. Universal SBBA scoring (FR-17), collateral
+    sizing (FR-14), slashing (FR-15), value-weighted EWMA reputation (FR-16), conservation identity and hash-linked signed
+    evidence chains. Pure JDK, no runtime dependencies; the scoring hot path allocates nothing.</description>
+  <dependencies>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
+</project>

@@ -12,6 +12,13 @@ gflags:
     ysql_enable_packed_row: true
     enable_automatic_tablet_splitting: true
     ysql_pg_conf_csv: "default_transaction_isolation='serializable'"
+    # Flyway serialises migrations with pg_advisory_lock; YugabyteDB 2.25 ships advisory locks as a preview feature
+    # (found live: "advisory locks feature is currently in preview"). The community Flyway YugabyteDB module, which
+    # uses a lock table instead, stops at Flyway 10 and Quarkus uses Flyway 12.
+    ysql_yb_enable_advisory_locks: true
+    allowed_preview_flags_csv: ysql_yb_enable_advisory_locks
   master:
     enable_automatic_tablet_splitting: true
+    ysql_yb_enable_advisory_locks: true
+    allowed_preview_flags_csv: ysql_yb_enable_advisory_locks
 tls: { enabled: false }   # Codespace: in-cluster encryption via the mesh; production overlay enables YB TLS + auth

@@ -10,6 +10,7 @@
 
   <modules>
     <module>common</module>
+    <module>exchange-kernel</module>
     <module>consistency</module>
     <module>cmd-svc</module>
     <module>qry-svc</module>

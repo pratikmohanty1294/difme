@@ -97,7 +97,15 @@ Details are in docs/knowledge-base/.
   - The message pool is small (`--limit-pipeline-requests=0` saves ~90 MiB) and compaction memory has no effect.
   - The ~2 GiB is LSM table memory sized by batch size × 32 compaction ops across all trees, so `--limit-request` (start-time) is the lever.
 - **Payment path, next:** an isolated `ysql_bench` replay of the accept transaction, comparing sharded vs colocated databases and SERIALIZABLE vs READ COMMITTED. It decides how to cut the ~360 ms of YugabyteDB time.
-- **DiscountAI:** `services/core/exchange-rules` (`PackRules`) is on `wip-dmn`, with tests for the FR-01 pack. It uses the Fluxnova DMN engine 3.1.1 (Apache-2.0), standalone.
+- **Payment path, done 2026-11-19** (rollout measurement pending):
+  - The pg_stat_statements profile showed two avoidable round trips per payment: a SELECT before every INSERT and a full-row UPDATE after it. Both are removed, and `@DynamicUpdate` is on.
+  - Dispatch moved off the request path (`AsyncDispatcher`). An inline Temporal start (~160 ms under load) had held each request's worker thread and limiter slot.
+  - Our Quarkus services get Netty 2+2 arenas with 1 MiB chunks, 2 event loops and `MALLOC_ARENA_MAX=2`.
+  - `rehydration-svc` is now a native image.
+- **DiscountAI:**
+  - `services/core/exchange-rules` (`PackRules`): embedded Fluxnova DMN 3.1.1 (Apache-2.0); the FR-01 pack is tested (7 tests). On `main`.
+  - `services/core/exchange-matching` (`MatchingEngine`, `MatchingIntake`): single-writer sealed-bid auction engine over the kernel's `BidBook`, with a lock-free many-to-one off-heap intake ring (Agrona 2.7.0), preallocated state, no hot-path allocation and backpressure on a full ring. 6 tests, including 4 concurrent producer threads. On `wip-matching`, to be merged after the image rollout. The JVM needs `--add-exports java.base/jdk.internal.misc=ALL-UNNAMED`.
+  - Next: an Aeron transport onto the same ring; wire PackRules and MatchingEngine into a Quarkus service; rail simulators; PWAs.
 
 ## Next steps (owner decides the order)
 1. **Payment path throughput:** cut the DB checkouts per payment (one connection per request; make the idempotency `find` part of the accept transaction; batch `markDispatched`), and find out where the ~360 ms of YugabyteDB time goes (statement timings; WAL fsync on the Codespace disk; read-committed vs serializable per ADR-001). Then re-run the baseline.

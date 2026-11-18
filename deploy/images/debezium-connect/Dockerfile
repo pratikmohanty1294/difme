@@ -1,9 +1,9 @@
 # Kafka Connect for Debezium CDC (PDF §5.5), built in CI instead of by Strimzi's in-cluster build: the cluster
 # has no push credentials and no push registry, and a prebuilt, scanned, signed image is what production runs anyway.
-# Base: the Strimzi Kafka image matching the operator (0.47.0) and Kafka (4.0.0) versions.
-FROM quay.io/strimzi/kafka:0.47.0-kafka-4.0.0
-ARG DEBEZIUM=3.1.0.Final
-ARG APICURIO=3.0.6
+# Base: the Strimzi Kafka image matching the operator (0.51.0) and Kafka (4.2.0) versions.
+FROM quay.io/strimzi/kafka:0.51.0-kafka-4.2.0
+ARG DEBEZIUM=3.7.1.Final
+ARG APICURIO=3.3.4
 USER root:root
 # Cruise Control (bundled Netty) and kafka_exporter (Go stdlib) are never used by Connect and carry CRITICAL CVEs
 # the gate blocks; removing them also shrinks the image. ca-certificates gets the distro fix.

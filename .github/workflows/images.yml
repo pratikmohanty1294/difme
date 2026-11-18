@@ -81,4 +81,4 @@ jobs:
       name: difme-debezium-connect
       context: deploy/images/debezium-connect
       dockerfile: deploy/images/debezium-connect/Dockerfile
-      version: "3.1.0"
+      version: "3.7.1"

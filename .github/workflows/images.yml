@@ -22,8 +22,8 @@ jobs:
           - { module: rate-limiter,       native: true }
           - { module: projection-svc,     native: true }
           - { module: replay-engine,      native: true }
-          - { module: process-gateway,    native: false }
-          - { module: exchange-svc,       native: false }   # Agrona off-heap rings: JVM (needs --add-exports, see Dockerfile.jvm)   # Temporal SDK shaded Netty is not native-image clean
+          - { module: process-gateway,    native: false }   # Temporal SDK shaded Netty is not native-image clean
+          - { module: exchange-svc,       native: false }   # Agrona off-heap rings: JVM (needs --add-exports, see Dockerfile.jvm)
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-${{ matrix.module }}

@@ -1,4 +1,14 @@
 watchNamespaces: [streaming]
-operatorPod: { resources: { requests: { cpu: 50m, memory: 256Mi } } }
-# Operator JVM heap capped (measured 600 Mi RSS with the default); the host earlyoom budget is ~14 GB.
-jvmArgs: { operator: "-Xms64m -Xmx192m", webhook: "-Xms32m -Xmx96m" }
+# Low-footprint control-plane JVM profile (Tier 2, measured): heap caps alone left ~150 Mi of non-heap per container
+# (JIT compilers + code cache, metaspace, thread stacks, glibc malloc arenas). The operator is not a hot path, so:
+# SerialGC (no G1 remembered sets / GC threads), C1 only (TieredStopAtLevel=1: one small compiler, smaller code cache),
+# capped metaspace/code cache, 256k thread stacks, and 2 malloc arenas instead of 8 per core.
+operatorPod:
+  resources: { requests: { cpu: 50m, memory: 256Mi } }
+  env: [{ name: MALLOC_ARENA_MAX, value: "2" }]
+webhook:
+  container:
+    env: [{ name: MALLOC_ARENA_MAX, value: "2" }]
+jvmArgs:
+  operator: "-Xms64m -Xmx192m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k"
+  webhook: "-Xms32m -Xmx96m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=16m -XX:MaxMetaspaceSize=64m -Xss256k"

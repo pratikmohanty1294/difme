@@ -114,8 +114,9 @@
 - **Restart case:** a Codespace restart empties `/tmp`, and Docker recreates the bind source with the bad ACL. `postStartCommand: ci/image-disk.sh heal` fixes the ACL and restarts the node; images re-pull from the registry caches, or from upstream if those were wiped too.
 - **Gain:** about 8.4 GB off the 32 GB root disk (core alone), which leaves room for the streaming and observability profiles.
 
-### Trial image builds in the Codespace filled the root disk and evicted the cluster (found 2026-11-18)
-- Docker's data root (`/var/lib/docker`) is on the 32 GB root disk. Three trial builds of the 1.3 GB Connect image plus the Trivy image left 2.8 GB of build cache and about 1 GB of images. The root disk reached 95%.
-- The kubelet then evicted pods for `ephemeral-storage`, including all of Kyverno. Kyverno is fail-closed, so every API write was rejected until it returned. The disk-pressure taint only lifts about 5 min after free space recovers.
-- **Rule:** after any local `docker build`/scan, run `docker builder prune -af && docker image prune -f`. Better: build images in CI and only scan locally.
-- The cluster's own volumes (about 8 GB of database PVCs) are the bulk of the remaining root-disk use.
+### Root disk filled to 95%, eviction storm (found 2026-11-18)
+- **Main cause: SeaweedFS reserved disk.** With `-master.volumeSizeLimitMB=1024`, each new volume reserved about 1 GB on disk. The default collection got 7 volumes and the RisingWave bucket 13 more, so about 21 GB was reserved for a few KB of data. Fix: 64 MB volumes and `-master.volumePreallocate=false`. Check a store's real disk use with `du`, not file sizes.
+- **Smaller cause: Docker build cache.** Trial image builds and Trivy left 2.8 GB of cache and about 1 GB of images on the root disk. Rule: after any local build or scan, run `docker builder prune -af && docker image prune -f`. Prefer CI builds.
+- **Effect:** the kubelet evicted pods for `ephemeral-storage`, including all of Kyverno. Kyverno is fail-closed, so every API write was rejected, including Argo sync patches.
+- **Recovery is slower than expected:** k3s adds a 10% **minimum reclaim**. Once pressure triggers, the taint stays until free space reaches threshold + 10% (18% here), then about 5 more minutes.
+- **Watch:** keep root-disk use under 70%. The watchers now abort above 80–90%.

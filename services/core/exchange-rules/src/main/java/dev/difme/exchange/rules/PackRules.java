@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.finos.fluxnova.bpm.dmn.engine.DmnDecision;
-import org.finos.fluxnova.bpm.dmn.engine.DmnDecisionResultEntries;
+import org.finos.fluxnova.bpm.dmn.engine.DmnDecisionRuleResult;
 import org.finos.fluxnova.bpm.dmn.engine.DmnDecisionTableResult;
 import org.finos.fluxnova.bpm.dmn.engine.DmnEngine;
 import org.finos.fluxnova.bpm.dmn.engine.DmnEngineConfiguration;
@@ -67,7 +67,7 @@ public final class PackRules {
         if (decision == null) throw new IllegalArgumentException("unknown decision " + decisionId + " in pack " + pack);
         DmnDecisionTableResult result = ENGINE.evaluateDecisionTable(decision, inputs);
         List<Finding> findings = new ArrayList<>(result.size());
-        for (DmnDecisionResultEntries row : result) {
+        for (DmnDecisionRuleResult row : result) {
             findings.add(new Finding(
                     (String) row.getEntry("code"),
                     Finding.Severity.valueOf((String) row.getEntry("severity")),

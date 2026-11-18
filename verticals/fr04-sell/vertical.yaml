@@ -1,0 +1,21 @@
+# FR-04 Sell It For Me: planned. Parameters from the PRD (§3.1, §5.1, §5.4.1); the kernel already runs
+# this pipeline, so going live needs eligibility rules, the rail adapters and a fulfilment verifier.
+id: fr04-sell
+name: Sell It For Me
+goal: A seller distributes a listing across channels above a floor price.
+status: planned
+domain: physical
+weights: { price: 0.50, reputation: 0.30, latency: 0.20 }
+collateral: { alpha: 0.2, gamma_rev: 1.8, min_minor: 50000 }   # D_min: owner to confirm
+auction: { mode: rfq, window_ms: 2000, latency_max_ms: 60000, backups: 2 }
+price_basis:
+  ask: channel commission
+  max_acceptable: seller's maximum commission (keeps price above the floor)
+settlement:
+  trigger: carrier proof of delivery + return window expired
+  split_release: proceeds released after the return window
+evidence:
+  chains: [S, B, I]
+  fulfillment: carrier proof of delivery
+rails: [channel-listing, logistics-capacity, agent-pa-escrow]
+dpi: [ONDC Network, Universal Commerce Protocol]

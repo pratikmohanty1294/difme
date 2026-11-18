@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DiscountAI · buyer intent (POI) eligibility before broadcast.
+     Hit policy COLLECT: the intent goes to the exchange only when no rule returns severity BLOCK. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:camunda="http://camunda.org/schema/1.0/dmn" id="fr01_buyer_intent_eligibility" name="Buyer intent eligibility" namespace="https://difme.dev/dmn/fr01-buy">
+  <decision id="buyer_intent_eligibility" name="Buyer intent eligibility" camunda:historyTimeToLive="180">
+    <decisionTable id="dt_buyer_intent_eligibility" hitPolicy="COLLECT">
+      <input id="in_riskScore" label="L3 risk score"><inputExpression id="ie_riskScore" typeRef="number"><text>riskScore</text></inputExpression></input>
+      <input id="in_maxPrice" label="Buyer max price (₹)"><inputExpression id="ie_maxPrice" typeRef="number"><text>maxPrice</text></inputExpression></input>
+      <input id="in_minViable" label="Card price A + fee F (₹)"><inputExpression id="ie_minViable" typeRef="number"><text>minViable</text></inputExpression></input>
+      <input id="in_listPrice" label="List price P (₹)"><inputExpression id="ie_listPrice" typeRef="number"><text>listPrice</text></inputExpression></input>
+      <input id="in_offerSanctioned" label="Offer sanctioned for third-party purchase"><inputExpression id="ie_offerSanctioned" typeRef="boolean"><text>offerSanctioned</text></inputExpression></input>
+      <output id="out_code" name="code" typeRef="string" />
+      <output id="out_severity" name="severity" typeRef="string" />
+      <output id="out_message" name="message" typeRef="string" />
+      <rule id="b1">
+        <inputEntry id="b1_1"><text>&lt; 850</text></inputEntry><inputEntry id="b1_2"><text>-</text></inputEntry><inputEntry id="b1_3"><text>-</text></inputEntry><inputEntry id="b1_4"><text>-</text></inputEntry><inputEntry id="b1_5"><text>-</text></inputEntry>
+        <outputEntry id="b1_o1"><text>"RISK_TOO_LOW"</text></outputEntry><outputEntry id="b1_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="b1_o3"><text>"L3 risk score is below 850, so the request can't be broadcast."</text></outputEntry>
+      </rule>
+      <rule id="b2">
+        <inputEntry id="b2_1"><text>-</text></inputEntry><inputEntry id="b2_2"><text>&lt; minViable</text></inputEntry><inputEntry id="b2_3"><text>-</text></inputEntry><inputEntry id="b2_4"><text>-</text></inputEntry><inputEntry id="b2_5"><text>-</text></inputEntry>
+        <outputEntry id="b2_o1"><text>"MAX_PRICE_TOO_LOW"</text></outputEntry><outputEntry id="b2_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="b2_o3"><text>"Max price is below the card price plus the platform fee, so no buying partner can match."</text></outputEntry>
+      </rule>
+      <rule id="b3">
+        <inputEntry id="b3_1"><text>-</text></inputEntry><inputEntry id="b3_2"><text>&gt; listPrice</text></inputEntry><inputEntry id="b3_3"><text>-</text></inputEntry><inputEntry id="b3_4"><text>-</text></inputEntry><inputEntry id="b3_5"><text>-</text></inputEntry>
+        <outputEntry id="b3_o1"><text>"ABOVE_LIST_PRICE"</text></outputEntry><outputEntry id="b3_o2"><text>"WARN"</text></outputEntry><outputEntry id="b3_o3"><text>"Max price is above the list price; buying direct would be cheaper."</text></outputEntry>
+      </rule>
+      <rule id="b4">
+        <inputEntry id="b4_1"><text>-</text></inputEntry><inputEntry id="b4_2"><text>-</text></inputEntry><inputEntry id="b4_3"><text>-</text></inputEntry><inputEntry id="b4_4"><text>-</text></inputEntry><inputEntry id="b4_5"><text>false</text></inputEntry>
+        <outputEntry id="b4_o1"><text>"OFFER_NOT_SANCTIONED"</text></outputEntry><outputEntry id="b4_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="b4_o3"><text>"This Bank X offer isn't sanctioned for third-party purchase (V4, restricted)."</text></outputEntry>
+      </rule>
+      <rule id="b5">
+        <inputEntry id="b5_1"><text>&gt;= 850</text></inputEntry><inputEntry id="b5_2"><text>&gt;= minViable</text></inputEntry><inputEntry id="b5_3"><text>-</text></inputEntry><inputEntry id="b5_4"><text>-</text></inputEntry><inputEntry id="b5_5"><text>true</text></inputEntry>
+        <outputEntry id="b5_o1"><text>"ELIGIBLE"</text></outputEntry><outputEntry id="b5_o2"><text>"INFO"</text></outputEntry><outputEntry id="b5_o3"><text>"Intent is eligible for the exchange."</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

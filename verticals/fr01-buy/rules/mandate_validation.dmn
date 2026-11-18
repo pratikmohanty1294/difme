@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DiscountAI · buying partner delegated purchase intent (budget-based, no human in the loop at purchase).
+     Hit policy COLLECT: every matching rule is returned; the result passes when no rule returns severity BLOCK.
+     Context variable depositRequired (not a column): the exchange's deposit rate × the total budget, sent by the caller. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:camunda="http://camunda.org/schema/1.0/dmn" id="fr01_mandate_validation" name="Mandate validation" namespace="https://difme.dev/dmn/fr01-buy">
+  <decision id="mandate_validation" name="Mandate validation" camunda:historyTimeToLive="180">
+    <decisionTable id="dt_mandate_validation" hitPolicy="COLLECT">
+      <input id="in_maxPerOrder" label="Max per order (₹)"><inputExpression id="ie_maxPerOrder" typeRef="number"><text>maxPerOrder</text></inputExpression></input>
+      <input id="in_limit" label="Mandate limit (₹)"><inputExpression id="ie_limit" typeRef="number"><text>limit</text></inputExpression></input>
+      <input id="in_minYieldPct" label="Minimum yield (%)"><inputExpression id="ie_minYieldPct" typeRef="number"><text>minYieldPct</text></inputExpression></input>
+      <input id="in_deposit" label="Security deposit (₹)"><inputExpression id="ie_deposit" typeRef="number"><text>deposit</text></inputExpression></input>
+      <input id="in_budgetTotal" label="Total budget (₹)"><inputExpression id="ie_budgetTotal" typeRef="number"><text>budgetTotal</text></inputExpression></input>
+      <input id="in_merchantCount" label="Approved merchants"><inputExpression id="ie_merchantCount" typeRef="number"><text>merchantCount</text></inputExpression></input>
+      <input id="in_goodsCount" label="Goods categories"><inputExpression id="ie_goodsCount" typeRef="number"><text>goodsCount</text></inputExpression></input>
+      <input id="in_validityDays" label="Instruction validity (days)"><inputExpression id="ie_validityDays" typeRef="number"><text>validityDays</text></inputExpression></input>
+      <input id="in_cardJurisdiction" label="Card jurisdiction"><inputExpression id="ie_cardJurisdiction" typeRef="string"><text>cardJurisdiction</text></inputExpression></input>
+      <output id="out_code" name="code" typeRef="string" />
+      <output id="out_severity" name="severity" typeRef="string" />
+      <output id="out_message" name="message" typeRef="string" />
+      <rule id="m1">
+        <inputEntry id="m1_1"><text>&gt; limit</text></inputEntry><inputEntry id="m1_2"><text>-</text></inputEntry><inputEntry id="m1_3"><text>-</text></inputEntry><inputEntry id="m1_4"><text>-</text></inputEntry><inputEntry id="m1_5"><text>-</text></inputEntry><inputEntry id="m1_6"><text>-</text></inputEntry><inputEntry id="m1_7"><text>-</text></inputEntry><inputEntry id="m1_8"><text>-</text></inputEntry><inputEntry id="m1_9"><text>-</text></inputEntry>
+        <outputEntry id="m1_o1"><text>"MAX_ABOVE_LIMIT"</text></outputEntry><outputEntry id="m1_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m1_o3"><text>"Max per order is above the mandate limit."</text></outputEntry>
+      </rule>
+      <rule id="m2">
+        <inputEntry id="m2_1"><text>&gt; 25000</text></inputEntry><inputEntry id="m2_2"><text>-</text></inputEntry><inputEntry id="m2_3"><text>-</text></inputEntry><inputEntry id="m2_4"><text>-</text></inputEntry><inputEntry id="m2_5"><text>-</text></inputEntry><inputEntry id="m2_6"><text>-</text></inputEntry><inputEntry id="m2_7"><text>-</text></inputEntry><inputEntry id="m2_8"><text>-</text></inputEntry><inputEntry id="m2_9"><text>-</text></inputEntry>
+        <outputEntry id="m2_o1"><text>"MAX_ABOVE_ORDER_CAP"</text></outputEntry><outputEntry id="m2_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m2_o3"><text>"Max per order is above the ₹25,000 per-order cap (DiscountAI policy)."</text></outputEntry>
+      </rule>
+      <rule id="m3">
+        <inputEntry id="m3_1"><text>-</text></inputEntry><inputEntry id="m3_2"><text>-</text></inputEntry><inputEntry id="m3_3"><text>&lt; 2</text></inputEntry><inputEntry id="m3_4"><text>-</text></inputEntry><inputEntry id="m3_5"><text>-</text></inputEntry><inputEntry id="m3_6"><text>-</text></inputEntry><inputEntry id="m3_7"><text>-</text></inputEntry><inputEntry id="m3_8"><text>-</text></inputEntry><inputEntry id="m3_9"><text>-</text></inputEntry>
+        <outputEntry id="m3_o1"><text>"YIELD_FLOOR_TOO_LOW"</text></outputEntry><outputEntry id="m3_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m3_o3"><text>"Minimum yield below 2% isn't allowed."</text></outputEntry>
+      </rule>
+      <rule id="m4">
+        <inputEntry id="m4_1"><text>-</text></inputEntry><inputEntry id="m4_2"><text>-</text></inputEntry><inputEntry id="m4_3"><text>&gt; 15</text></inputEntry><inputEntry id="m4_4"><text>-</text></inputEntry><inputEntry id="m4_5"><text>-</text></inputEntry><inputEntry id="m4_6"><text>-</text></inputEntry><inputEntry id="m4_7"><text>-</text></inputEntry><inputEntry id="m4_8"><text>-</text></inputEntry><inputEntry id="m4_9"><text>-</text></inputEntry>
+        <outputEntry id="m4_o1"><text>"YIELD_FLOOR_HIGH"</text></outputEntry><outputEntry id="m4_o2"><text>"WARN"</text></outputEntry><outputEntry id="m4_o3"><text>"A minimum yield above 15% will rarely win an auction."</text></outputEntry>
+      </rule>
+      <rule id="m5">
+        <inputEntry id="m5_1"><text>-</text></inputEntry><inputEntry id="m5_2"><text>-</text></inputEntry><inputEntry id="m5_3"><text>-</text></inputEntry><inputEntry id="m5_4"><text>&lt; depositRequired</text></inputEntry><inputEntry id="m5_5"><text>-</text></inputEntry><inputEntry id="m5_6"><text>-</text></inputEntry><inputEntry id="m5_7"><text>-</text></inputEntry><inputEntry id="m5_8"><text>-</text></inputEntry><inputEntry id="m5_9"><text>-</text></inputEntry>
+        <outputEntry id="m5_o1"><text>"DEPOSIT_SHORT"</text></outputEntry><outputEntry id="m5_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m5_o3"><text>"Security deposit is below the exchange's deposit rate on your total budget."</text></outputEntry>
+      </rule>
+      <rule id="m6">
+        <inputEntry id="m6_1"><text>-</text></inputEntry><inputEntry id="m6_2"><text>-</text></inputEntry><inputEntry id="m6_3"><text>-</text></inputEntry><inputEntry id="m6_4"><text>-</text></inputEntry><inputEntry id="m6_5"><text>&lt;= 0</text></inputEntry><inputEntry id="m6_6"><text>-</text></inputEntry><inputEntry id="m6_7"><text>-</text></inputEntry><inputEntry id="m6_8"><text>-</text></inputEntry><inputEntry id="m6_9"><text>-</text></inputEntry>
+        <outputEntry id="m6_o1"><text>"NO_BUDGET"</text></outputEntry><outputEntry id="m6_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m6_o3"><text>"Set a total budget. Mastercard requires a budget before an agent may buy without you present."</text></outputEntry>
+      </rule>
+      <rule id="m7">
+        <inputEntry id="m7_1"><text>-</text></inputEntry><inputEntry id="m7_2"><text>-</text></inputEntry><inputEntry id="m7_3"><text>-</text></inputEntry><inputEntry id="m7_4"><text>-</text></inputEntry><inputEntry id="m7_5"><text>&gt; limit</text></inputEntry><inputEntry id="m7_6"><text>-</text></inputEntry><inputEntry id="m7_7"><text>-</text></inputEntry><inputEntry id="m7_8"><text>-</text></inputEntry><inputEntry id="m7_9"><text>-</text></inputEntry>
+        <outputEntry id="m7_o1"><text>"BUDGET_ABOVE_LIMIT"</text></outputEntry><outputEntry id="m7_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m7_o3"><text>"Total budget is above your mandate limit."</text></outputEntry>
+      </rule>
+      <rule id="m8">
+        <inputEntry id="m8_1"><text>&gt; budgetTotal</text></inputEntry><inputEntry id="m8_2"><text>-</text></inputEntry><inputEntry id="m8_3"><text>-</text></inputEntry><inputEntry id="m8_4"><text>-</text></inputEntry><inputEntry id="m8_5"><text>-</text></inputEntry><inputEntry id="m8_6"><text>-</text></inputEntry><inputEntry id="m8_7"><text>-</text></inputEntry><inputEntry id="m8_8"><text>-</text></inputEntry><inputEntry id="m8_9"><text>-</text></inputEntry>
+        <outputEntry id="m8_o1"><text>"MAX_ABOVE_BUDGET"</text></outputEntry><outputEntry id="m8_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m8_o3"><text>"Max per order is above the total budget."</text></outputEntry>
+      </rule>
+      <rule id="m9">
+        <inputEntry id="m9_1"><text>-</text></inputEntry><inputEntry id="m9_2"><text>-</text></inputEntry><inputEntry id="m9_3"><text>-</text></inputEntry><inputEntry id="m9_4"><text>-</text></inputEntry><inputEntry id="m9_5"><text>-</text></inputEntry><inputEntry id="m9_6"><text>&lt; 1</text></inputEntry><inputEntry id="m9_7"><text>-</text></inputEntry><inputEntry id="m9_8"><text>-</text></inputEntry><inputEntry id="m9_9"><text>-</text></inputEntry>
+        <outputEntry id="m9_o1"><text>"NO_MERCHANTS"</text></outputEntry><outputEntry id="m9_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m9_o3"><text>"Pick at least one approved merchant. Mastercard requires approved merchants for purchases without you present."</text></outputEntry>
+      </rule>
+      <rule id="m10">
+        <inputEntry id="m10_1"><text>-</text></inputEntry><inputEntry id="m10_2"><text>-</text></inputEntry><inputEntry id="m10_3"><text>-</text></inputEntry><inputEntry id="m10_4"><text>-</text></inputEntry><inputEntry id="m10_5"><text>-</text></inputEntry><inputEntry id="m10_6"><text>-</text></inputEntry><inputEntry id="m10_7"><text>&lt; 1</text></inputEntry><inputEntry id="m10_8"><text>-</text></inputEntry><inputEntry id="m10_9"><text>-</text></inputEntry>
+        <outputEntry id="m10_o1"><text>"NO_GOODS"</text></outputEntry><outputEntry id="m10_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m10_o3"><text>"Pick what the agent may buy. Mastercard requires a description of the goods."</text></outputEntry>
+      </rule>
+      <rule id="m11">
+        <inputEntry id="m11_1"><text>-</text></inputEntry><inputEntry id="m11_2"><text>-</text></inputEntry><inputEntry id="m11_3"><text>-</text></inputEntry><inputEntry id="m11_4"><text>-</text></inputEntry><inputEntry id="m11_5"><text>-</text></inputEntry><inputEntry id="m11_6"><text>-</text></inputEntry><inputEntry id="m11_7"><text>-</text></inputEntry><inputEntry id="m11_8"><text>&lt; 1</text></inputEntry><inputEntry id="m11_9"><text>-</text></inputEntry>
+        <outputEntry id="m11_o1"><text>"NO_VALIDITY"</text></outputEntry><outputEntry id="m11_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m11_o3"><text>"Set how long the instruction is valid. Mastercard requires a validity period."</text></outputEntry>
+      </rule>
+      <rule id="m12">
+        <inputEntry id="m12_1"><text>-</text></inputEntry><inputEntry id="m12_2"><text>-</text></inputEntry><inputEntry id="m12_3"><text>-</text></inputEntry><inputEntry id="m12_4"><text>-</text></inputEntry><inputEntry id="m12_5"><text>-</text></inputEntry><inputEntry id="m12_6"><text>-</text></inputEntry><inputEntry id="m12_7"><text>-</text></inputEntry><inputEntry id="m12_8"><text>&gt; 7</text></inputEntry><inputEntry id="m12_9"><text>-</text></inputEntry>
+        <outputEntry id="m12_o1"><text>"VALIDITY_TOO_LONG"</text></outputEntry><outputEntry id="m12_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m12_o3"><text>"An instruction can last at most 7 days, then you confirm a new one with your passkey (DiscountAI policy: Visa asks for fresh authentication on older instructions)."</text></outputEntry>
+      </rule>
+      <rule id="m13">
+        <inputEntry id="m13_1"><text>-</text></inputEntry><inputEntry id="m13_2"><text>-</text></inputEntry><inputEntry id="m13_3"><text>-</text></inputEntry><inputEntry id="m13_4"><text>-</text></inputEntry><inputEntry id="m13_5"><text>-</text></inputEntry><inputEntry id="m13_6"><text>-</text></inputEntry><inputEntry id="m13_7"><text>-</text></inputEntry><inputEntry id="m13_8"><text>-</text></inputEntry><inputEntry id="m13_9"><text>"IN_DOMESTIC_AFA","US_GLOBAL"</text></inputEntry>
+        <outputEntry id="m13_o1"><text>"DELEGATED_NO_HUMAN"</text></outputEntry><outputEntry id="m13_o2"><text>"INFO"</text></outputEntry><outputEntry id="m13_o3"><text>"Your agent buys without asking you each time, only within this budget, these merchants and these goods, until the instruction expires. You are the purchaser; items ship to the matched buyer."</text></outputEntry>
+      </rule>
+      <rule id="m14">
+        <inputEntry id="m14_1"><text>-</text></inputEntry><inputEntry id="m14_2"><text>-</text></inputEntry><inputEntry id="m14_3"><text>-</text></inputEntry><inputEntry id="m14_4"><text>-</text></inputEntry><inputEntry id="m14_5"><text>-</text></inputEntry><inputEntry id="m14_6"><text>-</text></inputEntry><inputEntry id="m14_7"><text>-</text></inputEntry><inputEntry id="m14_8"><text>-</text></inputEntry><inputEntry id="m14_9"><text>"IN_DOMESTIC_AFA"</text></inputEntry>
+        <outputEntry id="m14_o1"><text>"INDIA_PREAUTH_MANDATE"</text></outputEntry><outputEntry id="m14_o2"><text>"INFO"</text></outputEntry><outputEntry id="m14_o3"><text>"India-issued card: approved once as a pre-authorised card mandate, with the additional factor of authentication at setup. Purchases under it need no AFA."</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

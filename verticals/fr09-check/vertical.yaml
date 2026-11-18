@@ -1,0 +1,21 @@
+# FR-09 Check It For Me: planned. Parameters from the PRD (§3.1, §5.1, §5.4.1); the kernel already runs
+# this pipeline, so going live needs eligibility rules, the rail adapters and a fulfilment verifier.
+id: fr09-check
+name: Check It For Me
+goal: A requester gets KYC/KYB, credential or sanction checks done by a qualified verifier.
+status: planned
+domain: identity
+weights: { price: 0.20, reputation: 0.70, latency: 0.10 }
+collateral: { alpha: 0.1, gamma_rev: 1.0, min_minor: 50000 }   # D_min: owner to confirm
+auction: { mode: rfq, window_ms: 1000, latency_max_ms: 10000, backups: 2 }
+price_basis:
+  ask: verification fee
+  max_acceptable: requester's maximum fee
+settlement:
+  trigger: W3C verifiable presentation with an embedded audit trail
+  split_release: fee refunded if the check cannot complete
+evidence:
+  chains: [S, B, I]
+  fulfillment: verifiable presentation
+rails: [vc-issuer, registry-lookup, secure-enclave]
+dpi: [Aadhaar SD-JWT, Sunbird RC, CKYCRR 2.0, eIDAS 2.0]

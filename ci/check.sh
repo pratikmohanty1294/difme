@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fast local feedback (seconds to ~1 min) — run in the Codespace before every push. CI confirms; it should not discover.
-# Usage: ci/check.sh [core|flink|backoffice|deploy|api|tla|all] [maven-modules,comma,separated]
+# Usage: ci/check.sh [core|flink|backoffice|deploy|verticals|api|tla|all] [maven-modules,comma,separated]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 AREA=${1:-all}
@@ -31,6 +31,9 @@ if want deploy; then
     kustomize build --load-restrictor LoadRestrictionsNone "$(dirname "$k")" >/dev/null || { echo "✗ $k"; exit 1; }
   done
   echo "✓ deploy"
+fi
+if want verticals; then
+  python3 verticals/check.py
 fi
 if want api; then
   (cd api/proto && buf lint)

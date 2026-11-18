@@ -1,0 +1,52 @@
+# FR-01 Buy It For Me (DiscountAI Exchange, E2E architecture v4.1). The first live vertical.
+# Every number here is a kernel input; the source column is the document the value comes from.
+id: fr01-buy
+name: Buy It For Me
+goal: A buyer gets an item at the best all-in price; a buying partner whose card offer qualifies buys it in their own name and ships it to the buyer.
+status: live
+domain: physical
+# FR-17 domain profile (PRD §5.4.1). The engine uses flow_weights when the bid names a settlement flow.
+weights: { price: 0.60, reputation: 0.25, latency: 0.15 }
+flow_weights:                      # v4.1 §3.2 (prototype DEFAULT_CONFIG)
+  A: { price: 0.50, reputation: 0.40, latency: 0.10 }   # card (issuer offer)
+  B: { price: 0.60, reputation: 0.30, latency: 0.10 }   # stablecoin
+  C: { price: 0.70, reputation: 0.30, latency: 0.00 }   # UPI reserve pay
+collateral:                        # FR-14: D_req = max(D_min, V · α · γ · φ)
+  alpha: 0.20                      # physical delivery risk (PRD range 0.15–0.25)
+  gamma_rev: 1.8                   # semi-reversible: returns/refunds unwind it
+  min_minor: 50000                 # ₹500 floor (owner to confirm)
+  mandate_deposit_bps: 500         # v4.1: security deposit = 5 % of the mandate budget, held in escrow
+auction:
+  mode: sbba
+  window_ms: 50                    # SBBA batch window
+  latency_max_ms: 50               # L_max
+  backups: 2                       # hot backups for silent failover
+  min_risk_score: 850              # L3 pre-broadcast gate
+  quote_timeout_s: 30
+price_basis:                       # what "ask" and "max acceptable" mean for this vertical's price utility
+  ask: yield Y asked by the buying partner
+  max_acceptable: discount pool d·P (so the buyer always pays less than list)
+slashing:                          # FR-15 β_fault overrides (v4.1)
+  iso_51_bps: 200                  # insufficient funds / over-commitment: 2 % of A
+  other_decline_bps: 50            # other declines: 0.5 % of A
+settlement:
+  identity: "A = P − d·P; B = A + Y + F; S = P − B; payout = A + Y"
+  trigger: signed merchant invoice + carrier tracking webhook (POE)
+  split_release: principal A before the card due date; yield Y after the return window
+  guarantee_fund_bps_of_fee: 1000
+  refunds: two-leg (merchant → buying partner card; exchange → buyer instrument)
+evidence:
+  chains: [S, B, I]                # mandate setup, buyer sale, one per buying-partner attempt
+  fulfillment: carrier proof of delivery
+rules:                             # embedded DMN (ADR-020); authored and approved in Fluxnova
+  - rules/buyer_intent_eligibility.dmn
+  - rules/investor_eligibility.dmn
+  - rules/mandate_validation.dmn
+intent_schema: intent.schema.json
+rails:                             # ports with open-source simulators (ADR-018)
+  - card-agent-credential          # network agentic token under a delegated purchase instruction
+  - merchant-psp-checkout          # ISO 8583 0100/0110 via jPOS
+  - agent-pa-escrow                # buyer hold + payout escrow
+  - upi-reserve-pay
+  - stablecoin
+dpi: [ONDC Commerce, ISO 20022, ISO 8583, RFC 9421 signatures]

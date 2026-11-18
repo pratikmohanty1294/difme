@@ -1,0 +1,21 @@
+# FR-05 Grow It For Me: planned. Parameters from the PRD (§3.1, §5.1, §5.4.1); the kernel already runs
+# this pipeline, so going live needs eligibility rules, the rail adapters and a fulfilment verifier.
+id: fr05-grow
+name: Grow It For Me
+goal: An owner reaches a portfolio or yield target through compliant allocation.
+status: planned
+domain: finance
+weights: { price: 0.20, reputation: 0.70, latency: 0.10 }
+collateral: { alpha: 0.05, gamma_rev: 2.5, min_minor: 50000 }   # D_min: owner to confirm
+auction: { mode: rfq, window_ms: 2000, latency_max_ms: 10000, backups: 2 }
+price_basis:
+  ask: management fee
+  max_acceptable: owner's maximum fee
+settlement:
+  trigger: depository execution confirmation or ZK solvency proof
+  split_release: none after execution (irreversible transfer)
+evidence:
+  chains: [S, B, I]
+  fulfillment: depository confirmation / ZK proof
+rails: [broker-order, depository, tokenized-asset]
+dpi: [SEBI SM-REIT, IFSCA RWA vaults, ERC-1400, Groth16 ZK]

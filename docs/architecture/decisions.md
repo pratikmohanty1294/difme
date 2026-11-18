@@ -210,3 +210,24 @@ Source documents: DIFME PRD/FRD v1.0 and DiscountAI E2E Architecture v4.1. The f
 - **Why:** Temporal's visibility schema creates multi-column GIN indexes. YugabyteDB's `ybgin` doesn't support them (found live), and Temporal doesn't officially support YugabyteDB.
 - **Change:** the PostgreSQL 17 instance that already hosts FerretDB, Fluxnova and Keycloak moves into the core profile as the **shared platform Postgres**. It now also hosts Temporal's default and visibility stores, under a `temporal` role without CREATEDB.
 - **Unchanged:** YugabyteDB remains the system of record for payments, the outbox and idempotency. One extra small instance (limit 768 Mi) serves every component that needs plain PostgreSQL semantics.
+
+## ADR-020 — One vertical kernel, nine vertical packs; DiscountAI built in parallel (owner-approved 2026-11-18)
+Source: the DiscountAI prototype (browser-only React simulation, DMN rules, evidence chains), E2E architecture v4.1 and
+DIFME PRD §3–5. The prototype becomes the real system, and its pipeline is generalised for all nine verticals.
+- **Order of work:** DiscountAI (FR-01) and the platform items (hub, edge app, ML) proceed **in parallel**. This updates ADR-018's ordering.
+- **Kernel + packs:** `services/core/exchange-kernel` implements the shared pipeline as pure JDK code: FR-17 universal score,
+  FR-14 collateral, FR-15 slashing, FR-16 value-weighted EWMA, conservation identity, and evidence chains format-compatible
+  with the prototype. Each vertical is a declarative pack in `verticals/<id>/` (weights, α/γ, auction, intent schema, DMN
+  rules, rails, fulfilment proof), validated by `verticals/check.py` in CI. FR-01 is live and FR-02…FR-09 are declared.
+  Going live adds rules, rail adapters and one fulfilment verifier. WASI plug-ins (ADR-016) can wrap packs later for
+  third-party verticals.
+- **Rules:** **embedded DMN**. The pack's `.dmn` files are evaluated in-process (Fluxnova's Apache-2.0 DMN engine),
+  compiled once per version and cached, with no network call in the 50 ms window. Fluxnova stays the authoring,
+  versioning and approval UI.
+- **UI split by audience:** Exchange OME, audit and compliance become back-office micro-frontends (Rsbuild shell,
+  Keycloak SSO). ShopBot (buyer) and Buying Partner become installable PWAs built from the prototype's React code, with
+  the simulation replaced by real APIs, and later embedded in the Tauri edge app.
+- **Hot path:** `BidBook` is struct-of-arrays and allocates nothing (PRD NFR-02: < 100 µs per bid, < 5 ms p99 match).
+  Aeron Cluster (ADR-018) wraps it for replication.
+- **Vendor-hosted pieces of the prototype** (serverless functions, edge KV, card-network SDK bridge) map to ports and
+  open-source simulators (ADR-018). No vendor SDK sits in the core path.

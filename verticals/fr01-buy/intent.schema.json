@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://difme.dev/verticals/fr01-buy/intent.schema.json",
+  "title": "Buy It For Me intent (POI)",
+  "type": "object",
+  "required": ["intentId", "product", "merchant", "listMinor", "maxPriceMinor", "currency", "shipToHash", "expiresAt"],
+  "additionalProperties": false,
+  "properties": {
+    "intentId": { "type": "string", "format": "uuid", "description": "UUIDv7, also the idempotency key" },
+    "product": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "sku": { "type": "string", "maxLength": 100 },
+    "merchant": { "type": "string", "maxLength": 100 },
+    "mcc": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "qualifyingInstrument": { "type": "string", "maxLength": 100, "description": "the card/offer the discount needs" },
+    "listMinor": { "type": "integer", "minimum": 1, "description": "P in minor units" },
+    "discountBps": { "type": "integer", "minimum": 0, "maximum": 9999 },
+    "maxPriceMinor": { "type": "integer", "minimum": 1, "description": "buyer's ceiling for B" },
+    "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "shipToHash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the address; the address itself stays in the buyer's vault" },
+    "region": { "enum": ["IN", "US", "EU"] },
+    "confirmation": { "enum": ["always", "criteria", "never"], "description": "buyer's automated-contracting choice" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

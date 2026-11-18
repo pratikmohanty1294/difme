@@ -1,0 +1,21 @@
+# FR-03 Build It For Me: planned. Parameters from the PRD (§3.1, §5.1, §5.4.1); the kernel already runs
+# this pipeline, so going live needs eligibility rules, the rail adapters and a fulfilment verifier.
+id: fr03-build
+name: Build It For Me
+goal: A requester gets software or a physical part built to a spec, with SLA-backed delivery.
+status: planned
+domain: compute
+weights: { price: 0.30, reputation: 0.50, latency: 0.20 }
+collateral: { alpha: 0.15, gamma_rev: { software: 1.0, manufacturing: 2.5 }, min_minor: 50000 }   # D_min: owner to confirm
+auction: { mode: rfq, window_ms: 5000, latency_max_ms: 86400000, backups: 2 }
+price_basis:
+  ask: build price
+  max_acceptable: requester's budget
+settlement:
+  trigger: deterministic test-suite SHA-256 pass hash, or a factory QC verifiable credential
+  split_release: milestone escrow; no refund once production starts
+evidence:
+  chains: [S, B, I]
+  fulfillment: matching test-suite hash or QC credential
+rails: [ci-runner-pool, factory-po, agent-pa-escrow]
+dpi: [Open-source CI/CD, ISO 23247 Digital Twin, OPC UA]

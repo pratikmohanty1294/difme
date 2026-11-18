@@ -1,0 +1,21 @@
+# FR-02 Book It For Me: planned. Parameters from the PRD (§3.1, §5.1, §5.4.1); the kernel already runs
+# this pipeline, so going live needs eligibility rules, the rail adapters and a fulfilment verifier.
+id: fr02-book
+name: Book It For Me
+goal: A traveller gets the best seat/ticket for a passenger profile, disclosing only what the provider needs.
+status: planned
+domain: physical
+weights: { price: 0.40, reputation: 0.40, latency: 0.20 }
+collateral: { alpha: 0.15, gamma_rev: 1.8, min_minor: 50000 }   # D_min: owner to confirm
+auction: { mode: rfq, window_ms: 2000, latency_max_ms: 5000, backups: 2 }
+price_basis:
+  ask: fare asked
+  max_acceptable: traveller's maximum fare
+settlement:
+  trigger: PNR issued + cryptographic verification on the issuer node
+  split_release: partial refunds per fare rules
+evidence:
+  chains: [S, B, I]
+  fulfillment: booking confirmation (PNR) verified by the issuer
+rails: [travel-booking-api, agent-pa-escrow, sd-jwt-presentation]
+dpi: [Beckn Mobility, W3C SD-JWT VC, DigiYatra Open API]

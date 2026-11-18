@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DiscountAI · per-auction buying partner eligibility: the order must fit the buying partner's delegated instruction.
+     Hit policy COLLECT: every matching rule is returned; the result passes when no rule returns severity BLOCK. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:camunda="http://camunda.org/schema/1.0/dmn" id="fr01_investor_eligibility" name="Buying partner eligibility" namespace="https://difme.dev/dmn/fr01-buy">
+  <decision id="investor_eligibility" name="Buying partner eligibility" camunda:historyTimeToLive="180">
+    <decisionTable id="dt_investor_eligibility" hitPolicy="COLLECT">
+      <input id="in_flow" label="Settlement flow"><inputExpression id="ie_flow" typeRef="string"><text>flow</text></inputExpression></input>
+      <input id="in_intentAgeDays" label="Instruction age (days)"><inputExpression id="ie_intentAgeDays" typeRef="number"><text>intentAgeDays</text></inputExpression></input>
+      <input id="in_deposit" label="Security deposit (₹)"><inputExpression id="ie_deposit" typeRef="number"><text>deposit</text></inputExpression></input>
+      <input id="in_amountA" label="Card amount A (₹)"><inputExpression id="ie_amountA" typeRef="number"><text>amountA</text></inputExpression></input>
+      <input id="in_budgetLeft" label="Budget left (₹)"><inputExpression id="ie_budgetLeft" typeRef="number"><text>budgetLeft</text></inputExpression></input>
+      <input id="in_merchantApproved" label="Merchant approved"><inputExpression id="ie_merchantApproved" typeRef="boolean"><text>merchantApproved</text></inputExpression></input>
+      <input id="in_goodsInScope" label="Goods in scope"><inputExpression id="ie_goodsInScope" typeRef="boolean"><text>goodsInScope</text></inputExpression></input>
+      <input id="in_yieldAsk" label="Yield ask Y (₹)"><inputExpression id="ie_yieldAsk" typeRef="number"><text>yieldAsk</text></inputExpression></input>
+      <output id="out_code" name="code" typeRef="string" />
+      <output id="out_severity" name="severity" typeRef="string" />
+      <output id="out_message" name="message" typeRef="string" />
+      <rule id="i1">
+        <inputEntry id="i1_1"><text>not("A")</text></inputEntry><inputEntry id="i1_2"><text>-</text></inputEntry><inputEntry id="i1_3"><text>-</text></inputEntry><inputEntry id="i1_4"><text>-</text></inputEntry><inputEntry id="i1_5"><text>-</text></inputEntry><inputEntry id="i1_6"><text>-</text></inputEntry><inputEntry id="i1_7"><text>-</text></inputEntry><inputEntry id="i1_8"><text>-</text></inputEntry>
+        <outputEntry id="i1_o1"><text>"FLOW_NOT_CARD"</text></outputEntry><outputEntry id="i1_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i1_o3"><text>"Offer needs a Bank X card at the merchant; non-card flows are not eligible."</text></outputEntry>
+      </rule>
+      <rule id="i2">
+        <inputEntry id="i2_1"><text>"A"</text></inputEntry><inputEntry id="i2_2"><text>&gt;= validityDays</text></inputEntry><inputEntry id="i2_3"><text>-</text></inputEntry><inputEntry id="i2_4"><text>-</text></inputEntry><inputEntry id="i2_5"><text>-</text></inputEntry><inputEntry id="i2_6"><text>-</text></inputEntry><inputEntry id="i2_7"><text>-</text></inputEntry><inputEntry id="i2_8"><text>-</text></inputEntry>
+        <outputEntry id="i2_o1"><text>"INTENT_EXPIRED"</text></outputEntry><outputEntry id="i2_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i2_o3"><text>"The buying partner's instruction has expired; they must confirm a new one with their passkey."</text></outputEntry>
+      </rule>
+      <rule id="i3">
+        <inputEntry id="i3_1"><text>"A"</text></inputEntry><inputEntry id="i3_2"><text>-</text></inputEntry><inputEntry id="i3_3"><text>&lt; maxDepositNeeded</text></inputEntry><inputEntry id="i3_4"><text>-</text></inputEntry><inputEntry id="i3_5"><text>-</text></inputEntry><inputEntry id="i3_6"><text>-</text></inputEntry><inputEntry id="i3_7"><text>-</text></inputEntry><inputEntry id="i3_8"><text>-</text></inputEntry>
+        <outputEntry id="i3_o1"><text>"DEPOSIT_SHORT"</text></outputEntry><outputEntry id="i3_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i3_o3"><text>"Security deposit not posted."</text></outputEntry>
+      </rule>
+      <rule id="i4">
+        <inputEntry id="i4_1"><text>"A"</text></inputEntry><inputEntry id="i4_2"><text>-</text></inputEntry><inputEntry id="i4_3"><text>-</text></inputEntry><inputEntry id="i4_4"><text>&gt; maxPerOrder</text></inputEntry><inputEntry id="i4_5"><text>-</text></inputEntry><inputEntry id="i4_6"><text>-</text></inputEntry><inputEntry id="i4_7"><text>-</text></inputEntry><inputEntry id="i4_8"><text>-</text></inputEntry>
+        <outputEntry id="i4_o1"><text>"ABOVE_MAX_PER_ORDER"</text></outputEntry><outputEntry id="i4_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i4_o3"><text>"Order amount is above the buying partner's max per order."</text></outputEntry>
+      </rule>
+      <rule id="i5">
+        <inputEntry id="i5_1"><text>"A"</text></inputEntry><inputEntry id="i5_2"><text>-</text></inputEntry><inputEntry id="i5_3"><text>-</text></inputEntry><inputEntry id="i5_4"><text>-</text></inputEntry><inputEntry id="i5_5"><text>&lt; amountA</text></inputEntry><inputEntry id="i5_6"><text>-</text></inputEntry><inputEntry id="i5_7"><text>-</text></inputEntry><inputEntry id="i5_8"><text>-</text></inputEntry>
+        <outputEntry id="i5_o1"><text>"BUDGET_EXHAUSTED"</text></outputEntry><outputEntry id="i5_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i5_o3"><text>"Order is larger than the buying partner's remaining budget."</text></outputEntry>
+      </rule>
+      <rule id="i6">
+        <inputEntry id="i6_1"><text>"A"</text></inputEntry><inputEntry id="i6_2"><text>-</text></inputEntry><inputEntry id="i6_3"><text>-</text></inputEntry><inputEntry id="i6_4"><text>-</text></inputEntry><inputEntry id="i6_5"><text>-</text></inputEntry><inputEntry id="i6_6"><text>false</text></inputEntry><inputEntry id="i6_7"><text>-</text></inputEntry><inputEntry id="i6_8"><text>-</text></inputEntry>
+        <outputEntry id="i6_o1"><text>"MERCHANT_NOT_APPROVED"</text></outputEntry><outputEntry id="i6_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i6_o3"><text>"This merchant isn't on the buying partner's approved list."</text></outputEntry>
+      </rule>
+      <rule id="i7">
+        <inputEntry id="i7_1"><text>"A"</text></inputEntry><inputEntry id="i7_2"><text>-</text></inputEntry><inputEntry id="i7_3"><text>-</text></inputEntry><inputEntry id="i7_4"><text>-</text></inputEntry><inputEntry id="i7_5"><text>-</text></inputEntry><inputEntry id="i7_6"><text>-</text></inputEntry><inputEntry id="i7_7"><text>false</text></inputEntry><inputEntry id="i7_8"><text>-</text></inputEntry>
+        <outputEntry id="i7_o1"><text>"GOODS_OUT_OF_SCOPE"</text></outputEntry><outputEntry id="i7_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i7_o3"><text>"This product is outside the goods the buying partner approved."</text></outputEntry>
+      </rule>
+      <rule id="i8">
+        <inputEntry id="i8_1"><text>"A"</text></inputEntry><inputEntry id="i8_2"><text>-</text></inputEntry><inputEntry id="i8_3"><text>-</text></inputEntry><inputEntry id="i8_4"><text>-</text></inputEntry><inputEntry id="i8_5"><text>-</text></inputEntry><inputEntry id="i8_6"><text>-</text></inputEntry><inputEntry id="i8_7"><text>-</text></inputEntry><inputEntry id="i8_8"><text>&gt; yieldRoom</text></inputEntry>
+        <outputEntry id="i8_o1"><text>"PRICE_ABOVE_MAX"</text></outputEntry><outputEntry id="i8_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="i8_o3"><text>"This yield would push B above the buyer's max price."</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

@@ -1,0 +1,21 @@
+# FR-08 Hold It For Me: planned. Parameters from the PRD (§3.1, §5.1, §5.4.1); the kernel already runs
+# this pipeline, so going live needs eligibility rules, the rail adapters and a fulfilment verifier.
+id: fr08-hold
+name: Hold It For Me
+goal: An owner places assets, escrow or consent in licensed custody.
+status: planned
+domain: finance
+weights: { price: 0.10, reputation: 0.85, latency: 0.05 }
+collateral: { alpha: 0.05, gamma_rev: 2.5, min_minor: 50000 }   # D_min: owner to confirm
+auction: { mode: rfq, window_ms: 5000, latency_max_ms: 60000, backups: 2 }
+price_basis:
+  ask: custody fee
+  max_acceptable: owner's maximum fee
+settlement:
+  trigger: dual-signature verification, time-lock expiry or condition proof
+  split_release: release only on condition proof
+evidence:
+  chains: [S, B, I]
+  fulfillment: dual-sign / time-lock / condition proof
+rails: [pa-escrow, multisig-vault, consent-vault]
+dpi: [Regulated PA escrow, DPDP consent framework, W3C data vaults]

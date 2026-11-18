@@ -1,1 +1,3 @@
-resources: [fraud-cep.yaml, event-archive.yaml, service-account.yaml]
+# ServiceAccount/Role "flink" come from the flink-operator chart (jobServiceAccount, rbac.jobRole); declaring them here too
+# made the two apps re-sync each other every ~2 s (found live).
+resources: [fraud-cep.yaml, event-archive.yaml]

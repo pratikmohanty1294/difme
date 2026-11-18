@@ -40,10 +40,15 @@ def manifests(s: dict) -> list[dict]:
     spec = {"serviceAccountName": s["name"], "containers": [container]}
     if volumes:
         spec["volumes"] = volumes
+    deploy_spec = {"selector": {"matchLabels": {"app": s["name"]}},
+                   "template": {"metadata": {"labels": labels}, "spec": spec}}
+    # KEDA owns the replica count of autoscaled services; declaring it here made Argo CD and the HPA reset each
+    # other's value in a loop (found live). Everyone else runs one replica in the Codespace.
+    if not s.get("autoscaled"):
+        deploy_spec = {"replicas": 1, **deploy_spec}
     return [
         {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": s["name"], "labels": {"app": s["name"]}},
-         "spec": {"replicas": 1, "selector": {"matchLabels": {"app": s["name"]}},
-                  "template": {"metadata": {"labels": labels}, "spec": spec}}},
+         "spec": deploy_spec},
         {"apiVersion": "v1", "kind": "Service", "metadata": {"name": s["name"], "labels": {"app": s["name"]}},
          "spec": {"selector": {"app": s["name"]}, "ports": [{"name": "http", "port": s["port"]}, {"name": "grpc", "port": 9000}]}},
         {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": s["name"]}},

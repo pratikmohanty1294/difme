@@ -41,6 +41,7 @@ class PackRulesTest {
     @Test
     void cleanIntentIsAllowed() {
         List<Finding> f = fr01.evaluate("buyer_intent_eligibility", intent(900, 95_000, 90_000, 100_000, true));
+        assertEquals(List.of("ELIGIBLE"), codes(f));
         assertTrue(PackRules.allowed(f), () -> "unexpected findings " + f);
     }
 
@@ -60,8 +61,9 @@ class PackRulesTest {
     @Test
     void aboveListPriceOnlyWarns() {
         List<Finding> f = fr01.evaluate("buyer_intent_eligibility", intent(900, 105_000, 90_000, 100_000, true));
-        assertEquals(List.of("ABOVE_LIST_PRICE"), codes(f));
-        assertEquals(Finding.Severity.WARN, f.get(0).severity());
+        // COLLECT: the WARN row and the INFO "ELIGIBLE" row both match; nothing blocks.
+        assertEquals(List.of("ABOVE_LIST_PRICE", "ELIGIBLE"), codes(f));
+        assertEquals(Finding.Severity.WARN, f.stream().filter(x -> x.code().equals("ABOVE_LIST_PRICE")).findFirst().orElseThrow().severity());
         assertTrue(PackRules.allowed(f));
     }
 

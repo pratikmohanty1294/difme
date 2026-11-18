@@ -27,6 +27,9 @@ if want backoffice; then
 fi
 if want deploy; then
   python3 deploy/argocd/render.py --check
+  # Generated service manifests must match services.yaml (a stale file shipped once; found 2026-11-18).
+  python3 deploy/components/quarkus-service/render.py >/dev/null
+  git diff --exit-code --stat -- deploy/platform/core-platform/ || { echo "✗ generated manifests are stale: commit the re-rendered files"; exit 1; }
   find deploy/platform -name kustomization.yaml -print0 | while IFS= read -r -d '' k; do
     kustomize build --load-restrictor LoadRestrictionsNone "$(dirname "$k")" >/dev/null || { echo "✗ $k"; exit 1; }
   done

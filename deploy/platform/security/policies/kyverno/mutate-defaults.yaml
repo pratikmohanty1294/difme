@@ -12,3 +12,16 @@ spec:
             containers:
               - (name): "*"
                 securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+    # Third-party operators and charts (Strimzi, KEDA, Apicurio, Flink, RisingWave, ...) don't carry our
+    # cost-attribution labels, so require-labels-and-limits rejected them and the streaming profile never came up.
+    # Fill in shared-infrastructure defaults only where a label is missing; our own services keep theirs.
+    - name: default-cost-attribution-labels
+      match: { any: [{ resources: { kinds: [Deployment, StatefulSet, Job], namespaces: [streaming, ml-platform] } }] }
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              metadata:
+                labels:
+                  +(difme/team): platform
+                  +(business.metric): shared-infra

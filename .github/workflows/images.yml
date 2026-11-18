@@ -17,7 +17,7 @@ jobs:
           - { module: cmd-svc,            native: false }
           - { module: qry-svc,            native: false }
           - { module: saga-orchestrator,  native: false }
-          - { module: rehydration-svc,    native: false }
+          - { module: rehydration-svc,    native: true }    # Tier 3 memory: KEDA keeps 2 replicas; gRPC + Kafka + Redis are native-clean (as projection-svc)
           - { module: consistency-router, native: true }
           - { module: rate-limiter,       native: true }
           - { module: projection-svc,     native: true }

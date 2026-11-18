@@ -49,7 +49,9 @@ public class Exchange {
     private final Map<String, MatchingIntake> intakes = new ConcurrentHashMap<>();
     private final List<AgentRunner> runners = new ArrayList<>();
     private final Map<Long, String> openAuctions = new ConcurrentHashMap<>();
-    private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() << 16);
+    // Ids stay below 2^53 so JSON clients (JavaScript, the PWAs) read them exactly; millis x 1000 also keeps them
+    // increasing across restarts. (millis << 16 exceeded 2^53 and the bids went to a rounded id; found by the test.)
+    private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1000L);
     private Map<Long, Result> results;
 
     @PostConstruct

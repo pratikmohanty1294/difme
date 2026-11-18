@@ -52,7 +52,7 @@ spec:
           volumeMounts: [{ name: scripts, mountPath: /scripts }]
           # Small request: with all profiles up the node's CPU requests are ~99% reserved and a 500m request never
           # schedules (found live). Requests only gate scheduling; k6 still bursts to what it needs.
-          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 1Gi } }
+          resources: { requests: { cpu: 10m, memory: 256Mi }, limits: { memory: 1Gi } }
       volumes: [{ name: scripts, configMap: { name: perf-scripts } }]
 EOF
 # `kubectl wait -l` fails at once when no pod exists yet (found live), so wait for the pod to appear.

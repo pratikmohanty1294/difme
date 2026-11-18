@@ -13,7 +13,9 @@ spec:
     database.password: ${secrets:streaming/debezium-db:password}
     database.dbname: difme
     plugin.name: pgoutput   # Debezium 3.7 accepts pgoutput/decoderbufs only; YugabyteDB logical replication serves pgoutput
-    publication.autocreate.mode: filtered
+    publication.autocreate.mode: disabled   # publications come from Flyway V4 (table owner)
+    publication.name: dbz_core_outbox
+    slot.name: core_outbox
     topic.prefix: difme
     table.include.list: core.outbox
     transforms: outbox
@@ -53,7 +55,9 @@ spec:
     database.password: ${secrets:streaming/debezium-db:password}
     database.dbname: difme
     plugin.name: pgoutput   # Debezium 3.7 accepts pgoutput/decoderbufs only; YugabyteDB logical replication serves pgoutput
-    publication.autocreate.mode: filtered
+    publication.autocreate.mode: disabled
+    publication.name: dbz_settlements
+    slot.name: settlements_cdc
     topic.prefix: settlements
     table.include.list: settlement.reservation,settlement.instruction
     transforms: route

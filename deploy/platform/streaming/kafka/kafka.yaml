@@ -2,7 +2,7 @@
 # Day-0 history: infinite retention + the Flink→Iceberg archive (ADR-006 covers the tiered-storage plugin choice).
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaNodePool
-metadata: { name: dual, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: dual, labels: { strimzi.io/cluster: difme } }
 spec:
   replicas: 1                        # redpanda-0/1/2 → 3 in production overlay
   roles: [controller, broker]
@@ -12,7 +12,8 @@ spec:
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
-metadata: { name: difme-kafka, annotations: { strimzi.io/node-pools: enabled, strimzi.io/kraft: enabled } }
+# Strimzi names services <cluster>-kafka-bootstrap, so cluster "difme" gives the difme-kafka-bootstrap every client uses.
+metadata: { name: difme, annotations: { strimzi.io/node-pools: enabled, strimzi.io/kraft: enabled } }
 spec:
   kafka:
     version: 4.2.0

@@ -1,4 +1,4 @@
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: bulk.validated.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: bulk.validated.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 12, replicas: 1, config: { retention.ms: "604800000" } }

@@ -2,52 +2,52 @@
 # Infinite retention on event topics = Day-0 replay (§15 auditability).
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: payments.events.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: payments.events.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 12, replicas: 1, config: { retention.ms: "-1", cleanup.policy: delete } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: ledger.cdc.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: ledger.cdc.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 12, replicas: 1, config: { retention.ms: "-1" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: settlements.cdc.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: settlements.cdc.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 6, replicas: 1, config: { retention.ms: "-1" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: edge.telemetry.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: edge.telemetry.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 6, replicas: 1, config: { retention.ms: "604800000" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: fraud.alerts.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: fraud.alerts.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 3, replicas: 1, config: { retention.ms: "-1" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: crdt.deltas.v1, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: crdt.deltas.v1, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 12, replicas: 1, config: { cleanup.policy: compact, min.compaction.lag.ms: "86400000" } }
 ---
 # ── Retry ladder + dead-letter queue (ADR-017). Consumers create none of these themselves. ─────────────────────
 # Retry topics are short-lived (records come back within seconds); the DLQ keeps 30 days for inspection and replay.
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: projection-svc.payments.retry-1000, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: projection-svc.payments.retry-1000, labels: { strimzi.io/cluster: difme } }
 spec: { topicName: projection-svc.payments.retry_1000, partitions: 3, replicas: 1, config: { retention.ms: "86400000" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: projection-svc.payments.retry-10000, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: projection-svc.payments.retry-10000, labels: { strimzi.io/cluster: difme } }
 spec: { topicName: projection-svc.payments.retry_10000, partitions: 3, replicas: 1, config: { retention.ms: "86400000" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: projection-svc.payments.retry-60000, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: projection-svc.payments.retry-60000, labels: { strimzi.io/cluster: difme } }
 spec: { topicName: projection-svc.payments.retry_60000, partitions: 3, replicas: 1, config: { retention.ms: "86400000" } }
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
-metadata: { name: projection-svc.payments.dlq, labels: { strimzi.io/cluster: difme-kafka } }
+metadata: { name: projection-svc.payments.dlq, labels: { strimzi.io/cluster: difme } }
 spec: { partitions: 3, replicas: 1, config: { retention.ms: "2592000000" } }

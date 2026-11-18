@@ -5,6 +5,10 @@ FROM quay.io/strimzi/kafka:0.47.0-kafka-4.0.0
 ARG DEBEZIUM=3.1.0.Final
 ARG APICURIO=3.0.6
 USER root:root
+# Cruise Control (bundled Netty) and kafka_exporter (Go stdlib) are never used by Connect and carry CRITICAL CVEs
+# the gate blocks; removing them also shrinks the image. ca-certificates gets the distro fix.
+RUN set -eux; rm -rf /opt/cruise-control /opt/kafka-exporter; \
+    microdnf -y update ca-certificates && microdnf clean all
 RUN set -eux; m=https://repo1.maven.org/maven2; \
     mkdir -p /opt/kafka/plugins/debezium-postgres /opt/kafka/plugins/apicurio-converters; \
     curl -fsSL "$m/io/debezium/debezium-connector-postgres/$DEBEZIUM/debezium-connector-postgres-$DEBEZIUM-plugin.tar.gz" \

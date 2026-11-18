@@ -50,14 +50,22 @@ spec:
           args: [run, --quiet, /scripts/payments.js]
           env: [{ name: RATE, value: "$RATE" }, { name: DURATION, value: "$DURATION" }, { name: ACCOUNTS, value: "$ACCOUNTS" }]
           volumeMounts: [{ name: scripts, mountPath: /scripts }]
-          resources: { requests: { cpu: 500m, memory: 256Mi }, limits: { memory: 1Gi } }
+          # Small request: with all profiles up the node's CPU requests are ~99% reserved and a 500m request never
+          # schedules (found live). Requests only gate scheduling; k6 still bursts to what it needs.
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 1Gi } }
       volumes: [{ name: scripts, configMap: { name: perf-scripts } }]
 EOF
 # `kubectl wait -l` fails at once when no pod exists yet (found live), so wait for the pod to appear.
 timeout 180 sh -c "until kubectl -n k6 get pods -l job-name=payments-baseline -o name | grep -q .; do sleep 2; done"
 
 : > "$OUT/load.txt"; : > "$OUT/load-node.txt"
+# Fail fast instead of waiting forever on an unschedulable pod.
+if ! timeout 120 sh -c "until kubectl -n k6 get pods -l job-name=payments-baseline -o jsonpath='{.items[0].status.phase}' | grep -qE 'Running|Succeeded|Failed'; do sleep 3; done"; then
+  echo "✗ k6 pod did not start within 120 s:"; kubectl -n k6 describe pods -l job-name=payments-baseline | grep -A4 '^Events' | tail -3; exit 1
+fi
+deadline=$(( $(date +%s) + 600 ))
 while ! kubectl -n k6 get job payments-baseline -o jsonpath='{.status.conditions[*].type}' | grep -qE 'Complete|Failed'; do
+  [ "$(date +%s)" -gt "$deadline" ] && { echo "✗ k6 job did not finish within 10 min"; exit 1; }
   top_pods >> "$OUT/load.txt" 2>/dev/null || true
   kubectl top node --no-headers >> "$OUT/load-node.txt" 2>/dev/null || true
   sleep 10

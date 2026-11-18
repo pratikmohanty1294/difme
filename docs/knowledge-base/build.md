@@ -23,3 +23,20 @@
 - `MaxRAMPercentage=70` with a 320 MiB limit left about 96 MiB for metaspace, code cache, thread stacks and Netty direct buffers, so cmd-svc was OOM-killed under load (exit 137).
 - Now 55% heap, `MaxDirectMemorySize=32m`, and cmd-svc at 448 MiB (it carries Hibernate, the Temporal SDK, gRPC and the Redis client). Re-measure before shrinking.
 - Quarkus Redis client defaults (6 connections, 24 waiters) saturate at a few hundred cache calls per second: `ConnectionPoolTooBusyException`. Size `quarkus.redis.max-pool-size`/`max-pool-waiting` to the call rate.
+
+### Payment write path: what pg_stat_statements and the cmd-svc metrics showed (2026-11-19)
+- **Profile** at 15 req/s, ~630 payments, YugabyteDB 2.25, one tablet per table:
+
+| Statement | Calls | Mean | Cause |
+|---|---|---|---|
+| Full-row `UPDATE core.payment` | 1097 | 10.5 ms | `PaymentService.accept()` set `p.dispatch` after `persist()`, so Hibernate flushed an INSERT plus an UPDATE of every column, including the indexed `idempotency_key` and partial-index columns. |
+| `SELECT core.payment` by id | 1097 | 3.4 ms | `PaymentRepository.record()` looked up the id first, even for a brand-new UUIDv7 payment. |
+
+- **Fix:** dispatch mode written in the INSERT, no lookup for `PaymentInitiated`, and `@DynamicUpdate` so status changes write only the changed columns.
+- **The dominant cost was not SQL:** about 55–60 ms of statements per payment, but p50 646 ms.
+  - `startSaga` (Temporal, ~160 ms under load) ran inline in the HTTP request, holding a worker thread and an adaptive-limiter slot. The class's own contract said "the client already has its answer".
+  - **Fix:** `AsyncDispatcher`, a bounded queue drained by virtual-thread workers, with inline fallback when the queue is full. Saga start is idempotent, and `PaymentSweeper` recovers any lost job.
+- **Other observations:**
+  - YugabyteDB WAL fsync averages 8.2 ms on the Codespace disk.
+  - Colocation would gain little here, because every table is already a single tablet on the single node.
+- **How to profile:** `CREATE EXTENSION pg_stat_statements` and `SELECT pg_stat_statements_reset()`, run light load (`ci/measure.sh 15 45s`), then sort by `total_exec_time`. Read the cmd-svc metrics through the API server: `kubectl get --raw /api/v1/namespaces/core-platform/services/<svc>:http/proxy/q/metrics` (the image has no curl).

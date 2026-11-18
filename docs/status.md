@@ -80,6 +80,22 @@ Details are in docs/knowledge-base/.
   - **Tier 2** (2026-11-19): the low-footprint JVM profile is applied to the Flink operator (−45%/−60%), the Strimzi cluster and topic operators (−24%/−22%) and Apicurio. `MALLOC_ARENA_MAX=2` is set on Kafka and Connect, `GOMEMLIMIT`/`GOGC` on the Argo CD controller and Temporal. Details: `docs/knowledge-base/cluster.md`.
   - **Tier 3:** `apache/kafka-native` cannot run under Strimzi, which needs its own broker images and agents. Adopting it would mean replacing Strimzi's broker with a plain StatefulSet; that is an owner decision. More of our own services as native images is still open.
   - **Tier 4:** no custom TigerBeetle build is needed. 0.16.78 has runtime flags (`--memory-lsm-compaction`, `--limit-pipeline-requests`, `--cache-grid`, `--development`); they are measured on a throwaway instance before the live ledger changes.
+- **Threads and shared memory (owner request 2026-11-19):**
+  - **Applied:**
+    - `MALLOC_ARENA_MAX=2` (per-thread glibc arenas);
+    - SerialGC and C1-only on control-plane JVMs (fewer GC and JIT threads);
+    - 256–512k thread stacks;
+    - virtual threads for blocking work;
+    - allocation-free struct-of-arrays `BidBook`;
+    - container-aware `GOMAXPROCS` and `GOMEMLIMIT`.
+  - **Staged on `wip-netty`:** Netty 4.1.138 2+2 arenas with 1 MiB chunks (default 8+8 with 4 MiB) and 2 Vert.x event loops (default 8) for every Quarkus service, JVM and native.
+  - **Planned:**
+    - one shared CDS archive per JDK image and common base layers, so read-only class data and `libjvm.so` pages are shared in the page cache;
+    - a KSM experiment: opt-in per process via `prctl(PR_SET_MEMORY_MERGE)` on the node's parent process; ksmd CPU cost to be measured;
+    - for the DiscountAI matching service: Aeron shared-memory IPC (mmap log buffers), Agrona lock-free SPSC rings, cache-line padding against false sharing, and backoff idle strategies rather than pinned busy-spin on 4 cores.
+- **TigerBeetle memory model** (from source and a throwaway instance):
+  - The message pool is small (`--limit-pipeline-requests=0` saves ~90 MiB) and compaction memory has no effect.
+  - The ~2 GiB is LSM table memory sized by batch size × 32 compaction ops across all trees, so `--limit-request` (start-time) is the lever.
 - **Payment path, next:** an isolated `ysql_bench` replay of the accept transaction, comparing sharded vs colocated databases and SERIALIZABLE vs READ COMMITTED. It decides how to cut the ~360 ms of YugabyteDB time.
 - **DiscountAI:** `services/core/exchange-rules` (`PackRules`) is on `wip-dmn`, with tests for the FR-01 pack. It uses the Fluxnova DMN engine 3.1.1 (Apache-2.0), standalone.
 

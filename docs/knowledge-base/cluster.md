@@ -107,3 +107,9 @@
 ### Long jobs without the client computer (2026-11-18)
 - `bash ci/bg.sh NAME cmd…` runs a job under nohup in the Codespace. A keep-alive (`gh codespace ssh` to itself every 4 min) runs only while the job does, so the 60-minute idle timeout can't stop it midway, and the Codespace still idles out normally afterwards.
 - Needs a one-time `gh auth login -s codespace` inside the Codespace; the default Codespace token has no `codespace` scope.
+
+### Containerd store on `/tmp`: resolved (2026-11-18, third approach after the time-box)
+- **Root cause (known):** `/tmp`'s default ACL (`default:other::rw-`, no traverse) is inherited by new directories, so non-root containers can't reach their image layers.
+- **What changed:** install `acl` (`setfacl` was missing before, and `|| true` hid that), then clear the ACL on `/tmp/difme-containerd`. Verified on a throwaway cluster: CoreDNS and a non-root (uid 1000) busybox both run.
+- **Restart case:** a Codespace restart empties `/tmp`, and Docker recreates the bind source with the bad ACL. `postStartCommand: ci/image-disk.sh heal` fixes the ACL and restarts the node; images re-pull from the registry caches, or from upstream if those were wiped too.
+- **Gain:** about 8.4 GB off the 32 GB root disk (core alone), which leaves room for the streaming and observability profiles.

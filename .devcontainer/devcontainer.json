@@ -14,6 +14,7 @@
     "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash ci/image-disk.sh heal",
   "forwardPorts": [8080, 8081, 3000, 3001, 8233, 9090, 4443],
   "portsAttributes": {
     "3000": { "label": "Grafana" },

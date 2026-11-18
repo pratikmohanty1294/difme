@@ -37,6 +37,7 @@ public class Dispatcher {
 
     @Inject GuardedCalls calls;
     @Inject PaymentRepository repository;
+    @Inject DispatchMarker marker;
     @Inject MeterRegistry metrics;
     Clock clock = Clock.systemUTC();
 
@@ -47,7 +48,7 @@ public class Dispatcher {
                 calls.startSaga(new TransferInput(job.paymentId().toString(), job.idempotencyKey().toString(),
                         job.debit().toString(), job.credit().toString(), job.amountMinor(), job.currency(),
                         job.targetBank(), job.traceId()));
-                inTx(() -> repository.markDispatched(job.paymentId(), now()));
+                marker.mark(job.paymentId());   // batched; a lost mark only means an idempotent re-dispatch
             } else {
                 try {
                     String tb = calls.directTransfer(job.paymentId(), job.debit(), job.credit(), job.amountMinor());

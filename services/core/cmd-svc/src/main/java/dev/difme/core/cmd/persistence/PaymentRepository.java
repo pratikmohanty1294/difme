@@ -57,10 +57,11 @@ public class PaymentRepository {
         return p;
     }
 
-    /** Marks the saga as started (bulk update: no version bump, so it never conflicts with the running workflow). */
+    /** Marks sagas as started, many payments per statement (bulk update: no version bump, so it never conflicts with
+     *  the running workflow). Called by DispatchMarker with batches of up to 500 ids. */
     @Transactional
-    public void markDispatched(java.util.UUID paymentId, java.time.Instant at) {
-        PaymentEntity.update("dispatchedAt = ?1 where paymentId = ?2 and dispatchedAt is null", at, paymentId);
+    public int markDispatched(java.util.Collection<java.util.UUID> paymentIds, java.time.Instant at) {
+        return PaymentEntity.update("dispatchedAt = ?1 where paymentId in ?2 and dispatchedAt is null", at, paymentIds);
     }
 
     private String toJson(PaymentEvent e) {

@@ -50,9 +50,9 @@ public class PaymentService {
         long nowMs = ctx.now().toEpochMilli();
         metrics.counter("difme_idempotency_checks_total").increment();
 
-        Optional<UUID> seen = idempotency.find(cmd.idempotencyKey(), nowMs);
-        if (seen.isPresent()) return duplicate(seen.get());
-
+        // No separate idempotency lookup up front: the claim inside the accept transaction detects duplicates atomically,
+        // and the extra round trip cost a connection checkout on every new payment (measured 2026-11-18). A retried
+        // request now also passes the rate limiter, which counts it like any other attempt.
         if (!rateLimit.allow(cmd.debitAccountId().toString(), "payments", nowMs)) {
             return new Outcome(null, null, "REJECTED_RATE_LIMIT");
         }

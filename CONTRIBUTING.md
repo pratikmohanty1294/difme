@@ -1,6 +1,6 @@
 # Contributing to DIFME
 
-Read [docs/CONVENTIONS.md](docs/CONVENTIONS.md) first: licence, footprint, privacy and dev-loop rules are hard requirements.
+Start with [docs/status.md](docs/status.md) (where things stand, the next steps). Read [docs/CONVENTIONS.md](docs/CONVENTIONS.md) first: licence, footprint, privacy and dev-loop rules are hard requirements.
 Then [docs/architecture/decisions.md](docs/architecture/decisions.md) (ADRs), [docs/roadmap.md](docs/roadmap.md) (what's done and next),
 [verticals/README.md](verticals/README.md) (the product model) and [docs/knowledge-base/](docs/knowledge-base/) (lessons learnt the hard way).
 

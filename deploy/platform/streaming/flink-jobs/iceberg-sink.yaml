@@ -8,6 +8,8 @@ spec:
   flinkConfiguration:
     taskmanager.numberOfTaskSlots: "1"
     execution.checkpointing.interval: "2s"
+    execution.checkpointing.dir: s3://flink/checkpoints/iceberg-sink
+    execution.checkpointing.savepoint-dir: s3://flink/savepoints/iceberg-sink   # required by upgradeMode: savepoint
     s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333
     s3.path.style.access: "true"
   serviceAccount: flink

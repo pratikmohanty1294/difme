@@ -1,0 +1,5 @@
+# PDF §4.5 canary gates. Their analysis queries VictoriaMetrics, so they deploy only with the observability profile.
+# In core alone, the Rollout could never pass analysis: it stayed on its first template, left the Deployment running
+# beside it, and doubled the pods (found live 2026-11-18).
+namespace: core-platform
+resources: [rollouts.yaml]

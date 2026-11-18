@@ -54,3 +54,9 @@
 - **Root cause:** after swapping the withdrawn `bitnami/kubectl` for `registry.k8s.io/kubectl` (distroless, no shell), the chart's legacy report-migration job could no longer run its bash script.
 - **Fix:** `policyReportsCleanup.enabled: false`. It only migrates reports from old Kyverno releases, which a fresh install doesn't have. `webhooksCleanup` calls kubectl directly and keeps working.
 - **Prevention:** when replacing a chart's helper image, check whether its jobs use a shell (`command: [/bin/bash, …]`).
+
+### Argo Rollouts `workloadRef` without its metrics backend doubles the pods (found 2026-11-18)
+- The cmd-svc canary Rollout's analysis queries VictoriaMetrics, which only the observability profile installs. In core alone the analysis could never pass.
+- So the Rollout stayed on its first template (from before `/tmp` was added; it crash-looped on a read-only FS) and the Deployment kept running beside it. Two controllers ran one service, and ReplicaSets piled up with each restart.
+- Fix: the Rollouts moved into a `canary-gates` component in the observability profile.
+- Also: `kubectl rollout restart` on an Argo-managed Deployment adds an annotation that self-heal reverts, which leaves another ReplicaSet behind. Delete the pods instead.

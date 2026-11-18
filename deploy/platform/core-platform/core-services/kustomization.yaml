@@ -1,3 +1,3 @@
 # PDF §5.3 core services (group: core). Generated from services.yaml by deploy/components/quarkus-service/render.py.
 namespace: core-platform
-resources: [generated.yaml, rollouts.yaml, network-policy.yaml]
+resources: [generated.yaml, network-policy.yaml]   # canary Rollouts: ../canary-gates (observability profile)

@@ -83,6 +83,7 @@ components:
   - { name: pyroscope,         ns: observability,   kind: helm, profile: observability, wave: 0,  pdf: "10.2", repo: https://grafana.github.io/helm-charts, chart: pyroscope, version: 1.13.2 }
   - { name: alloy,             ns: observability,   kind: helm, profile: observability, wave: 1,  pdf: "10", repo: https://grafana.github.io/helm-charts, chart: alloy, version: 1.0.1 }
   - { name: dashboards,        ns: observability,   kind: path, profile: observability, wave: 2,  pdf: "10.4" }
+  - { name: canary-gates,      ns: core-platform,   kind: path, profile: observability, wave: 3,  pdf: "4.5" }   # Rollouts need VictoriaMetrics
   - { name: opencost,          ns: opencost,        kind: helm, profile: observability, wave: 1,  pdf: "16", repo: https://opencost.github.io/opencost-helm-chart, chart: opencost, version: 2.0.2 }
 
   # ── Forms + business processes (profile: process, ADR-008) ────────────────

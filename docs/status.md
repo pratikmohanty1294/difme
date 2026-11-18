@@ -104,8 +104,18 @@ Details are in docs/knowledge-base/.
   - `rehydration-svc` is now a native image.
 - **DiscountAI:**
   - `services/core/exchange-rules` (`PackRules`): embedded Fluxnova DMN 3.1.1 (Apache-2.0); the FR-01 pack is tested (7 tests). On `main`.
-  - `services/core/exchange-matching` (`MatchingEngine`, `MatchingIntake`): single-writer sealed-bid auction engine over the kernel's `BidBook`, with a lock-free many-to-one off-heap intake ring (Agrona 2.7.0), preallocated state, no hot-path allocation and backpressure on a full ring. 6 tests, including 4 concurrent producer threads. On `wip-matching`, to be merged after the image rollout. The JVM needs `--add-exports java.base/jdk.internal.misc=ALL-UNNAMED`.
-  - Next: an Aeron transport onto the same ring; wire PackRules and MatchingEngine into a Quarkus service; rail simulators; PWAs.
+  - `services/core/exchange-matching` (`MatchingEngine`, `MatchingIntake`):
+    - single-writer sealed-bid auction engine over `BidBook`;
+    - lock-free many-to-one off-heap intake ring (Agrona 2.7.0) with backpressure on a full ring;
+    - no hot-path allocation;
+    - measured 117 ns per bid and p99 3 µs to rank/close a 61-bid auction (NFR-02: < 100 µs and < 5 ms).
+  - `services/core/exchange-svc` :8089, on `main` with its image building in CI:
+    - `POST /v1/exchange/{pack}/intents`: DMN eligibility; 422 with findings, or 202 with an auction id;
+    - `POST /v1/exchange/auctions/{id}/bids` and `GET /v1/exchange/auctions/{id}`: winner plus hot backups;
+    - packs on the classpath; one engine per pack under an AgentRunner with backoff;
+    - 3 end-to-end tests; 25 tests across the exchange modules;
+    - auction ids stay below 2^53 so JSON clients read them exactly.
+  - Next: collateral (FR-14) and the conservation identity at award; evidence chain per auction; investor/mandate rules; an Aeron transport onto the same ring; rail simulators; PWAs.
 
 ## Next steps (owner decides the order)
 1. **Payment path throughput:** cut the DB checkouts per payment (one connection per request; make the idempotency `find` part of the accept transaction; batch `markDispatched`), and find out where the ~360 ms of YugabyteDB time goes (statement timings; WAL fsync on the Codespace disk; read-committed vs serializable per ADR-001). Then re-run the baseline.

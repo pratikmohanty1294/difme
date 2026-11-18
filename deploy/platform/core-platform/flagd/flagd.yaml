@@ -8,11 +8,15 @@ spec:
   template:
     metadata: { labels: { app: flagd, difme/team: platform, business.metric: feature-flags } }
     spec:
+      # A Service named "flagd" makes Kubernetes inject FLAGD_PORT=tcp://<ip>:8013, which flagd reads as its own
+      # --port setting (FLAGD_* env); it then listened on a random port and every cmd-svc payment waited out the
+      # 500 ms flag deadline (found live, 2026-11-19). No service links, plus explicit ports.
+      enableServiceLinks: false
       containers:
         - name: flagd
           image: ghcr.io/open-feature/flagd:v0.12.4
-          args: [start, --uri, file:/etc/flagd/flags.json, --metrics-exporter, otel, --otel-collector-uri, alloy.observability.svc:4317]
-          ports: [{ name: grpc, containerPort: 8013 }, { name: ofrep, containerPort: 8016 }]
+          args: [start, --port, "8013", --sync-port, "8015", --ofrep-port, "8016", --uri, file:/etc/flagd/flags.json, --metrics-exporter, otel, --otel-collector-uri, alloy.observability.svc:4317]
+          ports: [{ name: grpc, containerPort: 8013 }, { name: sync, containerPort: 8015 }, { name: ofrep, containerPort: 8016 }]
           volumeMounts: [{ name: flags, mountPath: /etc/flagd }]
           resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 64Mi } }
       volumes: [{ name: flags, configMap: { name: flagd-flags } }]
@@ -20,4 +24,4 @@ spec:
 apiVersion: v1
 kind: Service
 metadata: { name: flagd, namespace: core-platform }
-spec: { selector: { app: flagd }, ports: [{ name: grpc, port: 8013 }, { name: ofrep, port: 8016 }] }
+spec: { selector: { app: flagd }, ports: [{ name: grpc, port: 8013 }, { name: sync, port: 8015 }, { name: ofrep, port: 8016 }] }

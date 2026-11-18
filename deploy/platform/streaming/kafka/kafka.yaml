@@ -29,4 +29,8 @@ spec:
       min.insync.replicas: 1
     metricsConfig: { type: jmxPrometheusExporter, valueFrom: { configMapKeyRef: { name: kafka-metrics, key: kafka-metrics-config.yml } } }
   # No KafkaUser resources exist, so no user operator (saves ~200 Mi); topic operator heap capped.
-  entityOperator: { topicOperator: { jvmOptions: { "-Xms": 64m, "-Xmx": 160m } } }
+  entityOperator:
+    topicOperator:
+      jvmOptions: { "-Xms": 64m, "-Xmx": 160m, "-XX": { UseSerialGC: "true", TieredStopAtLevel: "1", ReservedCodeCacheSize: 24m, MaxMetaspaceSize: 96m } }
+    template: { kafkaContainer: { env: [{ name: MALLOC_ARENA_MAX, value: "2" }] } }   # glibc arenas: 2 instead of 8 per core
+    template: { topicOperatorContainer: { env: [{ name: MALLOC_ARENA_MAX, value: "2" }] } }

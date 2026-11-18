@@ -19,7 +19,8 @@ spec:
   # Prebuilt in CI (deploy/images/debezium-connect): Debezium Postgres connector + Apicurio converters.
   image: ghcr.io/pratikmohanty1294/difme-debezium-connect:3.7.1
   resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }
-  jvmOptions: { "-Xms": 128m, "-Xmx": 384m }   # measured 885 Mi RSS with the default heap
+  jvmOptions: { "-Xms": 128m, "-Xmx": 384m, "-XX": { MaxMetaspaceSize: 128m } }   # measured 885 Mi RSS with the default heap
+  template: { connectContainer: { env: [{ name: MALLOC_ARENA_MAX, value: "2" }] } }
   # Plugin scanning takes ~10 s on a busy node; the default probes killed Connect mid-startup (found live).
   livenessProbe: { initialDelaySeconds: 90, timeoutSeconds: 5 }
   readinessProbe: { initialDelaySeconds: 60, timeoutSeconds: 5 }

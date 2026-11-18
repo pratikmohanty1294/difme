@@ -13,7 +13,10 @@ spec:
         - name: registry
           image: quay.io/apicurio/apicurio-registry:3.3.4
           env:
-            - { name: QUARKUS_HTTP_PORT, value: "8081" }   # the UI image listens on 8080 in 3.x; they share the pod
+            - { name: QUARKUS_HTTP_PORT, value: "8081" }
+            # Low-footprint JVM profile (Tier 2): schema registry, not on the payment path.
+            - { name: JAVA_OPTS_APPEND, value: "-XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k" }
+            - { name: MALLOC_ARENA_MAX, value: "2" }   # the UI image listens on 8080 in 3.x; they share the pod
             - { name: APICURIO_STORAGE_KIND, value: sql }
             - { name: APICURIO_STORAGE_SQL_KIND, value: postgresql }
             - { name: APICURIO_DATASOURCE_URL, value: "jdbc:postgresql://yb-tservers.database-tier.svc:5433/apicurio" }

@@ -1,0 +1,22 @@
+# JMX exporter rules referenced by kafka.yaml (metricsConfig). Deliberately small: broker throughput, request
+# latency, under-replication and controller health only; every extra rule is scrape and storage cost.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: kafka-metrics }
+data:
+  kafka-metrics-config.yml: |
+    lowercaseOutputName: true
+    rules:
+      - pattern: kafka.server<type=BrokerTopicMetrics, name=(BytesInPerSec|BytesOutPerSec|MessagesInPerSec)><>Count
+        name: kafka_server_brokertopicmetrics_$1_total
+        type: COUNTER
+      - pattern: kafka.server<type=ReplicaManager, name=(UnderReplicatedPartitions|PartitionCount|LeaderCount)><>Value
+        name: kafka_server_replicamanager_$1
+        type: GAUGE
+      - pattern: kafka.network<type=RequestMetrics, name=TotalTimeMs, request=(Produce|FetchConsumer|FetchFollower)><>(50thPercentile|99thPercentile)
+        name: kafka_network_requestmetrics_totaltimems
+        type: GAUGE
+        labels: { request: "$1", quantile: "$2" }
+      - pattern: kafka.controller<type=KafkaController, name=(ActiveControllerCount|OfflinePartitionsCount)><>Value
+        name: kafka_controller_$1
+        type: GAUGE

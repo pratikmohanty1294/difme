@@ -120,3 +120,9 @@
 - **Effect:** the kubelet evicted pods for `ephemeral-storage`, including all of Kyverno. Kyverno is fail-closed, so every API write was rejected, including Argo sync patches.
 - **Recovery is slower than expected:** k3s adds a 10% **minimum reclaim**. Once pressure triggers, the taint stays until free space reaches threshold + 10% (18% here), then about 5 more minutes.
 - **Watch:** keep root-disk use under 70%. The watchers now abort above 80–90%.
+
+### The startup heal never ran: the Codespace's devcontainer config is captured at creation (found 2026-11-18)
+- The Codespace restarted unexpectedly at 13:06 UTC. `/tmp` was emptied, which took the registry caches and the image store with it. Docker re-created `/tmp/difme-containerd` with `/tmp`'s default ACL, so 44 pods failed with `exec ...: permission denied`, Kyverno among them, and the cluster was blocked.
+- `postStartCommand` (`ci/image-disk.sh heal`) did not run. `/workspaces/.codespaces/.persistedshare/repo_devcontainer.json` holds the config from creation time, which predates the hook, and a Codespace only re-reads `devcontainer.json` on **Rebuild container**.
+- **Until the Codespace is rebuilt** (which also recreates the cluster), run `ci/cs.sh bg heal 'bash ci/image-disk.sh heal'` after any restart. Check with `uptime` and `getfacl -p /tmp/difme-containerd | grep default`.
+- After a restart, image pulls come from the internet again (the caches lived on `/tmp`), so recovery takes about 15 min.

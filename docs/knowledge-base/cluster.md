@@ -139,3 +139,20 @@
   - Large processes that allocate at startup (TigerBeetle, JVMs) are killed first.
   - Lower memory *requests* raise a pod's `oom_score_adj`, which makes it a likelier victim.
 - **Check memory headroom before** installing a profile or starting a load test. `free -m` "available" must stay above about 2 GB.
+
+### Tier 1 memory: zswap + swapfile + kubelet LimitedSwap (measured 2026-11-18)
+- **Setup:**
+  - `ci/image-disk.sh swap`, run on every start through `heal`: 16 GiB swapfile on `/tmp`; zswap with zstd, zsmalloc, pool cap 25%.
+  - `kubelet-difme.conf`: `failSwapOn: false`, `memorySwap.swapBehavior: LimitedSwap` (Kubernetes 1.32, cgroup v2).
+  - The Codespace container is privileged, so zswap parameters and swapon work from inside it.
+- **Result** with core and streaming fully up:
+
+| | Before Tier 1 | After Tier 1 |
+|---|---|---|
+| Available RAM | 2.4 GB | **5.3 GB** |
+| Swap in use | none | 2.8 GB |
+| Held in the zswap pool | — | 2,656 MiB of pages in **155 MiB** of RAM (≈17:1; idle JVM/Go heaps are mostly empty pages) |
+| Written to the disk swapfile | — | 135 MiB |
+
+- **Why it matters:** the host's earlyoom only fires when RAM *and* swap are both below ~10%, so the effective ceiling rises by the swap headroom.
+- **Check zswap:** `mount -t debugfs none /sys/kernel/debug`, then read `/sys/kernel/debug/zswap/{pool_total_size,stored_pages,written_back_pages}`.

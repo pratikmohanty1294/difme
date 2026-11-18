@@ -97,6 +97,11 @@ Details are in docs/knowledge-base/.
   - The message pool is small (`--limit-pipeline-requests=0` saves ~90 MiB) and compaction memory has no effect.
   - The ~2 GiB is LSM table memory sized by batch size × 32 compaction ops across all trees, so `--limit-request` (start-time) is the lever.
 - **Payment path, next:** an isolated `ysql_bench` replay of the accept transaction, comparing sharded vs colocated databases and SERIALIZABLE vs READ COMMITTED. It decides how to cut the ~360 ms of YugabyteDB time.
+- **Biggest single latency fix, 2026-11-19:**
+  - **Cause:** a fixed ~520 ms per payment. Kubernetes' `FLAGD_PORT` service-link env put flagd on a random port, so every flag lookup waited out its 500 ms deadline.
+  - **Fix:** flagd with explicit ports and service links off.
+  - **Result:** sequential payments **520 ms → 43–100 ms**, even before cmd-svc's in-process flag resolver (rolling out) removes the remaining network call.
+  - See `docs/knowledge-base/cluster.md`.
 - **Payment path, done 2026-11-19** (rollout measurement pending):
   - The pg_stat_statements profile showed two avoidable round trips per payment: a SELECT before every INSERT and a full-row UPDATE after it. Both are removed, and `@DynamicUpdate` is on.
   - Dispatch moved off the request path (`AsyncDispatcher`). An inline Temporal start (~160 ms under load) had held each request's worker thread and limiter slot.
@@ -115,7 +120,12 @@ Details are in docs/knowledge-base/.
     - packs on the classpath; one engine per pack under an AgentRunner with backoff;
     - 3 end-to-end tests; 25 tests across the exchange modules;
     - auction ids stay below 2^53 so JSON clients read them exactly.
-  - Next: collateral (FR-14) and the conservation identity at award; evidence chain per auction; investor/mandate rules; an Aeron transport onto the same ring; rail simulators; PWAs.
+  - **Award** (on `main`): the winner's split under the conservation identity (A, Y, F, B, buyer saving) and FR-14 collateral at close. The intent is in minor units, and Y_max = d·P − F − 1 is derived, not trusted from the client. Open owner questions in code: V = A for collateral; default partner tier ESTABLISHED.
+  - **Evidence** (on `main`):
+    - each auction gets a B-chain: intent + authorization, canonical JSON, SHA-256 links, Ed25519 operator seal plus witness;
+    - `GET /v1/exchange/auctions/{id}/evidence` (with a verification verdict) and `GET /v1/exchange/keys`;
+    - dev keys are generated at start. Open owner question: who witnesses in production, and where the operator key lives (OpenBao transit?).
+  - Next: investor/mandate rules at bid time; an Aeron transport onto the same ring; rail simulators; PWAs.
 
 ## Next steps (owner decides the order)
 1. **Payment path throughput:** cut the DB checkouts per payment (one connection per request; make the idempotency `find` part of the accept transaction; batch `markDispatched`), and find out where the ~360 ms of YugabyteDB time goes (statement timings; WAL fsync on the Codespace disk; read-committed vs serializable per ADR-001). Then re-run the baseline.

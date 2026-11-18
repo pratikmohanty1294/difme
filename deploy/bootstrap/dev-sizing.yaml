@@ -26,7 +26,8 @@ spec:
         all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/requests-scaled\" || '' }}", operator: Equals, value: "" }]
       mutate:
         foreach:
-          # CPU ÷ 4 and memory ÷ 2, each only where that request is set. divide() keeps Kubernetes quantity units.
+          # CPU ÷ 4 only. Memory requests stay as declared: lower memory requests raise a pod's oom_score_adj, and the
+          # Codespaces host runs earlyoom, which kills the highest-scoring process (found live).
           - list: "request.object.spec.containers"
             preconditions: { all: [{ key: "{{ element.resources.requests.cpu || '' }}", operator: NotEquals, value: "" }] }
             patchStrategicMerge:
@@ -36,13 +37,6 @@ spec:
                     # Millicores ("300m") divide directly; whole cores ("1", "0.5") would truncate to "0", so they are
                     # converted to millicores first (cores × 1000 ÷ 4 = cores × 250).
                     resources: { requests: { cpu: "{{ ends_with(element.resources.requests.cpu, 'm') && divide('{{ element.resources.requests.cpu }}', `4`) || join('', [to_string(multiply(to_number(element.resources.requests.cpu), `250`)), 'm']) }}" } }
-          - list: "request.object.spec.containers"
-            preconditions: { all: [{ key: "{{ element.resources.requests.memory || '' }}", operator: NotEquals, value: "" }] }
-            patchStrategicMerge:
-              spec:
-                containers:
-                  - name: "{{ element.name }}"
-                    resources: { requests: { memory: "{{ divide('{{ element.resources.requests.memory }}', `2`) }}" } }
     - name: mark-scaled
       match: { any: [{ resources: { kinds: [Pod] } }] }
       exclude: { any: [{ resources: { namespaces: [kube-system, security, argocd] } }] }
@@ -50,4 +44,4 @@ spec:
         all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/requests-scaled\" || '' }}", operator: Equals, value: "" }]
       mutate:
         patchStrategicMerge:
-          metadata: { annotations: { difme.dev/requests-scaled: "cpu/4,memory/2" } }
+          metadata: { annotations: { difme.dev/requests-scaled: "cpu/4" } }

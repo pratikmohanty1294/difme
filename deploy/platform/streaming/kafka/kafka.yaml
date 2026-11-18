@@ -8,7 +8,7 @@ spec:
   roles: [controller, broker]
   storage: { type: jbod, volumes: [{ id: 0, type: persistent-claim, size: 8Gi, kraftMetadata: shared }] }
   resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
-  jvmOptions: { "-Xms": 512m, "-Xmx": 768m }
+  jvmOptions: { "-Xms": 256m, "-Xmx": 512m }   # measured 663 Mi RSS at 768m; the host earlyoom budget is ~14 GB
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
@@ -28,4 +28,5 @@ spec:
       default.replication.factor: 1
       min.insync.replicas: 1
     metricsConfig: { type: jmxPrometheusExporter, valueFrom: { configMapKeyRef: { name: kafka-metrics, key: kafka-metrics-config.yml } } }
-  entityOperator: { topicOperator: {}, userOperator: {} }
+  # No KafkaUser resources exist, so no user operator (saves ~200 Mi); topic operator heap capped.
+  entityOperator: { topicOperator: { jvmOptions: { "-Xms": 64m, "-Xmx": 160m } } }

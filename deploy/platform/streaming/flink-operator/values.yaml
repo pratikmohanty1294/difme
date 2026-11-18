@@ -1,2 +1,4 @@
 watchNamespaces: [streaming]
 operatorPod: { resources: { requests: { cpu: 50m, memory: 256Mi } } }
+# Operator JVM heap capped (measured 600 Mi RSS with the default); the host earlyoom budget is ~14 GB.
+jvmArgs: { operator: "-Xms64m -Xmx192m", webhook: "-Xms32m -Xmx96m" }

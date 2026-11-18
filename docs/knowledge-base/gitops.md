@@ -81,3 +81,13 @@
   - **Apicurio on YugabyteDB:** it works when its first start isn't interrupted. The port clash had interrupted it, which left `idx_versions_8` behind, so the database had to be recreated.
   - **RisingWave meta store:** it can't run on YugabyteDB, so it moved to the shared Postgres (ADR-019 amendment). SeaweedFS moved into the streaming profile.
   - **Flink operator webhook:** it requires `execution.checkpointing.savepoint-dir` when `upgradeMode: savepoint`.
+
+### Kyverno autogen applied the dev request scaling twice (found 2026-11-18)
+- **Cause:** a Pod `mutate` rule is auto-generated for Deployment/StatefulSet/Job templates by default. `dev-request-scaling` therefore divided the template's requests, and the pod created from that template was divided again.
+  - TigerBeetle got 12m/550Mi instead of 50m/1100Mi, and its startup (a 1 GiB journal scan) was too slow. It was SIGTERMed (exit 143).
+- **Fix:** `pod-policies.kyverno.io/autogen-controllers: none`, plus a once-only marker annotation.
+- **Cleanup after the fact:**
+  - remove the marker the autogen copied into templates (`/spec/template/metadata/annotations/difme.dev~1requests-scaled`);
+  - force-sync every app (`syncStrategy.apply.force: true`). Kyverno now owns the mutated request fields, so a normal server-side sync does not take them back.
+- **Rule:** any mutate policy that does arithmetic on existing values must be idempotent and pods-only.
+- **Separate finding from the same rebuild:** the Argo CD controller SIGTERM loop (about 8 s after each start, with no kubelet, containerd or Argo reason) did not survive a Codespace container rebuild. The cause was leftover node/Codespace state; a reinstall of Argo CD alone did not help.

@@ -228,6 +228,7 @@ DIFME PRD §3–5. The prototype becomes the real system, and its pipeline is ge
 - **Rules:** **embedded DMN**. The pack's `.dmn` files are evaluated in-process (Fluxnova's Apache-2.0 DMN engine),
   compiled once per version and cached, with no network call in the 50 ms window. Fluxnova stays the authoring,
   versioning and approval UI.
+  - **Engine** (verified 2026-11-19): `org.finos.fluxnova.bpm.dmn:fluxnova-engine-dmn:3.1.1`, with BOM `fluxnova-engine-dmn-bom:3.1.1`. Apache-2.0, usable standalone without the BPMN engine; packages `org.finos.fluxnova.bpm.dmn.engine.*`. Wrapped by `services/core/exchange-rules` (`PackRules`): each pack's `rules/*.dmn` are compiled once and evaluated in-process.
 - **UI split by audience:** Exchange OME, audit and compliance become back-office micro-frontends (Rsbuild shell,
   Keycloak SSO). ShopBot (buyer) and Buying Partner become installable PWAs built from the prototype's React code, with
   the simulation replaced by real APIs, and later embedded in the Tauri edge app.

@@ -173,3 +173,17 @@
 - **Also applied to:** the Strimzi cluster operator (`extraEnvs` JAVA_OPTS), the topic operator (`jvmOptions."-XX"`) and Apicurio (`JAVA_OPTS_APPEND`).
 - **Data-path JVMs** (Kafka broker, Connect, our Quarkus services) keep G1 and full JIT and only get `MALLOC_ARENA_MAX=2`. Our services already use compact object headers, the Java 25 AOT cache and 512k stacks.
 - **TigerBeetle:** 0.16.78 exposes its big static allocations as start flags (`--memory-lsm-compaction`, `--limit-pipeline-requests`, `--cache-grid`; `--development` uses the minimums). No custom build is needed. Measure with a throwaway instance before changing the live one.
+- **Gotchas found while rolling the profile out (2026-11-19):**
+  - **Images whose launcher already picks a GC** (UBI `run-java`, e.g. Apicurio): appending `-XX:+UseSerialGC` gives two GCs and the JVM refuses to start ("Error occurred during initialization of VM"). Set `GC_CONTAINER_OPTIONS=-XX:+UseSerialGC` instead.
+  - **Flink operator chart:** the webhook's env goes under `operatorPod.webhook.container.env`, not `webhook.container.env`.
+  - **Measured so far:**
+
+| Container | Before | After |
+|---|---|---|
+| Strimzi cluster operator | 270 Mi | 204 Mi |
+| topic operator | 203 Mi | 159 Mi |
+| Flink operator | 369 Mi | 204 Mi |
+| Flink webhook | 218 Mi | 88 Mi |
+
+  - **TigerBeetle in a plain `docker run`** needs `--security-opt seccomp=unconfined`. Docker's default seccomp profile blocks io_uring ("io_uring is not available"). The k3d node is privileged, so the in-cluster TigerBeetle is unaffected.
+

@@ -20,6 +20,13 @@ done
 # Keyed by workload (Deployment pod-template hash and suffix stripped; mawk has no {n,m}, hence split), so a pod restarted mid-run still lines up with its idle sample.
 top_pods() { kubectl top pods -A --no-headers | grep -vE "^(kube-system|argocd|argo-rollouts) " | awk '{ n=split($2, p, "-"); w=$2; if (n > 2 && length(p[n]) == 5 && length(p[n-1]) >= 8) { w=p[1]; for (i=2; i<=n-2; i++) w=w"-"p[i] } print $1, w, $3, $4 }' | sort -k1,2; }
 
+echo "▶ waiting for the node to settle (CPU < 50 % twice in a row, max 5 min)"
+# The first baseline sampled "idle" 30 s after a restart and recorded JVM start-up as idle load (found 2026-11-18).
+calm=0; for _ in $(seq 1 30); do
+  pct=$(kubectl top node --no-headers | awk '{ sub("%", "", $3); print $3 }')
+  if [ "${pct:-100}" -lt 50 ]; then calm=$((calm + 1)); else calm=0; fi
+  [ $calm -ge 2 ] && break; sleep 10
+done
 echo "▶ idle snapshot"
 top_pods > "$OUT/idle.txt"; kubectl top node --no-headers > "$OUT/idle-node.txt"
 

@@ -1,13 +1,17 @@
 # Status and next steps
 
-Updated 2026-11-18. Read this first when picking up work, then CONTRIBUTING.md.
+Updated 2026-11-18 (evening). Read this first when picking up work, then CONTRIBUTING.md.
 
 ## Where things stand
-- **Running in the Codespace:** profiles `base` and `core`: Cilium, Argo CD, Kyverno, Envoy Gateway, cert-manager, MetalLB, YugabyteDB, TigerBeetle, Valkey, the shared Postgres (ADR-019), Temporal, flagd and the core services (cmd, qry, saga, rate-limiter, consistency-router).
-- **Built and tested, not yet deployed live:** the remaining profiles (streaming, lakehouse, ml, observability, security, process, backoffice, hub).
+- **Running in the Codespace:** profiles `base`, `core` and `streaming`. Rebuilt on 2026-11-18 with the containerd image store on `/tmp`.
+  - core: Cilium, Argo CD, Kyverno, Envoy Gateway, cert-manager, MetalLB, YugabyteDB, TigerBeetle, Valkey, the shared Postgres (ADR-019), Temporal, flagd and the core services.
+  - streaming: Strimzi 0.51 / Kafka 4.2, Apicurio 3.3.4, Debezium 3.7.1 (both connectors RUNNING), RisingWave (meta on the shared Postgres), Flink operator and fraud-cep, KEDA, SeaweedFS.
+  - Only `event-archive` is down, because it needs the lakehouse profile's Iceberg catalog.
+- **Built, not yet deployed live:** lakehouse, ml, observability, security, process, backoffice, hub.
+- **First real streaming install:** it surfaced about 20 defects, all fixed. See `docs/knowledge-base/gitops.md` and `cluster.md`. The worst: SeaweedFS reserved about 21 GB of disk and caused an eviction storm.
 - **DIFME/DiscountAI (ADR-020):** `services/core/exchange-kernel` (scoring, collateral, slashing, reputation, conservation identity, evidence chains; 8 tests) and `verticals/` (FR-01 live pack, FR-02…09 declared).
 
-## Baseline: payment write path (`ci/measure.sh 200 60s`, latest run)
+## Baseline: payment write path, core only (`ci/measure.sh 200 60s`, before DispatchMarker)
 | Metric | Value |
 |---|---|
 | Offered / accepted | 200 req/s offered; **13.5 req/s accepted (202)**; 149 req/s shed (503 from the adaptive limiter, limit fell to 8) |
@@ -27,6 +31,24 @@ Defects found and fixed while measuring:
 - the cluster went into an eviction loop at 86% disk use.
 
 Details are in docs/knowledge-base/.
+
+## Footprint: core + streaming (2026-11-18, idle)
+| Namespace | RAM | CPU used |
+|---|---|---|
+| streaming | 4.4 GiB | 0.28 cores |
+| database-tier | 2.9 GiB (TigerBeetle 2.2) | 0.31 |
+| core-platform | 1.0 GiB | 0.02 |
+| ingress-system | 0.6 GiB | 0.03 |
+| rest | 1.2 GiB | 0.47 |
+| **pods total** | **10.1 GiB** (node 13.2 GiB of 16) | node peak under load 3.2 of 4 cores |
+
+- **CPU requests are the binding limit:** 3,980m of 4,000m are reserved while real use is ~1.3 cores idle. The remaining profiles will not schedule until requests are right-sized.
+- **Biggest reservations:** yb-tserver 300m; fraud-cep TaskManager 300m; RisingWave, Kafka, yb-master, TigerBeetle and the Flink JobManagers 200m each; KEDA min 2 replicas of projection-svc and rehydration-svc.
+
+## Payment path, core + streaming (`ci/measure.sh 200 60s`, after DispatchMarker)
+- **Throughput:** 8.5 req/s accepted (202) and 152 req/s shed (503). Steady-state p50 is 14.6 ms and p95 176 ms. Node CPU peaks at 3.2 cores.
+- **Not comparable with the core-only baseline below:** streaming adds CPU contention (Temporal history peaked at 389m), and several pods restarted during the run (Debezium Connect, the Strimzi entity operator, Temporal pods recovering from the evictions).
+- **To isolate the DispatchMarker change**, re-measure on a quiet node, either with core only or after right-sizing.
 
 ## Next steps (owner decides the order)
 1. **Payment path throughput:** cut the DB checkouts per payment (one connection per request; make the idempotency `find` part of the accept transaction; batch `markDispatched`), and find out where the ~360 ms of YugabyteDB time goes (statement timings; WAL fsync on the Codespace disk; read-committed vs serializable per ADR-001). Then re-run the baseline.

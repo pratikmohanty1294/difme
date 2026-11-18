@@ -6,9 +6,9 @@ watchNamespaces: [streaming]
 operatorPod:
   resources: { requests: { cpu: 50m, memory: 256Mi } }
   env: [{ name: MALLOC_ARENA_MAX, value: "2" }]
-webhook:
-  container:
-    env: [{ name: MALLOC_ARENA_MAX, value: "2" }]
+  webhook:   # the chart reads the webhook container's env from operatorPod.webhook.container.env
+    container:
+      env: [{ name: MALLOC_ARENA_MAX, value: "2" }]
 jvmArgs:
   operator: "-Xms64m -Xmx192m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=24m -XX:MaxMetaspaceSize=96m -Xss256k"
   webhook: "-Xms32m -Xmx96m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=16m -XX:MaxMetaspaceSize=64m -Xss256k"

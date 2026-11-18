@@ -1,6 +1,8 @@
 # PDF §6.1 — Temporal OSS durable execution. Persistence on the shared platform Postgres (ADR-019): Temporal does
 # not support YugabyteDB (its visibility schema needs multi-column GIN indexes; found live).
 server:
+  # Tier 2 memory (Go): GC at +50% heap growth instead of +100%; Temporal services are mostly idle in the Codespace.
+  additionalEnv: [{ name: GOGC, value: "50" }]
   replicaCount: 1
   config:
     persistence:

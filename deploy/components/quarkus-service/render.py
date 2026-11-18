@@ -37,7 +37,9 @@ def manifests(s: dict) -> list[dict]:
     }
     if mounts:
         container["volumeMounts"] = mounts
-    spec = {"serviceAccountName": s["name"], "containers": [container]}
+    # No service-link env (KUBERNETES-style <SVC>_PORT=tcp://...): our services resolve by DNS, and those variables
+    # collided with an image's own config once (flagd, 2026-11-19).
+    spec = {"serviceAccountName": s["name"], "enableServiceLinks": False, "containers": [container]}
     if volumes:
         spec["volumes"] = volumes
     deploy_spec = {"selector": {"matchLabels": {"app": s["name"]}},

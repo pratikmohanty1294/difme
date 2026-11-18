@@ -6,6 +6,11 @@ WORKDIR /deployments
 COPY --chown=185 services/core/${MODULE}/target/quarkus-app/ ./
 USER 185
 # ADR-012: compact object headers, small thread stacks, bounded code cache, low-pause G1, Java 25 AOT cache if present.
-ENV JAVA_OPTS_APPEND="-XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=55 -XX:MaxDirectMemorySize=32m -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -Xss512k -XX:ReservedCodeCacheSize=64m -XX:+ExitOnOutOfMemoryError" \
+# Threads and native memory (Tier 2): Netty 4.1 defaults to 2x cores direct + heap arenas with 4 MiB chunks and
+# Vert.x to 2x cores event loops, per process. Blocking work runs on workers/virtual threads, so 2 event loops,
+# 2+2 Netty arenas of 1 MiB chunks (maxOrder=7) and 2 glibc malloc arenas suffice on the 4-core Codespace.
+ENV JAVA_OPTS_APPEND="-XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=55 -XX:MaxDirectMemorySize=32m -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -Xss512k -XX:ReservedCodeCacheSize=64m -XX:+ExitOnOutOfMemoryError -Dio.netty.allocator.numDirectArenas=2 -Dio.netty.allocator.numHeapArenas=2 -Dio.netty.allocator.maxOrder=7" \
+    MALLOC_ARENA_MAX=2 \
+    QUARKUS_VERTX_EVENT_LOOPS_POOL_SIZE=2 \
     QUARKUS_HTTP_HOST=0.0.0.0
 ENTRYPOINT ["sh", "-c", "AOT=; for f in /deployments/*.aot; do [ -f \"$f\" ] && AOT=-XX:AOTCache=$f; done; exec java $JAVA_OPTS_APPEND $AOT -jar /deployments/quarkus-run.jar"]

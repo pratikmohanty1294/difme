@@ -43,6 +43,7 @@ public class PaymentService {
     @Inject MeterRegistry metrics;
     @Inject RateLimitGuard rateLimit;
     @Inject Dispatcher dispatcher;
+    @Inject AsyncDispatcher async;
     Clock clock = Clock.systemUTC();
 
     public Outcome submit(SubmitPayment cmd, String traceId) {
@@ -78,8 +79,9 @@ public class PaymentService {
             return new Outcome(r.paymentId(), null, "REJECTED");
         }
 
-        dispatcher.dispatch(new Dispatcher.Job(decided.paymentId(), cmd.idempotencyKey(), cmd.debitAccountId(),
-                cmd.creditAccountId(), cmd.amount().amountMinor(), cmd.amount().currency(), cmd.targetBank(), mode, traceId));
+        Dispatcher.Job job = new Dispatcher.Job(decided.paymentId(), cmd.idempotencyKey(), cmd.debitAccountId(),
+                cmd.creditAccountId(), cmd.amount().amountMinor(), cmd.amount().currency(), cmd.targetBank(), mode, traceId);
+        if (!async.submit(job)) dispatcher.dispatch(job);   // off the request path; inline only when the queue is full
         metrics.counter("difme_payments_total", "outcome", "accepted", "channel", cmd.channel()).increment();
         return new Outcome(decided.paymentId(), decided.paymentId().toString(), "ACCEPTED");
     }

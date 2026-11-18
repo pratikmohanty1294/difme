@@ -1,5 +1,6 @@
 package dev.difme.exchange.svc;
 
+import dev.difme.exchange.kernel.Risk;
 import dev.difme.exchange.rules.Finding;
 import dev.difme.exchange.rules.PackRules;
 import jakarta.inject.Inject;
@@ -14,8 +15,13 @@ import java.util.Map;
 /** HTTP edge of the exchange (ADR-020). Eligibility first (embedded DMN), then the sealed-bid auction. */
 @Path("/v1/exchange")
 public class ExchangeResource {
-    public record Intent(double riskScore, double maxPrice, double minViable, double listPrice, boolean offerSanctioned,
-                         long maxAcceptableMinor) {}
+    /**
+     * A buyer's intent, all amounts in minor units. The exchange derives the rest from it: A = P − d·P (card price),
+     * the DMN inputs (in major units, as the rule tables are written), and the auction's maximum acceptable yield,
+     * Y_max = d·P − F − 1, so the buyer always pays less than list (vertical.yaml price_basis).
+     */
+    public record Intent(double riskScore, boolean offerSanctioned, long listMinor, int discountBps, long feeMinor,
+                         long maxPriceMinor, Risk.Tier partnerTier) {}
 
     public record Bid(int nodeRef, long askMinor, double reputation, long latencyMicros) {}
 
@@ -26,13 +32,24 @@ public class ExchangeResource {
     public Response intent(@PathParam("pack") String packId, Intent in) {
         VerticalPack pack = exchange.pack(packId);
         if (pack == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        if (in.listMinor() <= 0 || in.discountBps() <= 0 || in.discountBps() >= 10_000 || in.feeMinor() < 0) {
+            return Response.status(400).entity(Map.of("error", "listMinor > 0, 0 < discountBps < 10000, feeMinor >= 0")).build();
+        }
+        long discount = Math.round(in.listMinor() * (in.discountBps() / 10_000.0));
+        long cardPrice = in.listMinor() - discount;
         List<Finding> findings = pack.rules().evaluate("buyer_intent_eligibility", Map.of(
-                "riskScore", in.riskScore(), "maxPrice", in.maxPrice(), "minViable", in.minViable(),
-                "listPrice", in.listPrice(), "offerSanctioned", in.offerSanctioned()));
+                "riskScore", in.riskScore(),
+                "maxPrice", in.maxPriceMinor() / 100.0,
+                "minViable", (cardPrice + in.feeMinor()) / 100.0,
+                "listPrice", in.listMinor() / 100.0,
+                "offerSanctioned", in.offerSanctioned()));
         if (!PackRules.allowed(findings)) return Response.status(422).entity(Map.of("findings", findings)).build();
-        long auction = exchange.open(packId, in.maxAcceptableMinor());
+        long maxYield = discount - in.feeMinor() - 1;
+        if (maxYield <= 0) return Response.status(422).entity(Map.of("error", "the fee leaves no yield inside the discount")).build();
+        Risk.Tier tier = in.partnerTier() == null ? Risk.Tier.ESTABLISHED : in.partnerTier();
+        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor(), tier));
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
-        return Response.accepted(Map.of("auctionId", auction, "findings", findings)).build();
+        return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings)).build();
     }
 
     @POST

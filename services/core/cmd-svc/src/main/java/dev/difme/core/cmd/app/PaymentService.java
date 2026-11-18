@@ -43,6 +43,7 @@ public class PaymentService {
     @Inject MeterRegistry metrics;
     @Inject RateLimitGuard rateLimit;
     @Inject Dispatcher dispatcher;
+    @Inject AsyncDispatcher async;
     Clock clock = Clock.systemUTC();
 
     public Outcome submit(SubmitPayment cmd, String traceId) {
@@ -78,8 +79,9 @@ public class PaymentService {
             return new Outcome(r.paymentId(), null, "REJECTED");
         }
 
-        dispatcher.dispatch(new Dispatcher.Job(decided.paymentId(), cmd.idempotencyKey(), cmd.debitAccountId(),
-                cmd.creditAccountId(), cmd.amount().amountMinor(), cmd.amount().currency(), cmd.targetBank(), mode, traceId));
+        Dispatcher.Job job = new Dispatcher.Job(decided.paymentId(), cmd.idempotencyKey(), cmd.debitAccountId(),
+                cmd.creditAccountId(), cmd.amount().amountMinor(), cmd.amount().currency(), cmd.targetBank(), mode, traceId);
+        if (!async.submit(job)) dispatcher.dispatch(job);   // off the request path; inline only when the queue is full
         metrics.counter("difme_payments_total", "outcome", "accepted", "channel", cmd.channel()).increment();
         return new Outcome(decided.paymentId(), decided.paymentId().toString(), "ACCEPTED");
     }
@@ -88,8 +90,7 @@ public class PaymentService {
     private Accepted accept(SubmitPayment cmd, PaymentEvent decided, Dispatcher.Mode mode, String traceId, long nowMs) {
         Optional<UUID> duplicate = idempotency.claim(cmd.idempotencyKey(), decided.paymentId(), nowMs);
         if (duplicate.isPresent()) return new Accepted(decided, duplicate.get());
-        PaymentEntity p = repository.record(decided, traceId);
-        if (p != null && decided instanceof PaymentEvent.PaymentInitiated) p.dispatch = mode.name();
+        repository.record(decided, traceId, decided instanceof PaymentEvent.PaymentInitiated ? mode.name() : null);
         return new Accepted(decided, null);
     }
 

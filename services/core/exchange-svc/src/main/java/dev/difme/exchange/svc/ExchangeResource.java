@@ -40,8 +40,6 @@ public class ExchangeResource {
                           long budgetTotalMinor, int merchantCount, int goodsCount, int validityDays, String cardJurisdiction) {}
 
     @Inject Exchange exchange;
-    private final java.util.concurrent.atomic.AtomicLong mandateIds = new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis() * 1000L);
-    private static final Map<Long, Map<String, Object>> MANDATES = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Registers a mandate after the pack's mandate_validation rules. The required security deposit is computed by the
@@ -71,9 +69,7 @@ public class ExchangeResource {
         if (!PackRules.allowed(findings)) {
             return Response.status(422).entity(Map.of("findings", findings, "depositRequiredMinor", depositRequired)).build();
         }
-        long id = mandateIds.incrementAndGet();
-        MANDATES.put(id, Map.of("pack", packId, "partnerRef", m.partnerRef(), "budgetTotalMinor", m.budgetTotalMinor(),
-                "maxPerOrderMinor", m.maxPerOrderMinor(), "validityDays", m.validityDays()));
+        long id = exchange.registerMandate(packId, m);
         return Response.status(201).entity(Map.of("mandateId", id, "depositRequiredMinor", depositRequired, "findings", findings)).build();
     }
 

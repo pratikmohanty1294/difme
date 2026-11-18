@@ -154,6 +154,20 @@ public class Exchange {
         return pack != null && intakes.get(pack).bid(auctionId, nodeRef, askMinor, reputation, latencyMicros);
     }
 
+    /** Registered mandates (in memory for now; persistence and budget draw-down come with settlement). */
+    private final Map<Long, ExchangeResource.Mandate> mandates = new ConcurrentHashMap<>();
+    private final AtomicLong mandateIds = new AtomicLong(System.currentTimeMillis() * 1000L);
+
+    public long registerMandate(String pack, ExchangeResource.Mandate m) {
+        long id = mandateIds.incrementAndGet();
+        mandates.put(id, m);
+        return id;
+    }
+
+    public ExchangeResource.Mandate mandate(long id) {
+        return mandates.get(id);
+    }
+
     public Context context(long auctionId) {
         return contexts.get(auctionId);
     }

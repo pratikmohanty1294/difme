@@ -97,6 +97,15 @@ Details are in docs/knowledge-base/.
   - The message pool is small (`--limit-pipeline-requests=0` saves ~90 MiB) and compaction memory has no effect.
   - The ~2 GiB is LSM table memory sized by batch size × 32 compaction ops across all trees, so `--limit-request` (start-time) is the lever.
 - **Payment path, next:** an isolated `ysql_bench` replay of the accept transaction, comparing sharded vs colocated databases and SERIALIZABLE vs READ COMMITTED. It decides how to cut the ~360 ms of YugabyteDB time.
+- **Payment path after tonight's fixes** (core + streaming, 2026-11-19, `ci/measure.sh`):
+
+| Measure | Before the fixes | After |
+|---|---|---|
+| Sequential payment, warm | ~520 ms | p50 116 ms, p90 186 ms |
+| 15 req/s | p50 551 ms, with 503 shedding | p50 **88 ms**, p95 274 ms, nothing shed |
+| 200 req/s | 11.1 req/s accepted | **23.6 req/s accepted** (2.1×), p50 62 ms; node CPU peak 90%, so the next gains need less CPU per payment |
+
+  - Fixes, by effect: flagd port collision, in-process flags, async dispatch, no redundant SELECT/UPDATE, Argo CD churn, Netty/thread limits.
 - **Biggest single latency fix, 2026-11-19:**
   - **Cause:** a fixed ~520 ms per payment. Kubernetes' `FLAGD_PORT` service-link env put flagd on a random port, so every flag lookup waited out its 500 ms deadline.
   - **Fix:** flagd with explicit ports and service links off.

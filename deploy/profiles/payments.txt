@@ -6,6 +6,7 @@ db-init
 temporal
 flagd
 core-services
+postgres-docdb
 strimzi
 kafka
 apicurio

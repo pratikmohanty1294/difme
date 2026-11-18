@@ -4,8 +4,8 @@ metadata:
   name: postgres-docdb
   namespace: argocd
   labels:
-    difme/profile: process
-    difme/pdf-section: ADR-008
+    difme/profile: core
+    difme/pdf-section: ADR-019
   annotations:
     argocd.argoproj.io/sync-wave: '-2'
   finalizers:

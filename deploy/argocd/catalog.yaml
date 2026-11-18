@@ -86,7 +86,7 @@ components:
   - { name: opencost,          ns: opencost,        kind: helm, profile: observability, wave: 1,  pdf: "16", repo: https://opencost.github.io/opencost-helm-chart, chart: opencost, version: 2.0.2 }
 
   # ── Forms + business processes (profile: process, ADR-008) ────────────────
-  - { name: postgres-docdb,    ns: database-tier,   kind: path, profile: process, wave: -2, pdf: "ADR-008" }
+  - { name: postgres-docdb,    ns: database-tier,   kind: path, profile: core,    wave: -2, pdf: "ADR-019" }
   - { name: ferretdb,          ns: forms,           kind: path, profile: process, wave: -1, pdf: "ADR-008" }
   - { name: formio,            ns: forms,           kind: path, profile: process, wave: 0,  pdf: "ADR-008" }
   - { name: fluxnova,          ns: process,         kind: path, profile: process, wave: 0,  pdf: "ADR-008" }

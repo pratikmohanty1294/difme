@@ -39,7 +39,11 @@ secret ml-platform   mlflow-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY
 secret ml-platform   mlflow-db username=mlflow password="$YB"
 secret ml-platform   postgresml-db password="$(rand)"
 secret backup        velero-s3 cloud="$(printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$S3_KEY" "$S3_SECRET")"
-secret temporal      temporal-db password="$YB"
+# Temporal persists on the shared platform Postgres (ADR-019). Reuse an existing password so both copies match.
+TEMPORAL_PG=$(kubectl -n temporal get secret temporal-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
+TEMPORAL_PG=${TEMPORAL_PG:-$(rand)}
+secret temporal      temporal-db password="$TEMPORAL_PG"
+secret database-tier temporal-db password="$TEMPORAL_PG"
 secret harbor        harbor-db password="$YB"
 secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"

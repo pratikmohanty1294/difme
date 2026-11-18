@@ -6,3 +6,4 @@ db-init
 temporal
 flagd
 core-services
+postgres-docdb

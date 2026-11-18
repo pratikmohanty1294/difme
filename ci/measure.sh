@@ -11,8 +11,9 @@ OUT=/tmp/difme-measure; mkdir -p "$OUT"
 echo "▶ seeding $ACCOUNTS ledger accounts (idempotent: existing ids are reported as 'exists')"
 for start in $(seq 1 500 "$ACCOUNTS"); do
   end=$(( start + 499 < ACCOUNTS ? start + 499 : ACCOUNTS ))
-  cmd=$(for i in $(seq "$start" "$end"); do printf 'id=%d code=10 ledger=1' "$i"; [ "$i" -lt "$end" ] && printf ', '; done)
-  kubectl -n database-tier exec tigerbeetle-0 -- /tigerbeetle repl --cluster=0 --addresses=3000 \
+  # (A `[ ] && printf` loop here aborted the script under set -e on its last iteration — found live.)
+  cmd=$(seq -f 'id=%g code=10 ledger=1' "$start" "$end" | paste -sd, - | sed 's/,/, /g')
+  kubectl -n database-tier exec tigerbeetle-0 -c tigerbeetle -- /tigerbeetle repl --cluster=0 --addresses=3000 \
     --command="create_accounts $cmd;" >/dev/null
 done
 

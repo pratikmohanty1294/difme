@@ -1,14 +1,15 @@
-# PDF §6.1 — Temporal OSS durable execution. Persistence on YugabyteDB YSQL (postgres12 plugin, ADR-001).
+# PDF §6.1 — Temporal OSS durable execution. Persistence on the shared platform Postgres (ADR-019): Temporal does
+# not support YugabyteDB (its visibility schema needs multi-column GIN indexes; found live).
 server:
   replicaCount: 1
   config:
     persistence:
       default:
         driver: sql
-        sql: { driver: postgres12, host: yb-tservers.database-tier.svc, port: 5433, database: temporal, user: temporal, existingSecret: temporal-db, maxConns: 20 }
+        sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal, user: temporal, existingSecret: temporal-db, maxConns: 20 }
       visibility:
         driver: sql
-        sql: { driver: postgres12, host: yb-tservers.database-tier.svc, port: 5433, database: temporal_visibility, user: temporal, existingSecret: temporal-db, maxConns: 10 }
+        sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal_visibility, user: temporal, existingSecret: temporal-db, maxConns: 10 }
   frontend: { resources: { requests: { cpu: 50m, memory: 128Mi } } }
   history:  { replicaCount: 1, resources: { requests: { cpu: 100m, memory: 256Mi } } }   # ×3 in production overlay
   matching: { resources: { requests: { cpu: 50m, memory: 128Mi } } }
@@ -21,6 +22,6 @@ elasticsearch: { enabled: false }
 prometheus: { enabled: false }
 grafana: { enabled: false }
 web: { enabled: true, resources: { requests: { cpu: 20m, memory: 64Mi } } }
-# db-init creates the temporal databases; the temporal role has no CREATEDB privilege by design (found live:
+# The platform Postgres init script creates the temporal databases; the temporal role has no CREATEDB privilege by design (found live:
 # "permission denied to create database"), so the chart only sets up and updates the schema.
 schema: { createDatabase: { enabled: false }, setup: { enabled: true }, update: { enabled: true } }

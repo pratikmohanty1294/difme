@@ -1,4 +1,5 @@
-# ADR-008 — PostgreSQL 17 + DocumentDB extension (MIT). Backs FerretDB (formio) and Fluxnova (database: fluxnova).
+# Shared platform Postgres (ADR-008, ADR-019): PostgreSQL 17 + DocumentDB extension (MIT). Hosts FerretDB (formio),
+# Fluxnova, Keycloak and Temporal (default + visibility stores). Payments stay on YugabyteDB.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata: { name: postgres-docdb, labels: { app: postgres-docdb } }
@@ -17,11 +18,13 @@ spec:
             - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: postgres-docdb, key: password } } }
             - { name: POSTGRES_DB, value: postgres }
             - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+            - { name: TEMPORAL_DB_PASSWORD, valueFrom: { secretKeyRef: { name: temporal-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
             - { name: init, mountPath: /docker-entrypoint-initdb.d }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
+          readinessProbe: { exec: { command: [pg_isready, -U, difme] }, periodSeconds: 5 }
       volumes: [{ name: init, configMap: { name: postgres-docdb-init } }]
   volumeClaimTemplates:
     - metadata: { name: data }
@@ -34,6 +37,15 @@ data:
   10-fluxnova.sql: |
     CREATE DATABASE fluxnova;
     CREATE DATABASE keycloak;
+  # First boot only (docker-entrypoint-initdb.d). Temporal gets its own role without CREATEDB; it owns its two databases.
+  20-temporal.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$TEMPORAL_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE temporal LOGIN PASSWORD :'pw';
+    CREATE DATABASE temporal OWNER temporal;
+    CREATE DATABASE temporal_visibility OWNER temporal;
+    SQL
 ---
 apiVersion: v1
 kind: Service

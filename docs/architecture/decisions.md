@@ -205,3 +205,8 @@ Source documents: DIFME PRD/FRD v1.0 and DiscountAI E2E Architecture v4.1. The f
 - **External rails:** a port (interface) per rail, with an open-source simulator behind it. Covered rails: Visa VIC/TAP, Mastercard Agent Pay, VTS/MDES tokenization, RBI-licensed PA escrow, merchant PSP checkout (UCP/ACP), UPI. ISO 8583 0100/0110 runs through jPOS. Real providers plug in later without changes elsewhere.
 - **Matching engine** (SBBA auction, CLOB, 50 ms window, < 5 ms p99): Java 25 with Aeron + SBE + Agrona (zero-GC hot path). Aeron Cluster provides a Raft-replicated, deterministic order book. This replaces the documents' Rust choice, because Aeron's first-class clients are Java and C.
 - **Licence swaps** (hard rule, see ADR-009): the documents name CockroachDB (source-available since 2024), DragonflyDB (BSL 1.1) and Redpanda (BSL). They map to **YugabyteDB**, **Valkey** and **Apache Kafka**, all already in the platform.
+
+## ADR-019 — Temporal persists on the shared platform Postgres (owner-approved 2026-11-18)
+- **Why:** Temporal's visibility schema creates multi-column GIN indexes. YugabyteDB's `ybgin` doesn't support them (found live), and Temporal doesn't officially support YugabyteDB.
+- **Change:** the PostgreSQL 17 instance that already hosts FerretDB, Fluxnova and Keycloak moves into the core profile as the **shared platform Postgres**. It now also hosts Temporal's default and visibility stores, under a `temporal` role without CREATEDB.
+- **Unchanged:** YugabyteDB remains the system of record for payments, the outbox and idempotency. One extra small instance (limit 768 Mi) serves every component that needs plain PostgreSQL semantics.

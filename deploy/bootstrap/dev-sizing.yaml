@@ -10,15 +10,18 @@
 # (Strimzi, Flink, RisingWave) that are hard to size one by one.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
-metadata: { name: dev-request-scaling }
+metadata:
+  name: dev-request-scaling
+  # Pods only. Kyverno's autogen would also rewrite Deployment/StatefulSet templates, and the pods created from them
+  # were then divided a second time (TigerBeetle got 12m/550Mi and was killed during startup; found live).
+  annotations: { pod-policies.kyverno.io/autogen-controllers: none }
 spec:
   rules:
     - name: scale-container-requests
       match: { any: [{ resources: { kinds: [Pod] } }] }
       exclude: { any: [{ resources: { namespaces: [kube-system, security, argocd] } }] }
-      # Exactly once per pod: Kyverno re-invokes mutations when another webhook also changes the pod, which divided the
-      # requests twice (TigerBeetle got 12m/550Mi and was killed during startup; found live). The marker rule below
-      # sets the annotation, and both rules skip pods that already carry it.
+      # Exactly once per pod, also if Kyverno re-invokes mutations: the marker rule below sets the annotation, and
+      # both rules skip pods that already carry it.
       preconditions:
         all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/requests-scaled\" || '' }}", operator: Equals, value: "" }]
       mutate:

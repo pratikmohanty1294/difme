@@ -48,7 +48,7 @@ components:
   - { name: quinn-hub,         ns: quinn-hub,       kind: path, profile: hub, wave: 1, pdf: "5.2" }
 
   # ── Layers 6–7 · Streaming, CDC, replay (profile: streaming) ───────────────
-  - { name: strimzi,           ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "5.5", repo: https://strimzi.io/charts/, chart: strimzi-kafka-operator, version: 0.45.0 }
+  - { name: strimzi,           ns: streaming,       kind: helm, profile: streaming, wave: -3, pdf: "5.5", repo: https://strimzi.io/charts/, chart: strimzi-kafka-operator, version: 0.47.0 }   # 0.47 supports Kafka 4.0.0 (0.45 stops at 3.9)
   - { name: kafka,             ns: streaming,       kind: path, profile: streaming, wave: -1, pdf: "5.5" }
   - { name: apicurio,          ns: streaming,       kind: path, profile: streaming, wave: -1, pdf: "5.10" }
   - { name: debezium,          ns: streaming,       kind: path, profile: streaming, wave: 0,  pdf: "5.5" }

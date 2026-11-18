@@ -16,6 +16,7 @@ spec:
             - { name: APICURIO_STORAGE_KIND, value: sql }
             - { name: APICURIO_STORAGE_SQL_KIND, value: postgresql }
             - { name: APICURIO_DATASOURCE_URL, value: "jdbc:postgresql://yb-tservers.database-tier.svc:5433/apicurio" }
+            - { name: APICURIO_DATASOURCE_USERNAME, value: apicurio }   # role from db-init; without it the image defaults to "sa"
             - { name: APICURIO_REST_DELETION_ARTIFACT_ENABLED, value: "false" }
             - { name: APICURIO_RULES_GLOBAL_COMPATIBILITY, value: BACKWARD_TRANSITIVE }
             - { name: APICURIO_RULES_GLOBAL_VALIDITY, value: FULL }

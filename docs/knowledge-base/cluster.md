@@ -103,3 +103,7 @@
 - At ~86% root use the kubelet (nodefs 8% threshold) evicted pods; they restarted, re-pulled and refilled the disk — an eviction loop that also killed Temporal's schema Job midway (half-migrated DB).
 - Each image existed three times: registry cache (~4.9 GB), containerd content (~2.3 GB), unpacked snapshots (~6.2 GB).
 - Fix: registry pull-through caches are bind mounts under `/tmp/difme-registry/` (pure caches, safe to lose). Node containerd stays on root (moving it to /tmp broke non-root pods earlier).
+
+### Long jobs without the client computer (2026-11-18)
+- `bash ci/bg.sh NAME cmd…` runs a job under nohup in the Codespace. A keep-alive (`gh codespace ssh` to itself every 4 min) runs only while the job does, so the 60-minute idle timeout can't stop it midway, and the Codespace still idles out normally afterwards.
+- Needs a one-time `gh auth login -s codespace` inside the Codespace; the default Codespace token has no `codespace` scope.

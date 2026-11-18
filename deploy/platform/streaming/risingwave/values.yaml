@@ -1,5 +1,5 @@
-# PDF §5.5 streaming SQL views → RisingWave (ADR-001). State store on SeaweedFS S3, metadata on YugabyteDB.
+# PDF §5.5 streaming SQL views → RisingWave (ADR-001). State store on SeaweedFS S3, metadata on the shared Postgres (ADR-019 pattern; its migrations fail on YugabyteDB).
 standalone: { enabled: true, resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } } }
-metaStore: { postgresql: { enabled: true, host: yb-tservers.database-tier.svc, port: 5433, database: risingwave, authentication: { username: risingwave, existingSecretName: risingwave-db } } }
+metaStore: { postgresql: { enabled: true, host: postgres-docdb.database-tier.svc, port: 5432, database: risingwave, authentication: { username: risingwave, existingSecretName: risingwave-db } } }
 stateStore:
   s3: { enabled: true, endpoint: http://seaweedfs-s3.lakehouse.svc:8333, bucket: risingwave, region: local, forcePathStyle: true, authentication: { existingSecretName: risingwave-s3 } }

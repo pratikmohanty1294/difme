@@ -19,6 +19,7 @@ spec:
             - { name: POSTGRES_DB, value: postgres }
             - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
             - { name: TEMPORAL_DB_PASSWORD, valueFrom: { secretKeyRef: { name: temporal-db, key: password } } }
+            - { name: RISINGWAVE_DB_PASSWORD, valueFrom: { secretKeyRef: { name: risingwave-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
@@ -45,6 +46,15 @@ data:
     CREATE ROLE temporal LOGIN PASSWORD :'pw';
     CREATE DATABASE temporal OWNER temporal;
     CREATE DATABASE temporal_visibility OWNER temporal;
+    SQL
+  # RisingWave's meta store (ADR-019 pattern): its sea-orm migrations are not reliable on YugabyteDB
+  # (slow DDL, then a re-applied init migration and a crash), so it lives here like Temporal.
+  30-risingwave.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$RISINGWAVE_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE risingwave LOGIN PASSWORD :'pw';
+    CREATE DATABASE risingwave OWNER risingwave;
     SQL
 ---
 apiVersion: v1

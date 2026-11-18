@@ -210,6 +210,10 @@ Source documents: DIFME PRD/FRD v1.0 and DiscountAI E2E Architecture v4.1. The f
 - **Why:** Temporal's visibility schema creates multi-column GIN indexes. YugabyteDB's `ybgin` doesn't support them (found live), and Temporal doesn't officially support YugabyteDB.
 - **Change:** the PostgreSQL 17 instance that already hosts FerretDB, Fluxnova and Keycloak moves into the core profile as the **shared platform Postgres**. It now also hosts Temporal's default and visibility stores, under a `temporal` role without CREATEDB.
 - **Unchanged:** YugabyteDB remains the system of record for payments, the outbox and idempotency. One extra small instance (limit 768 Mi) serves every component that needs plain PostgreSQL semantics.
+- **Amendment (owner-approved 2026-11-18):** RisingWave's meta store moves here as well. Its sea-orm migrations
+  fail on YugabyteDB: DDL is slow, the init migration is re-applied after being recorded, and the process crashes.
+  Apicurio initialises cleanly on YugabyteDB and stays there. In the same decision, SeaweedFS (S3) moves from the
+  lakehouse profile into streaming, because Flink checkpoints and the RisingWave state store need it.
 
 ## ADR-020 — One vertical kernel, nine vertical packs; DiscountAI built in parallel (owner-approved 2026-11-18)
 Source: the DiscountAI prototype (browser-only React simulation, DMN rules, evidence chains), E2E architecture v4.1 and

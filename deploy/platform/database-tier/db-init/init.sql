@@ -3,7 +3,7 @@
 DO $$
 DECLARE r text;
 BEGIN
-  FOREACH r IN ARRAY ARRAY['difme','difme_reader','difme_bulk','debezium','apicurio','polaris','risingwave',
+  FOREACH r IN ARRAY ARRAY['difme','difme_reader','difme_bulk','debezium','apicurio','polaris',
                            'superset','mlflow','feast','harbor','datahub','trino'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
       EXECUTE format('CREATE ROLE %I LOGIN', r);

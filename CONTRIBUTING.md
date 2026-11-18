@@ -24,6 +24,6 @@ Long jobs always go through `bg`: they keep running if the caller disconnects. A
 
 ## Change flow
 1. Branch `wip-<topic>`, commit, push the branch.
-2. Verify in the Codespace: `make check AREA=…`. Dependency changes are compiled there. A quiet Maven log is not proof that tests ran: read `target/surefire-reports`.
+2. Verify in the Codespace: `make check AREA=…`. While a job uses the main checkout (a rebuild, `make up`), check in a separate worktree (`git worktree add /tmp/wt wip-x`) so switching branches can't change files under the running job. Dependency changes are compiled there. A quiet Maven log is not proof that tests ran: read `target/surefire-reports`.
 3. Fast-forward `main`, push, delete the branch. CI builds images and Argo CD syncs.
 4. Generated files (Argo CD apps, service manifests) are rendered in the Codespace and committed with the change. `make check AREA=deploy` fails if they're stale.

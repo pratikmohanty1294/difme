@@ -20,7 +20,18 @@ public class PaymentRepository {
     @Transactional
     @ConsistencyProfile(Consistency.SERIALIZABLE)
     public PaymentEntity record(PaymentEvent event, String traceId) {
-        PaymentEntity p = PaymentEntity.findById(event.paymentId());
+        return record(event, traceId, null);
+    }
+
+    /**
+     * @param dispatch how a newly initiated payment will be dispatched; set before the INSERT so it is written in the
+     *     same statement. (Setting it after persist() made Hibernate issue a second, full-row UPDATE per payment.)
+     */
+    @Transactional
+    @ConsistencyProfile(Consistency.SERIALIZABLE)
+    public PaymentEntity record(PaymentEvent event, String traceId, String dispatch) {
+        // A new payment's id is a fresh UUIDv7: looking it up first was one wasted SELECT per payment (measured).
+        PaymentEntity p = event instanceof PaymentInitiated ? null : PaymentEntity.findById(event.paymentId());
         if (event instanceof PaymentInitiated e) {
             p = new PaymentEntity();
             p.paymentId = e.paymentId();
@@ -34,6 +45,7 @@ public class PaymentRepository {
             p.status = "ACCEPTED";
             p.createdAt = e.occurredAt();
             p.updatedAt = e.occurredAt();
+            p.dispatch = dispatch;
             p.persist();
         } else if (p != null) {
             switch (event) {

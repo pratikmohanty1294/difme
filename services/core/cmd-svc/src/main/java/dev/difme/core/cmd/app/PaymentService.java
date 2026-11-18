@@ -88,8 +88,7 @@ public class PaymentService {
     private Accepted accept(SubmitPayment cmd, PaymentEvent decided, Dispatcher.Mode mode, String traceId, long nowMs) {
         Optional<UUID> duplicate = idempotency.claim(cmd.idempotencyKey(), decided.paymentId(), nowMs);
         if (duplicate.isPresent()) return new Accepted(decided, duplicate.get());
-        PaymentEntity p = repository.record(decided, traceId);
-        if (p != null && decided instanceof PaymentEvent.PaymentInitiated) p.dispatch = mode.name();
+        repository.record(decided, traceId, decided instanceof PaymentEvent.PaymentInitiated ? mode.name() : null);
         return new Accepted(decided, null);
     }
 

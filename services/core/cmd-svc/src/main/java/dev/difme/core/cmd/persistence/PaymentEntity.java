@@ -6,11 +6,15 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.annotations.DynamicUpdate;
 import java.time.Instant;
 import java.util.UUID;
 
 /** Write-side aggregate (Hibernate ORM + Panache, @Version optimistic locking — PDF §5.4, §11.3). */
 @Entity
+// Status changes write only the changed columns. A full-row UPDATE also rewrites the indexed columns (idempotency_key,
+// the partial index on status/dispatched_at), which on YugabyteDB adds index tablets to the transaction (measured).
+@DynamicUpdate
 @Table(name = "payment", schema = "core")
 public class PaymentEntity extends PanacheEntityBase {
     @Id @Column(name = "payment_id") public UUID paymentId;

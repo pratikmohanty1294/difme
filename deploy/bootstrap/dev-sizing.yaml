@@ -1,0 +1,35 @@
+# Codespace-only request scaling (owner-approved 2026-11-18). Applied by `make cluster` like dev-secrets.sh, never by
+# Argo CD, so the manifests keep their production requests.
+#
+# Why: with core + streaming the node had 3,980m of 4,000m CPU and 90% of memory *requested* while real use was
+# ~1.3 cores, so further profiles (and even the k6 pod) could not schedule. Requests only drive scheduling and CPU
+# share weights; dividing every pod's requests by the same factor keeps the relative weights. Limits are unchanged,
+# so memory protection (OOM limits) is exactly as in production.
+#
+# Pods are mutated at admission (Argo CD never manages pods, so there is no drift). Covers operator-created pods
+# (Strimzi, Flink, RisingWave) that are hard to size one by one.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: dev-request-scaling }
+spec:
+  rules:
+    - name: scale-container-requests
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      exclude: { any: [{ resources: { namespaces: [kube-system, security, argocd] } }] }
+      mutate:
+        foreach:
+          # CPU ÷ 4 and memory ÷ 2, each only where that request is set. divide() keeps Kubernetes quantity units.
+          - list: "request.object.spec.containers"
+            preconditions: { all: [{ key: "{{ element.resources.requests.cpu || '' }}", operator: NotEquals, value: "" }] }
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    resources: { requests: { cpu: "{{ divide('{{ element.resources.requests.cpu }}', `4`) }}" } }
+          - list: "request.object.spec.containers"
+            preconditions: { all: [{ key: "{{ element.resources.requests.memory || '' }}", operator: NotEquals, value: "" }] }
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    resources: { requests: { memory: "{{ divide('{{ element.resources.requests.memory }}', `2`) }}" } }

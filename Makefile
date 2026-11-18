@@ -33,6 +33,7 @@ cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (i
 	  --volume $(CURDIR)/deploy/bootstrap/kubelet-difme.conf:/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/50-difme.conf@server:*
 	bash deploy/bootstrap/install.sh $(REPO)
 	bash deploy/bootstrap/dev-secrets.sh
+	kubectl apply -f deploy/bootstrap/dev-sizing.yaml   # Codespace-only request scaling (see the file)
 
 destroy:         ## Delete the cluster
 	k3d cluster delete $(CLUSTER)

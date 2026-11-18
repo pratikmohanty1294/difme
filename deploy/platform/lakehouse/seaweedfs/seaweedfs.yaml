@@ -19,7 +19,8 @@ spec:
           ports: [{ name: s3, containerPort: 8333 }, { name: master, containerPort: 9333 }, { name: filer, containerPort: 8888 }, { name: metrics, containerPort: 9327 }]
           volumeMounts: [{ name: data, mountPath: /data }, { name: s3cfg, mountPath: /etc/seaweedfs }]
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
-      volumes: [{ name: s3cfg, secret: { secretName: seaweedfs-s3-config } }]
+      # /etc/seaweedfs: the S3 identities (Secret) plus master.toml (ConfigMap below).
+      volumes: [{ name: s3cfg, projected: { sources: [{ secret: { name: seaweedfs-s3-config } }, { configMap: { name: seaweedfs-master } }] } }]
   volumeClaimTemplates:
     - metadata: { name: data }
       spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 16Gi } } }
@@ -44,3 +45,17 @@ spec:
           args:
             - for b in lakehouse flink risingwave velero etcd-snapshots airbyte mlflow loki harbor cdn; do
                 rclone mkdir sw:$b; done
+---
+# One volume per growth instead of seven. Every S3 bucket is its own collection, and each new volume reserves
+# about 1 GiB on this filesystem, so the default reserved ~7 GiB per bucket and filled the 32 GB disk (found live).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: seaweedfs-master }
+data:
+  master.toml: |
+    [master.volume_growth]
+    copy_1 = 1
+    copy_2 = 2
+    copy_3 = 3
+    copy_other = 1
+    threshold = 0.9

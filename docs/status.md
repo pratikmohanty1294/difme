@@ -50,6 +50,21 @@ Details are in docs/knowledge-base/.
 - **Not comparable with the core-only baseline below:** streaming adds CPU contention (Temporal history peaked at 389m), and several pods restarted during the run (Debezium Connect, the Strimzi entity operator, Temporal pods recovering from the evictions).
 - **To isolate the DispatchMarker change**, re-measure on a quiet node, either with core only or after right-sizing.
 
+## Memory and CPU after the 2026-11-18 rebuild (core + streaming)
+- **Memory ceiling:** the Codespaces host runs **earlyoom**, which SIGTERMs the largest process when RAM *and* swap are both below ~10%. That caused the Argo CD controller restart loop and the TigerBeetle startup kills. See `docs/knowledge-base/cluster.md`.
+- **Fixes applied:**
+  - **Trims:** Debezium Connect 885 → 406 Mi; Flink operator 600 → 464 Mi; entity operator without the user operator; Kafka heap 512m.
+  - **Dev sizing:** CPU requests only.
+  - **Tier 1 (zswap + swap + kubelet LimitedSwap):** available RAM 2.4 → **5.3 GB**, with zswap compressing at about 17:1.
+- **Load test** (200 req/s, core + streaming, after Tier 1):
+  - 6.6 req/s accepted (202), 154 req/s shed (503); p50 32 ms, p95 259 ms.
+  - Node CPU was **64% at idle**, peaking at 89%.
+  - No swap thrashing (si/so ≈ 0).
+- **The limiting factor is now control-plane CPU at idle:** `k3s` (API server, datastore, controllers) ~1.1 cores and 1.8 GB RSS; Argo CD controller ~0.5 cores.
+  - Suspects: Argo CD reconcile churn, with server-side diff on every pass and 4 apps stuck OutOfSync (envoy-gateway, flink-operator, stream-services, flink-jobs).
+  - Proposed next: fix the OutOfSync diffs, lengthen the resync period, and measure k3s CPU before and after.
+- **Memory plan, still to do:** Tier 2 (JVM/Go runtime flags); Tier 3 (Kafka native image, more native services); Tier 4 (TigerBeetle dev build plus matching Java client).
+
 ## Next steps (owner decides the order)
 1. **Payment path throughput:** cut the DB checkouts per payment (one connection per request; make the idempotency `find` part of the accept transaction; batch `markDispatched`), and find out where the ~360 ms of YugabyteDB time goes (statement timings; WAL fsync on the Codespace disk; read-committed vs serializable per ADR-001). Then re-run the baseline.
 2. **Footprint candidates, with the numbers above:** TigerBeetle dev sizing (2.2 GiB idle), Istio → Cilium mesh, Argo CD → Flux, native images for the JVM services, and Kyverno report sizing.

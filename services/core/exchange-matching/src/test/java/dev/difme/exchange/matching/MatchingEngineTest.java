@@ -61,8 +61,8 @@ class MatchingEngineTest {
         intake.open(2, 100_000, WINDOW);
         intake.bid(2, 20, 120_000, 99, 1_000);
         intake.bid(2, 21, 99_000, 50, 10_000);
+        engine.doWork();                                   // the window starts when the engine sees the OPEN
         clock.now += WINDOW;
-        engine.doWork();
         engine.doWork();
         assertEquals(1, results.get(0).ranked());
         assertEquals(21, results.get(0).winnerNode());
@@ -91,9 +91,9 @@ class MatchingEngineTest {
     void lateAndUnknownBidsAreDroppedNotApplied() {
         intake.bid(99, 1, 10, 50, 10);                     // auction never opened
         intake.open(3, 1_000, WINDOW);
+        engine.doWork();
         clock.now += WINDOW;
-        engine.doWork();
-        engine.doWork();
+        engine.doWork();                                   // closes auction 3
         intake.bid(3, 2, 10, 50, 10);                      // after close
         engine.doWork();
         assertEquals(2, engine.dropped());

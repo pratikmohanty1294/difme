@@ -15,6 +15,14 @@ spec:
     s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333
     s3.path.style.access: "true"
   serviceAccount: flink
+  podTemplate:
+    spec:
+      containers:
+        - name: flink-main-container
+          env:
+            - { name: AWS_ACCESS_KEY_ID, valueFrom: { secretKeyRef: { name: flink-s3, key: access-key } } }
+            - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: flink-s3, key: secret-key } } }
+            - { name: AWS_REGION, value: local }
   jobManager: { resource: { memory: 768m, cpu: 0.2 } }
   taskManager: { resource: { memory: 1024m, cpu: 0.3 } }
   job: { jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar, entryClass: dev.difme.flink.fraud.FraudCepJob, parallelism: 1, upgradeMode: savepoint }

@@ -10,6 +10,6 @@ spec:
       containers:
         - name: psql
           image: postgres:17-alpine
-          command: [sh, -c, "for f in /sql/*.sql; do psql -v ON_ERROR_STOP=1 -h risingwave -p 4566 -U root -d dev -f $f; done"]
+          command: [sh, -c, "for f in /sql/*.sql; do psql -v ON_ERROR_STOP=1 -h risingwave -p 4567 -U root -d dev -f $f; done"]
           volumeMounts: [{ name: sql, mountPath: /sql }]
       volumes: [{ name: sql, configMap: { name: risingwave-sql } }]

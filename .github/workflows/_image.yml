@@ -36,6 +36,16 @@ jobs:
       - if: inputs.java
         uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "25", cache: maven }
+      # Maven Central rate-limits shared CI IPs (HTTP 429 seen 2026-11-20 with ~30 parallel jobs); resolve through
+      # Google's public Maven Central mirror instead.
+      - if: inputs.java
+        name: Maven mirror
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<'XML'
+          <settings><mirrors><mirror><id>central-gcs</id><mirrorOf>central</mirrorOf>
+          <url>https://maven-central.storage-download.googleapis.com/maven2/</url></mirror></mirrors></settings>
+          XML
       - if: inputs.node
         uses: actions/setup-node@v4
         with: { node-version: "22" }

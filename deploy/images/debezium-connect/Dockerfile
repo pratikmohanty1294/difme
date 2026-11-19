@@ -10,7 +10,8 @@ USER root:root
 # (2026-11-20: CVE-2026-114938 in java-21-openjdk-headless 21.0.10, fixed in 21.0.13).
 RUN set -eux; rm -rf /opt/cruise-control /opt/kafka-exporter; \
     microdnf -y update ca-certificates 'java-21-openjdk*' && microdnf clean all
-RUN set -eux; m=https://repo1.maven.org/maven2; \
+# Google's Maven Central mirror: repo1 returned HTTP 429 to CI runners (2026-11-20).
+RUN set -eux; m=https://maven-central.storage-download.googleapis.com/maven2; \
     mkdir -p /opt/kafka/plugins/debezium-postgres /opt/kafka/plugins/apicurio-converters; \
     curl -fsSL "$m/io/debezium/debezium-connector-postgres/$DEBEZIUM/debezium-connector-postgres-$DEBEZIUM-plugin.tar.gz" \
       | tar -xz -C /opt/kafka/plugins/debezium-postgres; \

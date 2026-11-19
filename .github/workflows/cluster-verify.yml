@@ -1,0 +1,75 @@
+# Ephemeral full-cluster verification on a free GitHub-hosted runner (public repo: 4 vCPU / 16 GB, x64 or arm64).
+# Same steps as the dev runtime: make cluster → base → each profile in order via ci/verify-profile.sh, with the
+# memory footprint after each. Argo CD syncs from the branch this runs on, so a wip-* branch is verified before main.
+# The runner is discarded afterwards; reports land in the job summary and the "cluster-report" artifact.
+# Independent runs share nothing, so several profile sets can be verified in parallel.
+name: cluster-verify
+on:
+  workflow_dispatch:
+    inputs:
+      profiles: { description: "Profiles after base, in order (comma-separated)", default: "core", type: string }
+      runner:   { description: "Runner", default: "ubuntu-24.04", type: choice, options: ["ubuntu-24.04", "ubuntu-24.04-arm"] }
+      deadline: { description: "Per-profile convergence deadline (s)", default: "1800", type: string }
+permissions: { contents: read }
+concurrency: { group: "cluster-verify-${{ github.ref }}-${{ inputs.profiles }}-${{ inputs.runner }}", cancel-in-progress: false }
+
+jobs:
+  verify:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 345
+    env:
+      DIFME_IMAGE_DIR: /mnt/difme/containerd
+      DIFME_SWAP_FILE: /mnt/difme/swap
+      DIFME_SWAP_SIZE: 12G
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk (preinstalled SDKs the cluster never uses)
+        run: |
+          df -h / /mnt | sed 1d
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift || true
+          docker system prune -af >/dev/null 2>&1 || true
+          sudo mkdir -p /mnt/difme && sudo chown "$USER" /mnt/difme
+          df -h / /mnt | sed 1d
+      - name: Tools (pinned, per arch)
+        run: |
+          set -eux
+          A=$(dpkg --print-architecture); B=/usr/local/bin
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.8.3 bash
+          curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/v1.32.3/bin/linux/$A/kubectl" && sudo install /tmp/kubectl $B/kubectl
+          curl -fsSL "https://get.helm.sh/helm-v3.17.3-linux-$A.tar.gz" | sudo tar xz -C $B --strip-components=1 "linux-$A/helm"
+          curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_$A.tar.gz" | sudo tar xz -C $B
+          sudo apt-get install -y -qq acl xxd >/dev/null
+          python3 -c "import yaml" 2>/dev/null || pip install -q --break-system-packages pyyaml
+      - name: Point Argo CD at this branch
+        run: |
+          sed -i "s#targetRevision: main\$#targetRevision: ${GITHUB_REF_NAME}#" deploy/argocd/apps/*.yaml
+          grep -c "targetRevision: ${GITHUB_REF_NAME}" deploy/argocd/apps/*.yaml | awk -F: '{s+=$2} END {print s " app sources now track '"${GITHUB_REF_NAME}"'"}'
+      - name: Cluster (k3d + Cilium + Argo CD + base profile + dev secrets)
+        run: make cluster
+      - name: Base profile healthy
+        run: bash ci/verify-profile.sh base "${{ inputs.deadline }}" 2>&1 | tee -a /tmp/report.txt
+      - name: Profiles
+        run: |
+          rc=0
+          for p in $(echo "${{ inputs.profiles }}" | tr ',' ' '); do
+            echo "::group::$p"
+            bash ci/verify-profile.sh "$p" "${{ inputs.deadline }}" 2>&1 | tee -a /tmp/report.txt
+            r=${PIPESTATUS[0]}; echo "::endgroup::"
+            echo "$p: $([ $r -eq 0 ] && echo converged || echo FAILED)" >> /tmp/verdicts.txt
+            [ $r -ne 0 ] && { rc=$r; break; }    # later profiles would run on a broken base
+          done
+          exit $rc
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## cluster-verify: ${{ inputs.profiles }} on ${{ inputs.runner }} (${GITHUB_REF_NAME})"
+            echo '```'; cat /tmp/verdicts.txt 2>/dev/null; echo '```'
+            echo '```'; bash ci/mem-report.sh 15 2>/dev/null; echo '```'
+            echo '```'; kubectl -n argocd get applications --no-headers 2>/dev/null; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p /tmp/out && cp /tmp/report.txt /tmp/verdicts.txt /tmp/up-*.log /tmp/out/ 2>/dev/null || true
+          kubectl get pods -A -o wide > /tmp/out/pods.txt 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: "cluster-report-${{ inputs.runner }}", path: /tmp/out, retention-days: 14 }

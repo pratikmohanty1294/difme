@@ -56,6 +56,41 @@ class ExchangeResourceTest {
                 .body("findings.code", hasItem("VALIDITY_TOO_LONG"));
     }
 
+    /** Runs one small auction (P = ₹20,000, A = ₹16,000) with a single mandate-backed bid; returns the bid's status. */
+    static int auctionWithMandate(long mandateId) throws InterruptedException {
+        long id = given().contentType(ContentType.JSON).body("""
+                {"riskScore": 900, "offerSanctioned": true, "listMinor": 2000000, "discountBps": 2000,
+                 "feeMinor": 20000, "maxPriceMinor": 1900000}""")
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        int status = given().contentType(ContentType.JSON).body("""
+                {"nodeRef": 9, "askMinor": 100000, "reputation": 90, "latencyMicros": 5000,
+                 "partner": {"flow": "A", "intentAgeDays": 0, "depositMinor": 0, "budgetLeftMinor": 999999999,
+                             "merchantApproved": true, "goodsInScope": true, "maxPerOrderMinor": 0, "validityDays": 0,
+                             "mandateId": %d}}""".formatted(mandateId))
+                .post("/v1/exchange/auctions/" + id + "/bids").then().extract().statusCode();
+        if (status == 202) {
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) {
+                Thread.sleep(20);
+            }
+        }
+        return status;
+    }
+
+    @Test
+    void mandateBudgetIsTheExchangesToTrackAndIsDrawnDownByAwards() throws InterruptedException {
+        // Budget ₹40,000, deposit ₹6,000 (covers the FR-14 collateral for A = ₹16,000: 5,760); limits from the mandate,
+        // not from the bid (the bid claims a huge budget and zero limits, which the exchange ignores).
+        long mandateId = given().contentType(ContentType.JSON).body("""
+                {"partnerRef": "bp-9", "limitMinor": 5000000, "maxPerOrderMinor": 2000000, "minYieldPct": 4,
+                 "depositMinor": 600000, "budgetTotalMinor": 4000000, "merchantCount": 2, "goodsCount": 5,
+                 "validityDays": 5, "cardJurisdiction": "IN_DOMESTIC_AFA"}""")
+                .post("/v1/exchange/fr01-buy/mandates").then().statusCode(201).extract().jsonPath().getLong("mandateId");
+        org.junit.jupiter.api.Assertions.assertEquals(202, auctionWithMandate(mandateId));   // budget 40,000 -> 24,000
+        org.junit.jupiter.api.Assertions.assertEquals(202, auctionWithMandate(mandateId));   // 24,000 -> 8,000
+        org.junit.jupiter.api.Assertions.assertEquals(422, auctionWithMandate(mandateId));   // 8,000 < A: BUDGET_EXHAUSTED
+    }
+
     @Test
     void unknownPackIs404() {
         given().contentType(ContentType.JSON).body(intent(900, 9_500_000))

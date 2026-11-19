@@ -243,5 +243,5 @@
 - Bootstrap: `curl -fsSL https://raw.githubusercontent.com/pratikmohanty1294/difme/main/ci/vm-bootstrap.sh | bash`, then log in again (docker group), then `make cluster && make up PROFILE=core`.
 - Persistent disk: `DIFME_IMAGE_DIR=/var/lib/difme/containerd` and `DIFME_SWAP_FILE=/var/lib/difme/swap` (set in `/etc/profile.d/difme.sh` and in `~/.bashrc` for non-interactive SSH). The Makefile and `ci/image-disk.sh` honour both.
 - There is no host earlyoom (that was a Codespaces host feature), so the full 24 GB is usable; zswap and swap still apply.
-- Every image must be multi-arch: check new third-party pins with `scratchpad archcheck.py`-style manifest inspection (look for `arm64` in the index) before adding them.
+- Every image must be multi-arch: check new third-party pins with `python3 ci/archcheck.py <file of image refs>` before adding them.
 

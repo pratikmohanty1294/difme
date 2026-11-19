@@ -1,4 +1,33 @@
 # PDF §11.1 — RATS RFC 9334 Verifier backend (Veraison, ADR-002).
+# Image built in CI from pinned source (deploy/images/veraison): Veraison publishes none. VTS, verification and
+# provisioning share one pod and talk over localhost, so the internal gRPC hop needs no TLS. Callers are in-cluster
+# only (the attestation verifier); the mesh provides mTLS in front of the HTTP APIs.
+# Dev stores: the policy store is SQLite on the pod's volume; the CoRIM endorsement store is in memory (provisioned
+# endorsements are lost on restart). Production points both at the shared Postgres.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: veraison, namespace: security }
+data:
+  config.yaml: |
+    logging: { level: info, output-paths: [stdout] }
+    provisioning: { listen-addr: "0.0.0.0:8888", protocol: http, max-payload-size: 1MB }
+    verification: { listen-addr: "0.0.0.0:8080", protocol: http, max-payload-size: 1MB }
+    vts:
+      server-addr: "127.0.0.1:50051"
+      listen-addr: "127.0.0.1:50051"
+      tls: false
+    ear-signer: { alg: ES256, key: /opt/veraison/keys/skey.jwk }
+    plugin: { backend: builtin }
+    po-store:
+      backend: sql
+      sql: { max_connections: 4, driver: sqlite3, datasource: /opt/veraison/stores/vts/po-store.sql }
+    po-agent: { backend: opa }
+    endorsement-store:
+      active-plugins: [corim-store]
+      plugin-parameters:
+        corim-store: { dbms: sqlite, dsn: "file::memory:?cache=shared" }
+    auth: { backend: passthrough }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: veraison, namespace: security, labels: { app: veraison } }
@@ -8,9 +37,33 @@ spec:
   template:
     metadata: { labels: { app: veraison } }
     spec:
+      enableServiceLinks: false
+      securityContext: { runAsNonRoot: true, runAsUser: 616, runAsGroup: 616, fsGroup: 616 }
+      volumes:
+        - { name: config, configMap: { name: veraison } }
+        - { name: keys, secret: { secretName: veraison-ear } }
+        - { name: stores, emptyDir: {} }
       containers:
-        - { name: verification, image: ghcr.io/veraison/verification:0.0.2501, ports: [{ containerPort: 8080 }], resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 256Mi } } }
-        - { name: provisioning, image: ghcr.io/veraison/provisioning:0.0.2501, ports: [{ containerPort: 8888 }], resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 256Mi } } }
+        - name: vts
+          image: ghcr.io/pratikmohanty1294/difme-veraison:0.1.0
+          args: [vts-service, --config, /opt/veraison/config/config.yaml]
+          env: [{ name: GOMEMLIMIT, value: 100MiB }]
+          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }, { name: keys, mountPath: /opt/veraison/keys }, { name: stores, mountPath: /opt/veraison/stores }]
+          resources: { requests: { cpu: 20m, memory: 48Mi }, limits: { memory: 160Mi } }
+        - name: verification
+          image: ghcr.io/pratikmohanty1294/difme-veraison:0.1.0
+          args: [verification-service, --config, /opt/veraison/config/config.yaml]
+          env: [{ name: GOMEMLIMIT, value: 48MiB }]
+          ports: [{ name: verify, containerPort: 8080 }]
+          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }]
+          resources: { requests: { cpu: 10m, memory: 24Mi }, limits: { memory: 96Mi } }
+        - name: provisioning
+          image: ghcr.io/pratikmohanty1294/difme-veraison:0.1.0
+          args: [provisioning-service, --config, /opt/veraison/config/config.yaml]
+          env: [{ name: GOMEMLIMIT, value: 48MiB }]
+          ports: [{ name: provision, containerPort: 8888 }]
+          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }]
+          resources: { requests: { cpu: 10m, memory: 24Mi }, limits: { memory: 96Mi } }
 ---
 apiVersion: v1
 kind: Service

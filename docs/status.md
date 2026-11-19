@@ -115,6 +115,11 @@ Details are in docs/knowledge-base/.
 
   - Temporal history CPU barely moves (~490m vs ~450m): it is mostly Temporal's baseline, not per-payment work.
   - Routing is the **owner's decision**; production keeps 100% saga.
+- **BLOCKED 2026-11-19 ~10:15 IST:** GitHub refuses to start the Codespace: `HTTP 402: Usage of this codespace is currently disallowed: There is a billing issue`. The included Codespaces hours are likely used up.
+  - The lakehouse install was in progress and must be re-run after the Codespace is back.
+  - The cluster data survives the stop, and the startup heal (swap, ACL, Cilium refresh) runs automatically.
+  - Staged and ready: `wip-security-prep` (istiod sizing, Keycloak JVM) and `wip-process-prep` (Fluxnova JVM).
+  - Done: observability installed and healthy (~950 Mi); its fixes are on `main`.
 - **Installation plan** (owner-approved order): observability → lakehouse → process → security → ml → backoffice → hub → platform-ops. One profile at a time: install, verify healthy, record its footprint (`ci/mem-report.sh`), fix what breaks, then decide whether it stays up together with the rest or runs on demand.
 - **Biggest single latency fix, 2026-11-19:**
   - **Cause:** a fixed ~520 ms per payment. Kubernetes' `FLAGD_PORT` service-link env put flagd on a random port, so every flag lookup waited out its 500 ms deadline.

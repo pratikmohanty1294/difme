@@ -220,3 +220,9 @@
 - **Rule:**
   - Any image that reads `<NAME>_*` env (flagd, many Kafka/Redis images) must run with `enableServiceLinks: false` when a Service of the same name exists.
   - Feature-flag lookups on a hot path must be in-process.
+
+### Codespace idle stop and automatic recovery (2026-11-19, 02:17–07:56 IST)
+- **What happened:** with no session talking to it, the Codespace stopped after its 60-minute idle timeout. The next SSH call started it again.
+- **Since the rebuild, the restart heals itself:** `postStartCommand` re-creates the swapfile and zswap and clears `/tmp`'s default ACL. The cluster came back on its own in about 15 min of image pulls, with no permission errors.
+- **Long jobs and the idle timeout:** `ci/bg.sh` now reads the keep-alive token from the **`GH_TOKEN` Codespaces secret** in `/workspaces/.codespaces/shared/.env` (SSH sessions don't load it), so jobs report "with keep-alive" and stay up through the idle timeout.
+- **Anything kept in `/tmp` is gone after a restart.** Re-upload helper scripts before re-running.

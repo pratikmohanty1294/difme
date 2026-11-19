@@ -28,7 +28,7 @@ cluster: registries   ## Create the k3d cluster: Cilium, Argo CD, dev secrets (i
 	@# Image layers go on the 118 GB /tmp disk (ci/image-disk.sh clears /tmp's default ACL, the cause of the earlier
 	@# non-root failures). Volumes stay on the root disk. Kubelet image GC (kubelet-difme.conf) still bounds growth.
 	bash ci/image-disk.sh prepare
-	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml 	  --volume /tmp/difme-containerd:/var/lib/rancher/k3s/agent/containerd@server:* \
+	K3D_FIX_DNS=0 k3d cluster create --config deploy/bootstrap/k3d.yaml 	  --volume $${DIFME_IMAGE_DIR:-/tmp/difme-containerd}:/var/lib/rancher/k3s/agent/containerd@server:* \
 	  --volume $(CURDIR)/deploy/bootstrap/k3s-resolv.conf:/etc/difme/resolv.conf@server:* \
 	  --volume $(CURDIR)/deploy/bootstrap/kubelet-difme.conf:/var/lib/rancher/k3s/agent/etc/kubelet.conf.d/50-difme.conf@server:*
 	bash deploy/bootstrap/install.sh $(REPO)

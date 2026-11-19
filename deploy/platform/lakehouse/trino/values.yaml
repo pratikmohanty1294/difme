@@ -1,7 +1,13 @@
 # PDF §5.6 — federated SQL across Iceberg, Cassandra (audit), Kafka and YugabyteDB in one query.
-server: { workers: 1 }
-coordinator: { resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }, jvm: { maxHeapSize: 1G } }
-worker: { resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }, jvm: { maxHeapSize: 1G } }
+# Single node: the coordinator also executes queries (no separate worker JVM; ~1.5 GB saved on the 16 GB Codespace).
+# Production overlays raise workers and heap.
+server:
+  workers: 0
+  config: { query: { maxMemory: "512MB" } }   # heap-sized (default 4GB assumes big workers)
+coordinator:
+  resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1280Mi } }
+  jvm: { maxHeapSize: 768M }
+  config: { nodeScheduler: { includeCoordinator: true }, query: { maxMemoryPerNode: "256MB" } }   # must fit the 768M heap
 catalogs:
   iceberg: |
     connector.name=iceberg
@@ -18,7 +24,8 @@ catalogs:
     connector.name=kafka
     kafka.nodes=difme-kafka-bootstrap.streaming.svc:9092
     kafka.table-description-supplier=FILE
-    kafka.table-description-dir=/etc/trino/kafka   # generated from api/asyncapi by ci/asyncapi_to_trino.py
+    # table descriptions generated from api/asyncapi by ci/asyncapi_to_trino.py (no inline comments in .properties)
+    kafka.table-description-dir=/etc/trino/kafka
   settlements: |
     connector.name=postgresql
     connection-url=jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme

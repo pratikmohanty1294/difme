@@ -102,3 +102,13 @@ jobs:
       context: deploy/images/debezium-connect
       dockerfile: deploy/images/debezium-connect/Dockerfile
       version: "3.7.1"
+
+  veraison:
+    # Veraison publishes no images; built from a pinned commit (see the Dockerfile). The smoke test starts all three
+    # services against the dev config and fails if any exits within 15 s.
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-veraison
+      context: deploy/images/veraison
+      dockerfile: deploy/images/veraison/Dockerfile
+      smoke: bash deploy/images/veraison/smoke.sh "$IMAGE:scan"

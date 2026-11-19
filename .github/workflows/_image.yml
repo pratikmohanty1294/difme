@@ -20,6 +20,7 @@ on:
       runner:      { type: string, default: "ubuntu-24.04" }
       tag-suffix:  { type: string, default: "" }
       sign:        { type: boolean, default: true }      # per-arch native images are signed on the joined manifest
+      smoke:       { type: string, default: "" }         # optional shell check against "$IMAGE:scan" before push
     outputs:
       digest: { value: "${{ jobs.image.outputs.digest }}" }
 
@@ -53,6 +54,9 @@ jobs:
           build-args: ${{ inputs.build-args }}
           load: true
           tags: ${{ env.IMAGE }}:scan
+      - name: Smoke test
+        if: inputs.smoke != ''
+        run: ${{ inputs.smoke }}
       - name: Trivy — CRITICAL vulnerabilities block promotion
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.59.1             image --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress "${IMAGE}:scan"

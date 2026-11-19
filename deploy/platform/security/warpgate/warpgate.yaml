@@ -9,9 +9,23 @@ spec:
   template:
     metadata: { labels: { app: warpgate } }
     spec:
+      # First start: write /data/warpgate.yaml (the chart's own setup job does the same). v0.13.2 never existed as a tag;
+      # 0.26.0 is the current release and ships amd64 + arm64.
+      initContainers:
+        - name: setup
+          image: ghcr.io/warp-tech/warpgate:0.26.0
+          env: [{ name: WARPGATE_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: warpgate, key: admin-password } } }]
+          command: [/bin/sh, -c]
+          args:
+            - |
+              set -e
+              [ -f /data/warpgate.yaml ] && exit 0
+              warpgate -c /data/warpgate.yaml unattended-setup --data-path /data --http-port 8888 --ssh-port 2222 --postgres-port 55432 --record-sessions
+          volumeMounts: [{ name: data, mountPath: /data }]
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 128Mi } }
       containers:
         - name: warpgate
-          image: ghcr.io/warp-tech/warpgate:v0.13.2
+          image: ghcr.io/warp-tech/warpgate:0.26.0
           args: [--config, /data/warpgate.yaml, run]
           ports: [{ name: https, containerPort: 8888 }, { name: ssh, containerPort: 2222 }, { name: postgres, containerPort: 55432 }]
           volumeMounts: [{ name: data, mountPath: /data }]

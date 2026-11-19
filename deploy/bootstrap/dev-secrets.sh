@@ -51,6 +51,7 @@ secret harbor        harbor-db password="$YB"
 secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"
 secret security      keycloak admin-password="$(rand)"
+secret security      warpgate admin-password="$(rand)"
 secret security      postgres-docdb password="$PG_DOCDB"
 POLARIS_CRED="root:$(rand)"
 for n in streaming lakehouse; do

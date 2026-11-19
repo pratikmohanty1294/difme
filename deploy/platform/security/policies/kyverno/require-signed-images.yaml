@@ -1,6 +1,7 @@
 # PDF §11.2 — every DIFME image must be cosign-signed by the reusable image pipeline and carry SLSA provenance + SBOM.
 # Kyverno is the single admission engine (ADR-015: Gatekeeper and the Sigstore policy-controller were removed).
 # The signing identity is the reusable workflow itself, so a build from any other workflow is rejected.
+# _manifest.yml signs the joined multi-arch images (2026-11-20). Only builds from main are accepted.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata: { name: require-signed-images }
@@ -15,7 +16,7 @@ spec:
           attestors:
             - entries:
                 - keyless:
-                    subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
+                    subjectRegExp: '^https://github\.com/pratikmohanty1294/difme/\.github/workflows/_(image|manifest)\.yml@refs/heads/main$'
                     issuer: "https://token.actions.githubusercontent.com"
                     rekor: { url: https://rekor.sigstore.dev }
           attestations:
@@ -23,13 +24,13 @@ spec:
               attestors:
                 - entries:
                     - keyless:
-                        subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
+                        subjectRegExp: '^https://github\.com/pratikmohanty1294/difme/\.github/workflows/_(image|manifest)\.yml@refs/heads/main$'
                         issuer: "https://token.actions.githubusercontent.com"
                         rekor: { url: https://rekor.sigstore.dev }
             - type: https://spdx.dev/Document
               attestors:
                 - entries:
                     - keyless:
-                        subject: "https://github.com/pratikmohanty1294/difme/.github/workflows/_image.yml@refs/heads/main"
+                        subjectRegExp: '^https://github\.com/pratikmohanty1294/difme/\.github/workflows/_(image|manifest)\.yml@refs/heads/main$'
                         issuer: "https://token.actions.githubusercontent.com"
                         rekor: { url: https://rekor.sigstore.dev }

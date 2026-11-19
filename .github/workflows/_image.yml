@@ -70,8 +70,10 @@ jobs:
           push: true
           provenance: false
           platforms: ${{ inputs.platforms }}
+          # The release tag moves only on main; branch builds push sha tags only (a branch build once overwrote
+          # :0.1.0 with a branch-signed image that admission then rejected, 2026-11-20).
           tags: |
-            ${{ env.IMAGE }}:${{ inputs.version }}${{ inputs.tag-suffix }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}:{1}{2}', env.IMAGE, inputs.version, inputs.tag-suffix) || '' }}
             ${{ env.IMAGE }}:sha-${{ github.sha }}${{ inputs.tag-suffix }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

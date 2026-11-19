@@ -20,8 +20,9 @@ jobs:
       - name: Join amd64 + arm64
         id: join
         run: |
-          docker buildx imagetools create \
-            -t "${IMAGE}:${{ inputs.version }}" -t "${IMAGE}:sha-${{ github.sha }}" \
+          # Release tag only from main (branch builds keep to sha tags).
+          rel=(); [ "$GITHUB_REF" = refs/heads/main ] && rel=(-t "${IMAGE}:${{ inputs.version }}")
+          docker buildx imagetools create "${rel[@]}" -t "${IMAGE}:sha-${{ github.sha }}" \
             "${IMAGE}:sha-${{ github.sha }}-amd64" "${IMAGE}:sha-${{ github.sha }}-arm64"
           digest=$(docker buildx imagetools inspect "${IMAGE}:sha-${{ github.sha }}" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"

@@ -1,5 +1,33 @@
 # PDF §5.6 — OLAP engine (MPP, vectorised) reading Iceberg through the Polaris external catalog.
+# Sizing (found before install, 2026-11-19): the chart's fe.conf sets -Xmx8192m and the BE defaults mem_limit to 90%
+# of the machine memory it sees (the whole 16 GB host, not the container). Both would outgrow their 2 GiB limits and be
+# OOM-killed (or trip the host's earlyoom). Explicit heap and BE memory limit below; production overlays raise them.
 starrocks:
-  starrocksFESpec: { replicas: 1, resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }, storageSpec: { name: fe, storageSize: 4Gi } }
-  starrocksBeSpec: { replicas: 1, resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }, storageSpec: { name: be, storageSize: 8Gi } }
+  starrocksFESpec:
+    replicas: 1
+    resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
+    storageSpec: { name: fe, storageSize: 4Gi }
+    feEnvVars: [{ name: MALLOC_ARENA_MAX, value: "2" }]
+    config: |
+      LOG_DIR = ${STARROCKS_HOME}/log
+      DATE = "$(date +%Y%m%d-%H%M%S)"
+      JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xms256m -Xmx1024m -XX:+UseG1GC -XX:MaxMetaspaceSize=256m -Xss512k -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"
+      http_port = 8030
+      rpc_port = 9020
+      query_port = 9030
+      edit_log_port = 9010
+      mysql_service_nio_enabled = true
+      sys_log_level = INFO
+  starrocksBeSpec:
+    replicas: 1
+    resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }
+    storageSpec: { name: be, storageSize: 8Gi }
+    config: |
+      be_port = 9060
+      webserver_port = 8040
+      heartbeat_service_port = 9050
+      brpc_port = 8060
+      sys_log_level = INFO
+      default_rowset_type = beta
+      mem_limit = 1200M
   initPassword: { enabled: true, passwordSecret: starrocks-root }

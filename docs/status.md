@@ -120,6 +120,11 @@ Details are in docs/knowledge-base/.
   - The cluster data survives the stop, and the startup heal (swap, ACL, Cilium refresh) runs automatically.
   - Staged and ready: `wip-security-prep` (istiod sizing, Keycloak JVM) and `wip-process-prep` (Fluxnova JVM).
   - Done: observability installed and healthy (~950 Mi); its fixes are on `main`.
+- **Runtime move (owner decision 2026-11-20): Oracle Cloud Always Free Ampere A1** (arm64, 4 OCPU / 24 GB RAM, up to 200 GB disk, free with no time limit) replaces the blocked Codespace.
+  - Setup: `ci/vm-bootstrap.sh` (idempotent; same `/workspaces/difme` path, image store and swap under `/var/lib/difme`, `difme-heal.service` at boot).
+  - Driving it: `DIFME_VM=ubuntu@<ip> DIFME_VM_KEY=~/.ssh/<key> bash ci/cs.sh '<cmd>'`.
+  - Images: all first-party images are multi-arch. Core services build per arch on native runners (native binaries and the AOT cache are CPU-specific), and `_manifest.yml` joins and signs the result. All directly referenced third-party images have arm64 builds.
+  - Fixes found on the way: Warpgate `v0.13.2` never existed, so it is now 0.26.0 with first-start setup; Veraison publishes no images, so it is built from pinned source with a smoke test; Debezium needed the JDK CVE fix.
 - **Installation plan** (owner-approved order): observability → lakehouse → process → security → ml → backoffice → hub → platform-ops. One profile at a time: install, verify healthy, record its footprint (`ci/mem-report.sh`), fix what breaks, then decide whether it stays up together with the rest or runs on demand.
 - **Biggest single latency fix, 2026-11-19:**
   - **Cause:** a fixed ~520 ms per payment. Kubernetes' `FLAGD_PORT` service-link env put flagd on a random port, so every flag lookup waited out its 500 ms deadline.

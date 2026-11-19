@@ -106,6 +106,16 @@ Details are in docs/knowledge-base/.
 | 200 req/s | 11.1 req/s accepted | **23.6 req/s accepted** (2.1×), p50 62 ms; node CPU peak 90%, so the next gains need less CPU per payment |
 
   - Fixes, by effect: flagd port collision, in-process flags, async dispatch, no redundant SELECT/UPDATE, Argo CD churn, Netty/thread limits.
+- **Saga vs DIRECT A/B** (2026-11-19, same node, flag patched live and restored to saga afterwards):
+
+| Load | Saga (today) | DIRECT (same-bank) |
+|---|---|---|
+| 15 req/s, p50 / p95 | 97 / 263 ms | 43 / 132 ms |
+| 200 req/s, accepted | 33.4 req/s | 37.0 req/s (+11%) |
+
+  - Temporal history CPU barely moves (~490m vs ~450m): it is mostly Temporal's baseline, not per-payment work.
+  - Routing is the **owner's decision**; production keeps 100% saga.
+- **Installation plan** (owner-approved order): observability → lakehouse → process → security → ml → backoffice → hub → platform-ops. One profile at a time: install, verify healthy, record its footprint (`ci/mem-report.sh`), fix what breaks, then decide whether it stays up together with the rest or runs on demand.
 - **Biggest single latency fix, 2026-11-19:**
   - **Cause:** a fixed ~520 ms per payment. Kubernetes' `FLAGD_PORT` service-link env put flagd on a random port, so every flag lookup waited out its 500 ms deadline.
   - **Fix:** flagd with explicit ports and service links off.

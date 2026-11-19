@@ -155,17 +155,30 @@ public class Exchange {
     }
 
     /** Registered mandates (in memory for now; persistence and budget draw-down come with settlement). */
-    private final Map<Long, ExchangeResource.Mandate> mandates = new ConcurrentHashMap<>();
+    /** A registered mandate and what the exchange tracks for it (the partner cannot misstate these). */
+    public record MandateState(String pack, ExchangeResource.Mandate terms, long registeredAtMillis, AtomicLong budgetLeftMinor) {
+        public int ageDays() {
+            return (int) ((System.currentTimeMillis() - registeredAtMillis) / 86_400_000L);
+        }
+    }
+
+    private final Map<Long, MandateState> mandates = new ConcurrentHashMap<>();
     private final AtomicLong mandateIds = new AtomicLong(System.currentTimeMillis() * 1000L);
+    /** auction id -> (bidder nodeRef -> mandate id), so the award can draw down the winner's budget. */
+    private final Map<Long, Map<Integer, Long>> bidMandates = new ConcurrentHashMap<>();
 
     public long registerMandate(String pack, ExchangeResource.Mandate m) {
         long id = mandateIds.incrementAndGet();
-        mandates.put(id, m);
+        mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor())));
         return id;
     }
 
-    public ExchangeResource.Mandate mandate(long id) {
+    public MandateState mandate(long id) {
         return mandates.get(id);
+    }
+
+    public void bindBidMandate(long auctionId, int nodeRef, long mandateId) {
+        bidMandates.computeIfAbsent(auctionId, k -> new ConcurrentHashMap<>()).put(nodeRef, mandateId);
     }
 
     public Context context(long auctionId) {
@@ -210,6 +223,7 @@ public class Exchange {
         }
         Terms t = terms.remove(auctionId);
         contexts.remove(auctionId);
+        Map<Integer, Long> bound = bidMandates.remove(auctionId);
         Award award = null;
         if (!top.isEmpty() && t != null) {
             VerticalPack p = packs.get(pack);
@@ -218,6 +232,11 @@ public class Exchange {
             long collateral = Risk.requiredCollateral(split.a(), p.collateral().alpha(), p.collateral().gammaRev(),
                     t.partnerTier(), p.collateral().minMinor());
             award = new Award(w, split, collateral);
+            // Draw the card price A from the winner's mandate budget (it was checked against the budget at bid time;
+            // a concurrent award on the same mandate can still race, so never let it go negative).
+            Long mandateId = bound == null ? null : bound.get(w.nodeRef());
+            MandateState ms = mandateId == null ? null : mandates.get(mandateId);
+            if (ms != null) ms.budgetLeftMinor().updateAndGet(left -> Math.max(0, left - split.a()));
         }
         EvidenceChain chain = chains.get(auctionId);
         if (chain != null) {

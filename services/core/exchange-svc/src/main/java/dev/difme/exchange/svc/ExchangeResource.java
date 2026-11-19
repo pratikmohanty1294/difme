@@ -31,7 +31,7 @@ public class ExchangeResource {
      * are written in major units, as for the buyer rules.
      */
     public record Partner(String flow, int intentAgeDays, long depositMinor, long budgetLeftMinor, boolean merchantApproved,
-                          boolean goodsInScope, long maxPerOrderMinor, int validityDays) {}
+                          boolean goodsInScope, long maxPerOrderMinor, int validityDays, Long mandateId) {}
 
     public record Bid(int nodeRef, long askMinor, double reputation, long latencyMicros, Partner partner) {}
 
@@ -116,15 +116,21 @@ public class ExchangeResource {
         if (pack != null && ctx != null && pack.rules().decisionIds().contains("investor_eligibility")) {
             Partner pt = b.partner();
             if (pt == null) return Response.status(400).entity(Map.of("error", "this vertical needs the partner block on bids")).build();
+            // With a registered mandate the exchange's own records replace the bidder's claims for limits, age and budget.
+            Exchange.MandateState ms = pt.mandateId() == null ? null : exchange.mandate(pt.mandateId());
+            if (pt.mandateId() != null && ms == null) return Response.status(404).entity(Map.of("error", "unknown mandate")).build();
+            if (ms != null && !ms.pack().equals(exchange.packOf(auctionId))) {
+                return Response.status(409).entity(Map.of("error", "mandate belongs to another vertical")).build();
+            }
             Map<String, Object> in = new java.util.HashMap<>();
             in.put("flow", pt.flow());
-            in.put("intentAgeDays", pt.intentAgeDays());
-            in.put("validityDays", pt.validityDays());
-            in.put("deposit", pt.depositMinor() / 100.0);
+            in.put("intentAgeDays", ms != null ? ms.ageDays() : pt.intentAgeDays());
+            in.put("validityDays", ms != null ? ms.terms().validityDays() : pt.validityDays());
+            in.put("deposit", (ms != null ? ms.terms().depositMinor() : pt.depositMinor()) / 100.0);
             in.put("maxDepositNeeded", ctx.depositNeededMinor() / 100.0);   // the exchange's own number, not the bidder's
             in.put("amountA", ctx.cardPriceMinor() / 100.0);
-            in.put("maxPerOrder", pt.maxPerOrderMinor() / 100.0);
-            in.put("budgetLeft", pt.budgetLeftMinor() / 100.0);
+            in.put("maxPerOrder", (ms != null ? ms.terms().maxPerOrderMinor() : pt.maxPerOrderMinor()) / 100.0);
+            in.put("budgetLeft", (ms != null ? ms.budgetLeftMinor().get() : pt.budgetLeftMinor()) / 100.0);
             in.put("merchantApproved", pt.merchantApproved());
             in.put("goodsInScope", pt.goodsInScope());
             in.put("yieldAsk", b.askMinor() / 100.0);
@@ -132,6 +138,7 @@ public class ExchangeResource {
             List<Finding> findings = pack.rules().evaluate("investor_eligibility", in);
             if (!PackRules.allowed(findings)) return Response.status(422).entity(Map.of("findings", findings)).build();
         }
+        if (b.partner() != null && b.partner().mandateId() != null) exchange.bindBidMandate(auctionId, b.nodeRef(), b.partner().mandateId());
         if (!exchange.bid(auctionId, b.nodeRef(), b.askMinor(), b.reputation(), b.latencyMicros())) {
             return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         }

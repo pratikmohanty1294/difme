@@ -13,12 +13,19 @@ on:
       node:        { type: boolean, default: false }
       prebuild:    { type: string, default: "true" }
       version:     { type: string, default: "0.1.0" }
+      # Multi-arch (2026-11-20: the runtime moves to an arm64 Oracle Cloud VM). Arch-independent builds (jars, JS
+      # bundles) publish both platforms from one job; native binaries build per arch on a matching runner with a
+      # tag suffix, and _manifest.yml joins them under the plain tag.
+      platforms:   { type: string, default: "linux/amd64,linux/arm64" }
+      runner:      { type: string, default: "ubuntu-24.04" }
+      tag-suffix:  { type: string, default: "" }
+      sign:        { type: boolean, default: true }      # per-arch native images are signed on the joined manifest
     outputs:
       digest: { value: "${{ jobs.image.outputs.digest }}" }
 
 jobs:
   image:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner }}
     permissions: { contents: read, packages: write, id-token: write, attestations: write }
     outputs: { digest: "${{ steps.push.outputs.digest }}" }
     env:
@@ -33,6 +40,8 @@ jobs:
         with: { node-version: "22" }
       - name: Prebuild
         run: ${{ inputs.prebuild }}
+      - if: contains(inputs.platforms, ',')
+        uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
@@ -56,29 +65,36 @@ jobs:
           build-args: ${{ inputs.build-args }}
           push: true
           provenance: false
+          platforms: ${{ inputs.platforms }}
           tags: |
-            ${{ env.IMAGE }}:${{ inputs.version }}
-            ${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.IMAGE }}:${{ inputs.version }}${{ inputs.tag-suffix }}
+            ${{ env.IMAGE }}:sha-${{ github.sha }}${{ inputs.tag-suffix }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ inputs.version }}
       - name: Syft SBOM
+        if: inputs.sign
         uses: anchore/sbom-action@v0
         with: { image: "${{ env.IMAGE }}@${{ steps.push.outputs.digest }}", format: spdx-json, output-file: sbom.spdx.json, upload-artifact: true }
       - name: Attest SBOM (stored next to the image)
+        if: inputs.sign
         uses: actions/attest-sbom@v2
         with: { subject-name: "${{ env.IMAGE }}", subject-digest: "${{ steps.push.outputs.digest }}", sbom-path: sbom.spdx.json, push-to-registry: true }
-      - uses: sigstore/cosign-installer@v3
+      - if: inputs.sign
+        uses: sigstore/cosign-installer@v3
       - name: Cosign keyless signature
+        if: inputs.sign
         run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"
       - name: SLSA provenance (Build L3 via reusable workflow)
+        if: inputs.sign
         id: provenance
         uses: actions/attest-build-provenance@v2
         with: { subject-name: "${{ env.IMAGE }}", subject-digest: "${{ steps.push.outputs.digest }}", push-to-registry: true }
       # Kyverno verifyImages reads cosign-format attestations, not the Sigstore-bundle referrers written above
       # (found by a server dry run on the live cluster). Publish both, signed by this same workflow identity.
       - name: Cosign attestations for admission control (SLSA provenance + SPDX SBOM)
+        if: inputs.sign
         run: |
           REF="${IMAGE}@${{ steps.push.outputs.digest }}"
           jq -r '.dsseEnvelope.payload' "${{ steps.provenance.outputs.bundle-path }}" | base64 -d | jq '.predicate' > provenance.json

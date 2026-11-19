@@ -3,27 +3,31 @@ name: images
 on:
   push:
     branches: [main]
-    paths: ["services/**", "vendor/**", "backoffice/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml"]
+    paths: ["services/**", "vendor/**", "backoffice/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml", ".github/workflows/_manifest.yml"]
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write, attestations: write }
 
 jobs:
   core:
     # ADR-012 hybrid runtimes: native images for light I/O-bound services, JVM + AOT cache for hot paths.
+    # Built per arch on matching runners (2026-11-20, arm64 runtime): native binaries and the Java AOT cache are both
+    # CPU-specific, so emulation is not an option. core-manifest joins -amd64/-arm64 under the plain tag and signs it.
     strategy:
       fail-fast: false
       matrix:
+        module: [cmd-svc, qry-svc, saga-orchestrator, rehydration-svc, consistency-router, rate-limiter, projection-svc,
+                 replay-engine, process-gateway, exchange-svc]
+        arch: [amd64, arm64]
         include:
-          - { module: cmd-svc,            native: false }
-          - { module: qry-svc,            native: false }
-          - { module: saga-orchestrator,  native: false }
-          - { module: rehydration-svc,    native: true }    # Tier 3 memory: KEDA keeps 2 replicas; gRPC + Kafka + Redis are native-clean (as projection-svc)
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+          # Native: light I/O-bound services (rehydration-svc: KEDA keeps 2 replicas; gRPC + Kafka + Redis are native-clean).
+          # JVM: process-gateway (Temporal SDK shaded Netty is not native-image clean), exchange-svc (Agrona off-heap rings).
+          - { module: rehydration-svc,    native: true }
           - { module: consistency-router, native: true }
           - { module: rate-limiter,       native: true }
           - { module: projection-svc,     native: true }
           - { module: replay-engine,      native: true }
-          - { module: process-gateway,    native: false }   # Temporal SDK shaded Netty is not native-image clean
-          - { module: exchange-svc,       native: false }   # Agrona off-heap rings: JVM (needs --add-exports, see Dockerfile.jvm)
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-${{ matrix.module }}
@@ -31,9 +35,24 @@ jobs:
       build-args: |
         MODULE=${{ matrix.module }}
       java: true
+      platforms: linux/${{ matrix.arch }}
+      runner: ${{ matrix.runner }}
+      tag-suffix: -${{ matrix.arch }}
+      sign: false
       prebuild: >-
         mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
         ${{ matrix.native && '-Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true -Dquarkus.native.builder-image=quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25' || '-Dquarkus.package.jar.aot.enabled=true' }}
+
+  core-manifest:
+    needs: core
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [cmd-svc, qry-svc, saga-orchestrator, rehydration-svc, consistency-router, rate-limiter, projection-svc,
+                 replay-engine, process-gateway, exchange-svc]
+    uses: ./.github/workflows/_manifest.yml
+    with:
+      name: difme-${{ matrix.module }}
 
   backoffice:
     strategy:

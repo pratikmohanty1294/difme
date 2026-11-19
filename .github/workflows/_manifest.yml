@@ -1,0 +1,47 @@
+# Joins per-arch images (built by _image.yml with tag-suffix -amd64 / -arm64 on matching runners) into one multi-arch
+# tag, then signs and attests the joined digest: that is the digest Kyverno's verifyImages checks at admission.
+name: _manifest
+on:
+  workflow_call:
+    inputs:
+      name:    { type: string, required: true }    # image name without registry
+      version: { type: string, default: "0.1.0" }
+
+jobs:
+  manifest:
+    runs-on: ubuntu-24.04
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ inputs.name }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Join amd64 + arm64
+        id: join
+        run: |
+          docker buildx imagetools create \
+            -t "${IMAGE}:${{ inputs.version }}" -t "${IMAGE}:sha-${{ github.sha }}" \
+            "${IMAGE}:sha-${{ github.sha }}-amd64" "${IMAGE}:sha-${{ github.sha }}-arm64"
+          digest=$(docker buildx imagetools inspect "${IMAGE}:sha-${{ github.sha }}" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          docker buildx imagetools inspect "${IMAGE}:sha-${{ github.sha }}" | grep -E "Platform" || true
+      - name: Syft SBOM
+        uses: anchore/sbom-action@v0
+        with: { image: "${{ env.IMAGE }}@${{ steps.join.outputs.digest }}", format: spdx-json, output-file: sbom.spdx.json, upload-artifact: false }
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with: { subject-name: "${{ env.IMAGE }}", subject-digest: "${{ steps.join.outputs.digest }}", sbom-path: sbom.spdx.json, push-to-registry: true }
+      - uses: sigstore/cosign-installer@v3
+      - name: Cosign keyless signature
+        run: cosign sign --yes "${IMAGE}@${{ steps.join.outputs.digest }}"
+      - name: SLSA provenance
+        id: provenance
+        uses: actions/attest-build-provenance@v2
+        with: { subject-name: "${{ env.IMAGE }}", subject-digest: "${{ steps.join.outputs.digest }}", push-to-registry: true }
+      - name: Cosign attestations for admission control (SLSA provenance + SPDX SBOM)
+        run: |
+          REF="${IMAGE}@${{ steps.join.outputs.digest }}"
+          jq -r '.dsseEnvelope.payload' "${{ steps.provenance.outputs.bundle-path }}" | base64 -d | jq '.predicate' > provenance.json
+          cosign attest --yes --type slsaprovenance1 --predicate provenance.json "$REF"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"

@@ -16,7 +16,10 @@ spec:
             - { name: SPRING_DATASOURCE_USERNAME, value: difme }
             - { name: SPRING_DATASOURCE_PASSWORD, valueFrom: { secretKeyRef: { name: postgres-docdb, key: password } } }
             - { name: FLUXNOVA_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: fluxnova, key: admin-password } } }
-            - { name: JAVA_OPTS, value: "-Xms256m -Xmx640m" }
+            # Back-office workflows, not the payment path: SerialGC, capped metaspace/code cache, small stacks, 2 malloc
+            # arenas (the Tier 2 control-plane profile, full JIT kept for rule/DMN evaluation).
+            - { name: JAVA_OPTS, value: "-Xms128m -Xmx512m -XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Xss256k" }
+            - { name: MALLOC_ARENA_MAX, value: "2" }
           ports: [{ containerPort: 8080 }]
           readinessProbe: { httpGet: { path: /engine-rest/version, port: 8080 }, initialDelaySeconds: 40, periodSeconds: 10 }
           volumeMounts: [{ name: config, mountPath: /difme }]

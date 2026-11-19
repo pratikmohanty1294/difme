@@ -31,16 +31,32 @@ swap() {
   fi
   echo "swap: $(awk -v f="$SWAP" '$1==f {printf "%d MiB", $3/1024}' /proc/swaps), zswap=$(cat $Z/enabled 2>/dev/null) $(cat $Z/compressor 2>/dev/null)"
 }
+# After a Codespace restart Docker may give the node container a new IP on the k3d network. Cilium then keeps
+# endpoint state under the old one ("cannot take ownership of CEP that is not local ... nodeIP"), and pod-to-pod
+# TCP partly fails (YugabyteDB/Temporal unreachable while DNS works; found 2026-11-19). Restart Cilium once the API is
+# up and recreate pods that still carry the old host IP.
+refresh_network() {
+  command -v kubectl >/dev/null || return 0
+  for i in $(seq 1 60); do kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready" && break; sleep 5; done
+  local ip; ip=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)
+  [ -z "$ip" ] && return 0
+  kubectl -n kube-system rollout restart ds/cilium deploy/cilium-operator >/dev/null 2>&1 || return 0
+  kubectl -n kube-system rollout status ds/cilium --timeout=180s >/dev/null 2>&1
+  kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.metadata.name} {.status.hostIP}{"
+"}{end}' 2>/dev/null     | awk -v ip="$ip" '$3 != "" && $3 != ip {print $1, $2}' | while read -r ns p; do kubectl -n "$ns" delete pod "$p" --wait=false >/dev/null 2>&1; done
+  echo "network refreshed for node IP $ip"
+}
 has_default_acl() { getfacl -p "$DIR" 2>/dev/null | grep -q '^default:'; }
 case "${1:-}" in
   prepare) fix; swap; echo "image disk ready: $DIR" ;;
   swap) swap ;;
   heal)
     swap
-    [ -d "$DIR" ] && ! has_default_acl && { echo "image disk OK"; exit 0; }
+    [ -d "$DIR" ] && ! has_default_acl && { echo "image disk OK"; refresh_network; exit 0; }
     if docker inspect "$NODE" >/dev/null 2>&1; then
       docker stop "$NODE" >/dev/null; fix; docker start "$NODE" >/dev/null
       echo "image disk healed; $NODE restarted (images re-pull from the registry caches)"
+      refresh_network
     else
       fix; echo "image disk prepared (no cluster yet)"
     fi ;;

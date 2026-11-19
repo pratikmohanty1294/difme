@@ -13,10 +13,10 @@ jobs:
         with: { node-version: "22" }
       - name: Build vendored formio.js
         working-directory: vendor/formio/js
-        run: npm install --no-audit --no-fund && npm run lib && npm run dist
+        run: npm ci --no-audit --no-fund && npm run lib && npm run dist
       - run: corepack enable
       - working-directory: backoffice
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - working-directory: backoffice
         run: pnpm turbo run build
       - name: Bundle budget (hard gate)

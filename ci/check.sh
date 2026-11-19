@@ -27,7 +27,7 @@ if want flink; then
   echo "✓ flink"
 fi
 if want backoffice; then
-  (cd backoffice && pnpm install --prefer-offline --silent && pnpm turbo run build --output-logs=errors-only && pnpm bundle-budget)
+  (cd backoffice && pnpm install --frozen-lockfile --prefer-offline --silent && pnpm turbo run build --output-logs=errors-only && pnpm bundle-budget)
   echo "✓ backoffice"
 fi
 if want deploy; then

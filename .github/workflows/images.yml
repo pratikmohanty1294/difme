@@ -39,9 +39,13 @@ jobs:
       runner: ${{ matrix.runner }}
       tag-suffix: -${{ matrix.arch }}
       sign: false
+      # Retried: x64 runners intermittently get "Could not find artifact" for artifacts Central does serve (shared-IP
+      # throttling, seen 2026-11-20 on a different artifact each run); the not-found markers are cleared between tries.
       prebuild: >-
-        mvn -B -ntp -q -U -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
+        for try in 1 2 3; do
+        mvn -B -ntp -q -U -Daether.connector.http.retryHandler.count=5 -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
         ${{ matrix.native && '-Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true -Dquarkus.native.builder-image=quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25' || '-Dquarkus.package.jar.aot.enabled=true' }}
+        && break; [ $try = 3 ] && exit 1; find ~/.m2/repository -name '*.lastUpdated' -delete; sleep $((try * 45)); done
 
   core-manifest:
     # -U above: the restored x64 Maven cache held "not found" markers for artifacts that exist in Central (qry-svc

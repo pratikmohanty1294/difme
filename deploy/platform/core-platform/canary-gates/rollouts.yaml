@@ -14,9 +14,11 @@ spec:
       provider:
         prometheus:
           address: http://vmsingle-victoria-metrics-k8s-stack.observability.svc:8429
+          # "or vector(1)": with no traffic the ratio is empty and the analysis errored, aborting the very first rollout
+          # of a fresh cluster (found by cluster-verify 2026-11-20). No requests means nothing failed.
           query: |
-            sum(rate(http_server_requests_seconds_count{service="{{args.service}}",outcome="SUCCESS"}[2m]))
-            / sum(rate(http_server_requests_seconds_count{service="{{args.service}}"}[2m]))
+            (sum(rate(http_server_requests_seconds_count{service="{{args.service}}",outcome="SUCCESS"}[2m]))
+            / sum(rate(http_server_requests_seconds_count{service="{{args.service}}"}[2m]))) or vector(1)
     - name: p99-latency
       interval: 1m
       count: 5
@@ -24,7 +26,7 @@ spec:
       provider:
         prometheus:
           address: http://vmsingle-victoria-metrics-k8s-stack.observability.svc:8429
-          query: histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{service="{{args.service}}"}[2m])) by (le))
+          query: histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{service="{{args.service}}"}[2m])) by (le)) or vector(0)
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout

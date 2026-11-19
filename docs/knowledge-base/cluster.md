@@ -226,3 +226,15 @@
 - **Since the rebuild, the restart heals itself:** `postStartCommand` re-creates the swapfile and zswap and clears `/tmp`'s default ACL. The cluster came back on its own in about 15 min of image pulls, with no permission errors.
 - **Long jobs and the idle timeout:** `ci/bg.sh` now reads the keep-alive token from the **`GH_TOKEN` Codespaces secret** in `/workspaces/.codespaces/shared/.env` (SSH sessions don't load it), so jobs report "with keep-alive" and stay up through the idle timeout.
 - **Anything kept in `/tmp` is gone after a restart.** Re-upload helper scripts before re-running.
+
+### After a Codespace restart the k3d node can get a new IP, and Cilium half-breaks (found 2026-11-19)
+- **Symptom:** 14 pods crash-loop and don't recover in 20 min.
+  - DNS resolves, and Postgres connects.
+  - YugabyteDB, Temporal and cmd-svc are unreachable.
+  - The Kafka broker can't reach its own headless name.
+- **Cause:**
+  - Docker gave `k3d-difme-server-0` 172.18.0.3 instead of .2.
+  - Cilium logged `endpoint sync cannot take ownership of CEP that is not local ... pod's hostIP "172.18.0.2", cilium nodeIP "172.18.0.3"`, and kept stale endpoint state.
+- **Fix:** restart `ds/cilium` and `deploy/cilium-operator`, then delete pods whose `status.hostIP` is not the node's InternalIP. Connectivity came back at once.
+- **Now automatic:** `ci/image-disk.sh heal` (postStartCommand) calls `refresh_network` once the node is Ready.
+- **Check by hand:** `nc -z` from a busybox pod to `yb-tservers.database-tier:5433`, `temporal-frontend.temporal:7233` and `difme-kafka-bootstrap.streaming:9092`.

@@ -9,4 +9,7 @@ meshConfig:
     - name: otel
       opentelemetry: { service: alloy.observability.svc.cluster.local, port: 4317 }
   outboundTrafficPolicy: { mode: REGISTRY_ONLY }     # egress allowlist (§4.4)
-pilot: { resources: { requests: { cpu: 100m, memory: 256Mi } } }
+# The chart's default request is 500m CPU / 2 GiB memory; a single-node ambient mesh uses a few hundred MB.
+# (The chart already derives GOMEMLIMIT from the memory limit; don't set it again or the env key duplicates.)
+pilot:
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 1Gi } }

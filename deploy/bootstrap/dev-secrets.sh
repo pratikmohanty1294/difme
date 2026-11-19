@@ -51,6 +51,18 @@ secret harbor        harbor-db password="$YB"
 secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"
 secret security      keycloak admin-password="$(rand)"
+secret security      warpgate admin-password="$(rand)"
+# Veraison EAR signing key: EC P-256 as a JWK (Veraison's loader only reads JWK). b64u: hex -> base64url.
+b64u() { xxd -r -p | base64 -w0 | tr '+/' '-_' | tr -d '='; }
+ear_jwk() {
+  local t; t=$(openssl ecparam -name prime256v1 -genkey -noout 2>/dev/null | openssl ec -text -noout 2>/dev/null)
+  local d pub; d=$(echo "$t" | awk '/priv:/{f=1;next} /pub:/{f=0} f' | tr -d ' :
+')
+  pub=$(echo "$t" | awk '/pub:/{f=1;next} /ASN1 OID/{f=0} f' | tr -d ' :
+'); pub=${pub#04}
+  printf '{"kty":"EC","crv":"P-256","alg":"ES256","d":"%s","x":"%s","y":"%s"}'     "$(printf %s "${d: -64}" | b64u)" "$(printf %s "${pub:0:64}" | b64u)" "$(printf %s "${pub:64:64}" | b64u)"
+}
+kubectl -n security get secret veraison-ear >/dev/null 2>&1 || secret security veraison-ear skey.jwk="$(ear_jwk)"
 secret security      postgres-docdb password="$PG_DOCDB"
 POLARIS_CRED="root:$(rand)"
 for n in streaming lakehouse; do

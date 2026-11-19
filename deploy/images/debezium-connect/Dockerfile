@@ -6,9 +6,10 @@ ARG DEBEZIUM=3.7.1.Final
 ARG APICURIO=3.3.4
 USER root:root
 # Cruise Control (bundled Netty) and kafka_exporter (Go stdlib) are never used by Connect and carry CRITICAL CVEs
-# the gate blocks; removing them also shrinks the image. ca-certificates gets the distro fix.
+# the gate blocks; removing them also shrinks the image. ca-certificates and the JDK get the distro fixes
+# (2026-11-20: CVE-2026-114938 in java-21-openjdk-headless 21.0.10, fixed in 21.0.13).
 RUN set -eux; rm -rf /opt/cruise-control /opt/kafka-exporter; \
-    microdnf -y update ca-certificates && microdnf clean all
+    microdnf -y update ca-certificates 'java-21-openjdk*' && microdnf clean all
 RUN set -eux; m=https://repo1.maven.org/maven2; \
     mkdir -p /opt/kafka/plugins/debezium-postgres /opt/kafka/plugins/apicurio-converters; \
     curl -fsSL "$m/io/debezium/debezium-connector-postgres/$DEBEZIUM/debezium-connector-postgres-$DEBEZIUM-plugin.tar.gz" \

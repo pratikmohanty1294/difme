@@ -1,4 +1,13 @@
 # PDF §10 — VictoriaMetrics (metrics), Grafana (dashboards), Alertmanager + vmalert (alerting).
+# Release "victoria-metrics" + chart name produced names over Kubernetes' 63-character limit
+# (victoria-metrics-victoria-metrics-k8s-stack-kube-controller-manager); this override gives the names the rest of the
+# repo already uses (vmsingle-victoria-metrics-k8s-stack).
+fullnameOverride: victoria-metrics-k8s-stack
+# k3s runs these in-process; there is nothing separate to scrape.
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeEtcd: { enabled: false }
+kubeProxy: { enabled: false }
 vmsingle: { spec: { retentionPeriod: "30d", resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }, storage: { resources: { requests: { storage: 8Gi } } } } }
 vmagent: { spec: { resources: { requests: { cpu: 50m, memory: 128Mi } } } }
 alertmanager:

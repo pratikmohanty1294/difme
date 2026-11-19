@@ -7,21 +7,65 @@ alloy:
     - { name: otlp-http, port: 4318, targetPort: 4318, protocol: TCP }
   configMap:
     content: |
+      // One statement per line: Alloy's syntax rejects several attributes or blocks on a line (found live).
       otelcol.receiver.otlp "default" {
-        grpc { endpoint = "0.0.0.0:4317" }
-        http { endpoint = "0.0.0.0:4318" }
-        output { metrics = [otelcol.exporter.prometheus.vm.input]  traces = [otelcol.exporter.otlp.tempo.input]  logs = [otelcol.exporter.loki.default.input] }
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+        output {
+          metrics = [otelcol.exporter.prometheus.vm.input]
+          traces  = [otelcol.exporter.otlp.tempo.input]
+          logs    = [otelcol.exporter.loki.default.input]
+        }
       }
-      otelcol.exporter.prometheus "vm" { forward_to = [prometheus.remote_write.vm.receiver] }
-      prometheus.remote_write "vm" { endpoint { url = "http://vmsingle-victoria-metrics-k8s-stack.observability.svc:8429/api/v1/write" } }
-      otelcol.exporter.otlp "tempo" { client { endpoint = "tempo.observability.svc:4317"  tls { insecure = true } } }
-      otelcol.exporter.loki "default" { forward_to = [loki.write.default.receiver] }
-      loki.write "default" { endpoint { url = "http://loki-gateway.observability.svc/loki/api/v1/push" } }
-      discovery.kubernetes "pods" { role = "pod" }
-      loki.source.kubernetes "pods" { targets = discovery.kubernetes.pods.targets  forward_to = [loki.write.default.receiver] }
+      otelcol.exporter.prometheus "vm" {
+        forward_to = [prometheus.remote_write.vm.receiver]
+      }
+      prometheus.remote_write "vm" {
+        endpoint {
+          url = "http://vmsingle-victoria-metrics-k8s-stack.observability.svc:8429/api/v1/write"
+        }
+      }
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.observability.svc:4317"
+          tls {
+            insecure = true
+          }
+        }
+      }
+      otelcol.exporter.loki "default" {
+        forward_to = [loki.write.default.receiver]
+      }
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.observability.svc/loki/api/v1/push"
+        }
+      }
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+      loki.source.kubernetes "pods" {
+        targets    = discovery.kubernetes.pods.targets
+        forward_to = [loki.write.default.receiver]
+      }
       discovery.relabel "profiled" {
         targets = discovery.kubernetes.pods.targets
-        rule { source_labels = ["__meta_kubernetes_pod_annotation_profiles_grafana_com_cpu_scrape"]  action = "keep"  regex = "true" }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_annotation_profiles_grafana_com_cpu_scrape"]
+          action        = "keep"
+          regex         = "true"
+        }
       }
-      pyroscope.scrape "pods" { targets = discovery.relabel.profiled.output  forward_to = [pyroscope.write.default.receiver] }
-      pyroscope.write "default" { endpoint { url = "http://pyroscope.observability.svc:4040" } }
+      pyroscope.scrape "pods" {
+        targets    = discovery.relabel.profiled.output
+        forward_to = [pyroscope.write.default.receiver]
+      }
+      pyroscope.write "default" {
+        endpoint {
+          url = "http://pyroscope.observability.svc:4040"
+        }
+      }

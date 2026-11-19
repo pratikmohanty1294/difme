@@ -40,11 +40,15 @@ jobs:
       tag-suffix: -${{ matrix.arch }}
       sign: false
       prebuild: >-
-        mvn -B -ntp -q -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
+        mvn -B -ntp -q -U -f services/core/pom.xml -pl ${{ matrix.module }} -am package -DskipTests
         ${{ matrix.native && '-Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true -Dquarkus.native.builder-image=quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25' || '-Dquarkus.package.jar.aot.enabled=true' }}
 
   core-manifest:
+    # -U above: the restored x64 Maven cache held "not found" markers for artifacts that exist in Central (qry-svc
+    # failed twice on amd64 only, 2026-11-20). !cancelled(): one failed leg must not skip every other manifest;
+    # a module whose arch images are missing fails its own join step.
     needs: core
+    if: ${{ !cancelled() }}
     strategy:
       fail-fast: false
       matrix:

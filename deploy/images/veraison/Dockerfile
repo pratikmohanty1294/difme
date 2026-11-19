@@ -17,7 +17,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 616 veraison && useradd -u 616 -g veraison --system -m veraison
 COPY --from=build /out/ /usr/local/bin/
-COPY entrypoint.sh /usr/local/bin/veraison-entrypoint
+COPY --chmod=755 entrypoint.sh /usr/local/bin/veraison-entrypoint
 WORKDIR /opt/veraison
 USER 616:616
 ENTRYPOINT ["/usr/local/bin/veraison-entrypoint"]

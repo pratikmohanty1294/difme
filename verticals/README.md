@@ -56,3 +56,12 @@ fulfilment proof differ. The **kernel** (`services/core/exchange-kernel`) implem
 - FR-01 has two weight sets. The PRD's domain profile (.60/.25/.15) is the default. The v4.1 per-settlement-flow weights
   apply when a bid names its flow.
 - `min_minor` floors are placeholders until the owner sets them.
+
+## Rails (ADR-018)
+`services/core/exchange-rails` holds one port per rail with a deterministic simulator behind each (`sim/SimRails`):
+`card-agent-credential` (single-use agentic token, amount and merchant capped), `merchant-psp-checkout` (ISO 8583
+0100/0110 with a simulated issuer: limits → 51, scripted faults → 91/96, duplicate STAN replays the original 0110),
+`agent-pa-escrow` (hold/release/refund with conservation), `upi-reserve-pay` (block, partial debits) and `stablecoin`.
+`Failover` runs the winner and hot backups in rank order and slashes with the kernel formula from the pack's per-code
+basis points. `RailRegistry.requireAll` refuses a pack whose rails aren't all implemented. Real providers replace a
+simulator by registering another implementation of the same port.

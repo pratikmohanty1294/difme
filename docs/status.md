@@ -164,7 +164,7 @@ Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/di
 
 | Branch | What it fixes | Run to check | Next action |
 |---|---|---|---|
-| `wip-formio-auth` | formio → FerretDB 2 with SCRAM credentials (process profile) | 44689378187 `core,process` | process converged → merge; else read the formio log for the next error |
+| `wip-formio-auth` | formio → FerretDB 2: SCRAM credentials (worked) + DocumentDB extension created at Postgres init | 44694741384 `core,process` (with fail-fast) | process converged → merge; else read the formio log for the next error |
 | `wip-security-dev` | OpenBao 1 replica + static seal + self-init; SPIRE hooks off; Istio ambient on Cilium (probe CCNP 169.254.7.127, cni.exclusive=false, istio-cni k3d paths); Veraison stores; verifier kept | 44691132238 `core,security` | needs the `difme-attestation-verifier` image from the main image build; converged → merge |
 | `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`) | 44689754881 `core,streaming,lakehouse,ml` (first run lost its runner) | converged → rebase on main (keep-both doc conflicts) → merge; then extras |
 | `wip-mem-batch2` | Go defaults GOMAXPROCS=2/GOGC=50 (Kyverno, where unset); JVM ActiveProcessorCount=2 | A/B 44690021537 vs main 44690017534 (`core` + `measure 200 60s`) | merge only if PSS/CPU drop and accepted/p50/p99 don't regress |

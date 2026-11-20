@@ -66,3 +66,4 @@ Marquez 0.50 API (`-Xmx256m`, SerialGC) 187 MiB PSS + web UI 51 MiB, on the shar
 - YugabyteDB tserver heartbeat 1 s → 3 s did not change the ~270 KB/s each way between yb-tserver and yb-master (542.9 vs 542.4 KB/s): heartbeats are not the source. Reverted.
 - One 15 s window is too noisy for disk I/O of bursty processes (Flink): use the since-start average.
 - Second A/B: fraud-cep incremental RocksDB checkpoints gave no benefit and the JobManager looked restarted (8.7 vs 2.0 MB/s); dropped. The process report runs right after convergence, so measure idle disk I/O only after a settle period.
+- YugabyteDB single-node idle chatter (~270–350 KB/s each way, tserver↔master): not heartbeats (1→3 s no change) and not tablet count (1 tablet/table: traffic slightly up, CPU within noise). Both reverted. Next step: read YB's per-RPC metrics before changing flags.

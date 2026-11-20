@@ -119,6 +119,8 @@ if [ "$rc" -eq 0 ] && kubectl -n core-platform get configmap exchange-evidence >
     newest=$(kubectl -n core-platform get pods -l app=exchange-svc --sort-by=.metadata.creationTimestamp -o name 2>/dev/null | tail -1)
     [ -n "$newest" ] && kubectl -n core-platform logs "$newest" --tail=30 2>&1 | grep -iE 'evidence|openbao|notary|transit|error|exception|caused' | tail -12 | cut -c1-260
     echo "  restart job:"; kubectl -n core-platform logs job/exchange-evidence-restart --tail=5 2>&1 | cut -c1-200
+    echo "  configmap: $(kubectl -n core-platform get configmap exchange-evidence -o jsonpath='{.data.DIFME_EVIDENCE_OPERATOR}' 2>&1)"
+    kubectl -n argocd get application exchange-evidence -o jsonpath='  app: {.status.sync.status} {.status.health.status} {.status.operationState.phase} {.status.operationState.message}{"\n"}' 2>&1 | cut -c1-300
     kubectl -n core-platform get events --sort-by=.lastTimestamp 2>/dev/null | grep -iE 'exchange-evidence|exchange-svc' | tail -6 | cut -c1-220
   fi
 fi

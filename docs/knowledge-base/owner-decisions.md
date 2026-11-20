@@ -4,6 +4,7 @@ Imported from the agent sessions of 2026-11-17 to 2026-11-20 so that no answer l
 Newest first within each section. When the owner answers a question, move it from **Open** to **Decided** with the date.
 
 ## Working rules (in force)
+- **Save progress after every step** (2026-11-20, "so that nothing is lost in abrupt stoppage of GitHub Actions or network issues"): push work to a `wip-*` branch as soon as it exists, and update the PROGRESS LOG in `docs/status.md` on `main` (branch, fix, run, next action) after each step.
 - **Nothing runs on the owner's PC** (2026-11-20): no builds, installs, scans, watchers, `git` or `gh`. Work happens in a cloud agent session, GitHub Actions, or the runtime VM/Codespace.
 - **Never sit idle.** While something runs in the background, work on the next items using what is known about the system.
 - **Be proactive about delays.** Know how long a step should take, track how long it has taken, and report an overrun without being asked. Watchers get deadlines and fail fast.

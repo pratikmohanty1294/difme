@@ -17,3 +17,10 @@ configOverrides:
     SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
   roles: |
     FAB_ROLES = {"Compliance": [[".*", "can_read"]], "Settlements": [["Dashboard", "can_read"]]}
+# The chart's worker waits for its bundled Redis (superset-redis-headless), which is disabled: we use Valkey
+# (cluster-verify 44734645270: worker init crash-looped on "no such host").
+supersetWorker:
+  initContainers:
+    - name: wait-for-valkey
+      image: apache/superset:dockerize
+      command: [/bin/sh, -c, "dockerize -wait tcp://valkey.cache-tier.svc:6379 -wait tcp://yb-tservers.database-tier.svc:5433 -timeout 300s"]

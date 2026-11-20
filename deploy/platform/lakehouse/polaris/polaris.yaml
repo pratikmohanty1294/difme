@@ -1,4 +1,7 @@
-# Iceberg REST catalog (ADR-005): shared by Trino, Spark and Flink; metadata on YugabyteDB.
+# Iceberg REST catalog (ADR-005): shared by Trino, Spark and Flink. Metadata on the shared Postgres (moved off
+# YugabyteDB like Temporal/RisingWave/Harbor/MLflow, whose schema migrations broke there). With relational-jdbc the
+# schema and the root principal come from the admin tool's bootstrap (Job below), not from the server's
+# POLARIS_BOOTSTRAP_CREDENTIALS (cluster-verify 44734645270: "relation polaris_schema.entities does not exist").
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: polaris, labels: { app: polaris } }
@@ -13,7 +16,9 @@ spec:
           image: apache/polaris:1.0.0-incubating
           env:
             - { name: POLARIS_PERSISTENCE_TYPE, value: relational-jdbc }
-            - { name: QUARKUS_DATASOURCE_JDBC_URL, value: "jdbc:postgresql://yb-tservers.database-tier.svc:5433/polaris" }
+            - { name: QUARKUS_DATASOURCE_JDBC_URL, value: "jdbc:postgresql://postgres-docdb.database-tier.svc:5432/polaris" }
+            - { name: QUARKUS_DATASOURCE_USERNAME, value: polaris }
+            - { name: QUARKUS_DATASOURCE_PASSWORD, valueFrom: { secretKeyRef: { name: polaris-db, key: password } } }
             - { name: POLARIS_BOOTSTRAP_CREDENTIALS, valueFrom: { secretKeyRef: { name: polaris-bootstrap, key: credentials } } }
           ports: [{ name: api, containerPort: 8181 }, { name: mgmt, containerPort: 8182 }]
           resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
@@ -22,3 +27,24 @@ apiVersion: v1
 kind: Service
 metadata: { name: polaris }
 spec: { selector: { app: polaris }, ports: [{ name: api, port: 8181 }, { name: mgmt, port: 8182 }] }
+---
+# One-time schema + realm bootstrap (a completed Job is not re-run by Argo CD). The credential is "realm,client,secret".
+apiVersion: batch/v1
+kind: Job
+metadata: { name: polaris-bootstrap }
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: apache/polaris-admin-tool:1.0.0-incubating
+          args: [bootstrap, --realm=POLARIS, "--credential=$(POLARIS_BOOTSTRAP_CREDENTIALS)"]
+          env:
+            - { name: POLARIS_PERSISTENCE_TYPE, value: relational-jdbc }
+            - { name: QUARKUS_DATASOURCE_JDBC_URL, value: "jdbc:postgresql://postgres-docdb.database-tier.svc:5432/polaris" }
+            - { name: QUARKUS_DATASOURCE_USERNAME, value: polaris }
+            - { name: QUARKUS_DATASOURCE_PASSWORD, valueFrom: { secretKeyRef: { name: polaris-db, key: password } } }
+            - { name: POLARIS_BOOTSTRAP_CREDENTIALS, valueFrom: { secretKeyRef: { name: polaris-bootstrap, key: credentials } } }
+          resources: { requests: { cpu: 50m, memory: 192Mi }, limits: { memory: 384Mi } }

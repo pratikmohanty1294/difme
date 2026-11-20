@@ -35,6 +35,9 @@ secret lakehouse     seaweedfs-s3-admin RCLONE_CONFIG_SW_TYPE=s3 RCLONE_CONFIG_S
                      RCLONE_CONFIG_SW_ENDPOINT=http://seaweedfs-s3:8333 RCLONE_CONFIG_SW_ACCESS_KEY_ID="$S3_KEY" RCLONE_CONFIG_SW_SECRET_ACCESS_KEY="$S3_SECRET"
 POLARIS_SECRET=$(rand)   # one secret for the bootstrap principal and the clients (they were generated separately and could never match)
 secret lakehouse     polaris-bootstrap credentials="POLARIS,root,$POLARIS_SECRET"
+POLARIS_PG=$(rand)
+secret lakehouse     polaris-db password="$POLARIS_PG"
+secret database-tier polaris-db password="$POLARIS_PG"
 secret lakehouse     superset-secret-key key="$(rand 48)"
 secret streaming     risingwave-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET"   # key names the chart requires
 # RisingWave meta store is on the shared Postgres (ADR-019 pattern); both copies must match, so reuse an existing one.

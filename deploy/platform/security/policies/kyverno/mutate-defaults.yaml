@@ -12,6 +12,21 @@ spec:
             containers:
               - (name): "*"
                 securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+    # Process-level memory (owner rule 2026-11-20): glibc gives every threaded process up to 8 malloc arenas per core,
+    # each keeping freed memory it rarely returns; on a 4-core node that is up to 32 arenas per JVM, Postgres or C++
+    # process. Two arenas cut that fragmentation; Go and musl binaries ignore the variable. Added only where a container
+    # doesn't set its own value (+() anchor), at Pod level so no Argo CD-managed template changes.
+    - name: default-malloc-arena-max
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      exclude: { any: [{ resources: { namespaces: [kube-system] } }] }
+      mutate:
+        patchStrategicMerge:
+          spec:
+            containers:
+              - (name): "*"
+                env:
+                  - name: MALLOC_ARENA_MAX
+                    +(value): "2"
     # Third-party operators and charts (Strimzi, KEDA, Apicurio, Flink, RisingWave, ...) don't carry our
     # cost-attribution labels, so require-labels-and-limits rejected them and the streaming profile never came up.
     # Fill in shared-infrastructure defaults only where a label is missing; our own services keep theirs.

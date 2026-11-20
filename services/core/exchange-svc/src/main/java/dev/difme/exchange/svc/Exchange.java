@@ -49,17 +49,18 @@ public class Exchange {
     public record Ranked(int nodeRef, long askMinor, double score) {}
 
     /** Commercial terms of the intent, needed to settle the award (all minor units). */
-    public record Terms(long listMinor, int discountBps, long feeMinor, Risk.Tier partnerTier) {}
+    public record Terms(long listMinor, int discountBps, long feeMinor) {}
 
     /**
      * The award: the winner's split under the conservation identity (A, Y, F, B, buyer saving; FR-01 v4.1) and the
-     * collateral the winner must lock before execution (FR-14, D_req = max(D_min, V·α·γ·φ)). Open owner questions:
-     * V is taken as A (what the partner pays the merchant) and the partner tier defaults to ESTABLISHED.
+     * collateral the winner must lock before execution (FR-14, D_req = max(D_min, V·α·γ·φ)). V is A (what the partner
+     * pays the merchant); φ comes from the winner's tier, which the exchange derives from its own history (decided
+     * 2026-11-20): COLD_START until enough verified deliveries, then ESTABLISHED.
      */
-    public record Award(Ranked winner, CommerceSplit split, long collateralMinor) {}
+    public record Award(Ranked winner, CommerceSplit split, long collateralMinor, Risk.Tier tier) {}
 
     /** What the exchange (not the bidder) knows about an open auction; the facts bid-time rules are checked against. */
-    public record Context(long cardPriceMinor, long yieldRoomMinor, long depositNeededMinor) {}
+    public record Context(long cardPriceMinor, long yieldRoomMinor) {}
 
     public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
 
@@ -83,6 +84,8 @@ public class Exchange {
     private final Map<String, PublicKey> partyKeys = new ConcurrentHashMap<>();
     /** FR-16 reputation the exchange has learned per partner ("pack:nodeRef"), from execution and fulfilment outcomes. */
     private final Map<String, Double> reputation = new ConcurrentHashMap<>();
+    /** Verified deliveries per partner ("pack:nodeRef"): accepted proofs of delivery, the basis of the tier. */
+    private final Map<String, Integer> deliveries = new ConcurrentHashMap<>();
     private Map<Long, Fulfilment> fulfilments;
     /** Overrides every pack's return window when >= 0 (tests can't wait days). */
     @ConfigProperty(name = "difme.exchange.return-window-override-ms", defaultValue = "-1") long returnWindowOverrideMs;
@@ -178,8 +181,7 @@ public class Exchange {
         chain.append(EvidenceChain.Type.intent, EvidenceChain.Signal.Deterministic, intent);
         chains.put(id, chain);
         long cardPrice = t.listMinor() - Math.round(t.listMinor() * (t.discountBps() / 10_000.0));
-        contexts.put(id, new Context(cardPrice, maxAcceptableMinor, Risk.requiredCollateral(cardPrice,
-                p.collateral().alpha(), p.collateral().gammaRev(), t.partnerTier(), p.collateral().minMinor())));
+        contexts.put(id, new Context(cardPrice, maxAcceptableMinor));
         openAuctions.put(id, pack);
         terms.put(id, t);
         long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
@@ -227,6 +229,37 @@ public class Exchange {
 
     public Context context(long auctionId) {
         return contexts.get(auctionId);
+    }
+
+    /** FR-14 collateral this partner would have to lock for this auction, at the partner's own tier; -1 if not open. */
+    public long depositNeeded(long auctionId, int nodeRef) {
+        Context c = contexts.get(auctionId);
+        String pack = openAuctions.get(auctionId);
+        if (c == null || pack == null) return -1;
+        VerticalPack p = packs.get(pack);
+        return Risk.requiredCollateral(c.cardPriceMinor(), p.collateral().alpha(), p.collateral().gammaRev(),
+                tierOf(pack, nodeRef), p.collateral().minMinor());
+    }
+
+    /** The partner's tier from the exchange's own records, never from the intent or the bid. */
+    public Risk.Tier tierOf(String pack, long nodeRef) {
+        VerticalPack p = packs.get(pack);
+        String k = pack + ":" + nodeRef;
+        return tierFor(deliveries.getOrDefault(k, 0), reputation.get(k), p == null ? Integer.MAX_VALUE : p.establishedAfterDeliveries());
+    }
+
+    /**
+     * COLD_START (φ 2.0) until the partner has {@code threshold} verified deliveries and a tracked reputation no lower
+     * than the cold-start prior; then ESTABLISHED (φ 1.0). ENTERPRISE (φ 0.6) needs a signed enterprise agreement and is
+     * never reached from history alone.
+     */
+    static Risk.Tier tierFor(int verifiedDeliveries, Double trackedReputation, int threshold) {
+        return verifiedDeliveries >= threshold && trackedReputation != null && trackedReputation >= Reputation.PRIOR_UNVERIFIED
+                ? Risk.Tier.ESTABLISHED : Risk.Tier.COLD_START;
+    }
+
+    public int verifiedDeliveries(String pack, int nodeRef) {
+        return deliveries.getOrDefault(pack + ":" + nodeRef, 0);
     }
 
     public String packOf(long auctionId) {
@@ -359,6 +392,7 @@ public class Exchange {
                 chain.append(EvidenceChain.Type.fulfillment, EvidenceChain.Signal.Attested, f);
             }
             learn(r.pack(), e.boughtBy(), 100, s.a(), Reputation.PRIOR_UNVERIFIED);   // delivered: a successful task
+            deliveries.merge(r.pack() + ":" + e.boughtBy(), 1, Integer::sum);
             Fulfilment ok = new Fulfilment(auctionId, true, List.of(), hold, yieldAt);
             fulfilments.put(auctionId, ok);
             metrics.counter("difme_exchange_fulfilments_total", "pack", r.pack()).increment();
@@ -402,9 +436,10 @@ public class Exchange {
             VerticalPack p = packs.get(pack);
             Ranked w = top.get(0);
             CommerceSplit split = CommerceSplit.of(t.listMinor(), t.discountBps(), w.askMinor(), t.feeMinor(), p.guaranteeFundBps());
+            Risk.Tier tier = tierOf(pack, w.nodeRef());
             long collateral = Risk.requiredCollateral(split.a(), p.collateral().alpha(), p.collateral().gammaRev(),
-                    t.partnerTier(), p.collateral().minMinor());
-            award = new Award(w, split, collateral);
+                    tier, p.collateral().minMinor());
+            award = new Award(w, split, collateral, tier);
             // Draw the card price A from the winner's mandate budget (it was checked against the budget at bid time;
             // a concurrent award on the same mandate can still race, so never let it go negative).
             Long mandateId = bound == null ? null : bound.get(w.nodeRef());
@@ -428,6 +463,7 @@ public class Exchange {
                 auth.put("currency", "INR");
                 auth.put("buyerSaves", award.split().buyerSaves());
                 auth.put("collateralMinor", award.collateralMinor());
+                auth.put("winnerTier", award.tier().name());
             }
             chain.append(EvidenceChain.Type.authorization, EvidenceChain.Signal.Deterministic, auth);
             chain.seal(OPERATOR, operatorKey.getPrivate(), Map.of(WITNESS, witnessKey.getPrivate()));

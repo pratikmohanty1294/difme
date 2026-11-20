@@ -87,7 +87,7 @@ paths:
       security: [{ oauth2: [exchange:read] }]
       parameters: [{ $ref: "#/components/parameters/Pack" }, { name: nodeRef, in: path, required: true, schema: { type: integer } }]
       responses:
-        "200": { description: Reputation, content: { application/json: { schema: { type: object, properties: { pack: { type: string }, nodeRef: { type: integer }, reputation: { type: [number, "null"], minimum: 0, maximum: 100 }, tracked: { type: boolean } } } } } }
+        "200": { description: Reputation, content: { application/json: { schema: { type: object, properties: { pack: { type: string }, nodeRef: { type: integer }, reputation: { type: [number, "null"], minimum: 0, maximum: 100 }, tracked: { type: boolean }, verifiedDeliveries: { type: integer, minimum: 0 }, tier: { type: string, enum: [COLD_START, ESTABLISHED, ENTERPRISE] } } } } } }
         "404": { description: Unknown pack }
   /v1/exchange/auctions/{auctionId}/bids:
     post:
@@ -264,7 +264,6 @@ components:
         discountBps: { type: integer, minimum: 1, maximum: 9999 }
         feeMinor: { type: integer, format: int64, minimum: 0 }
         maxPriceMinor: { type: integer, format: int64, minimum: 1 }
-        partnerTier: { type: string, enum: [COLD_START, ESTABLISHED, ENTERPRISE] }
     IntentOpened:
       type: object
       properties:
@@ -326,6 +325,7 @@ components:
           type: object
           properties:
             collateralMinor: { type: integer, format: int64 }
+            tier: { type: string, enum: [COLD_START, ESTABLISHED, ENTERPRISE], description: "the winner's tier from its delivery history (FR-14 φ)" }
             split: { type: object, description: "Conservation identity: A = P − d·P; B = A + Y + F; buyer saves P − B", additionalProperties: { type: integer, format: int64 } }
     Execution:
       type: object

@@ -47,6 +47,8 @@ if [ $rc -ne 0 ]; then
   for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error|Pending/ || ($4 == "Running" && $3 ~ /^0\//) {print $1"/"$2}' | head -8); do
     echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=40 2>&1 | cut -c1-300
     kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous --tail=15 2>/dev/null | sed 's/^/  (previous) /' | cut -c1-300
+    # Errors of the previous run: a long config dump (Trino's Bootstrap table) pushes them out of the tail.
+    kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous 2>/dev/null | grep -E 'ERROR|FATAL|Exception:|Caused by|panic' | grep -v '^\s*at ' | head -8 | sed 's/^/  (previous error) /' | cut -c1-300
     kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8
   done
   # Apps can stay Progressing while every pod is Ready (a FlinkDeployment whose job keeps failing, a Rollout, a Job).

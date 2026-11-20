@@ -11,7 +11,7 @@ env:
   - { name: YB_TRINO_USER, value: trino }
   - { name: YB_TRINO_PASSWORD, value: dev-ysql-auth-off }
 coordinator:
-  resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1280Mi } }
+  resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 1280Mi } }   # used 668 Mi at start (run 44724409966)
   jvm: { maxHeapSize: 768M }
   config: { nodeScheduler: { includeCoordinator: true }, query: { maxMemoryPerNode: "256MB" } }   # must fit the 768M heap
 catalogs:

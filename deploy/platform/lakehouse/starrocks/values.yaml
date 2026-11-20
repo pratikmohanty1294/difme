@@ -7,7 +7,7 @@ starrocks:
     replicas: 1
     runAsNonRoot: true    # chart 1.10.1 renders false as null (its helper prints only truthy values) and the CRD rejects null;
                           # true runs as uid 1000, which the chart recommends for a fresh cluster (no root-owned files yet)
-    resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
+    resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 1536Mi } }   # requests sized for scheduling on one 16 GB node; limits unchanged
     storageSpec: { name: fe, storageSize: 4Gi, storageClassName: local-path }   # unset renders as null (same chart helper), which the CRD rejects
     feEnvVars: [{ name: MALLOC_ARENA_MAX, value: "2" }]
     config: |
@@ -24,7 +24,7 @@ starrocks:
     replicas: 1
     runAsNonRoot: true    # chart 1.10.1 renders false as null (its helper prints only truthy values) and the CRD rejects null;
                           # true runs as uid 1000, which the chart recommends for a fresh cluster (no root-owned files yet)
-    resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }
+    resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 2Gi } }
     storageSpec: { name: be, storageSize: 8Gi, storageClassName: local-path }
     config: |
       be_port = 9060

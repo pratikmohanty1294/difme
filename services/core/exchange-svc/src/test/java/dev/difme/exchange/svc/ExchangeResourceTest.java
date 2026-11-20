@@ -257,4 +257,38 @@ class ExchangeResourceTest {
         org.junit.jupiter.api.Assertions.assertEquals(dev.difme.exchange.kernel.Risk.Tier.COLD_START, Exchange.tierFor(5, 79.9, 3));
         org.junit.jupiter.api.Assertions.assertEquals(dev.difme.exchange.kernel.Risk.Tier.ESTABLISHED, Exchange.tierFor(3, 80.0, 3));
     }
+
+    /** Decided 2026-11-20: a standing mandate is a resting order; the exchange bids for it as soon as an intent opens. */
+    @Test
+    void standingMandateBidsAtTheFloorAndIsDrawnDownByTheAward() throws InterruptedException {
+        // P = ₹20,000, d = 20 % → A = 1,600,000 (card mandates cap one order at ₹25,000). Budget = exactly one A, so after
+        // this award it stops standing and can't bid in other tests' auctions; deposit covers the COLD_START collateral.
+        var m = given().contentType(ContentType.JSON).body("""
+                {"partnerRef": "standing-1", "limitMinor": 1600000, "maxPerOrderMinor": 1600000, "minYieldPct": 4,
+                 "depositMinor": 1200000, "budgetTotalMinor": 1600000, "merchantCount": 2, "goodsCount": 5,
+                 "validityDays": 5, "cardJurisdiction": "IN_DOMESTIC_AFA"}""")
+                .post("/v1/exchange/fr01-buy/mandates").then().statusCode(201).extract().jsonPath();
+        long mandateId = m.getLong("mandateId");
+        var opened = given().contentType(ContentType.JSON).body("""
+                {"riskScore": 900, "offerSanctioned": true, "listMinor": 2000000, "discountBps": 2000,
+                 "feeMinor": 20000, "maxPriceMinor": 1900000}""")
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath();
+        org.junit.jupiter.api.Assertions.assertTrue(opened.getInt("standingBids") >= 1);
+        long id = opened.getLong("auctionId");
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) {
+            Thread.sleep(20);
+        }
+        int node = given().get("/v1/exchange/fr01-buy/mandates/" + mandateId).jsonPath().getInt("nodeRef");
+        given().get("/v1/exchange/auctions/" + id).then().statusCode(200)
+                .body("award.winner.nodeRef", equalTo(node))
+                .body("award.split.yield", equalTo(64_000));                        // 4 % of A, the mandate's floor
+        given().get("/v1/exchange/fr01-buy/mandates/" + mandateId).then().statusCode(200)
+                .body("awards", equalTo(1))
+                .body("budgetLeftMinor", equalTo(0))
+                .body("yieldEarnedMinor", equalTo(64_000))
+                .body("standing", equalTo(false));
+        given().get("/v1/exchange/fr01-buy/mandates/987654321").then().statusCode(404);
+    }
 }
+

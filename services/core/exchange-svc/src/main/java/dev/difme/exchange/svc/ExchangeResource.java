@@ -104,7 +104,54 @@ public class ExchangeResource {
         evidence.put("findings", findings.stream().map(Finding::code).toList());
         long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor()), evidence);
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
-        return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings)).build();
+        int standing = standingBids(auction);
+        return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings, "standingBids", standing)).build();
+    }
+
+    /**
+     * Standing mandates are resting orders (decided 2026-11-20): the 50 ms batch window is too short for a person or a
+     * polling app, so when an intent opens the exchange bids for every standing mandate of the vertical, asking the
+     * mandate's yield floor (minYieldPct of A). Each bid goes through the same investor_eligibility rules and mandate
+     * records as an external bid; ineligible mandates simply don't bid. Remote agents still bid through /bids or the hub.
+     */
+    int standingBids(long auctionId) {
+        Exchange.Context ctx = exchange.context(auctionId);
+        String packId = exchange.packOf(auctionId);
+        if (ctx == null || packId == null) return 0;
+        int placed = 0;
+        for (long mandateId : exchange.standingMandates(packId)) {
+            Exchange.MandateState ms = exchange.mandate(mandateId);
+            if (ms == null) continue;
+            long ask = (long) Math.ceil(ctx.cardPriceMinor() * (ms.terms().minYieldPct() / 100.0));
+            if (ask > ctx.yieldRoomMinor() || ms.budgetLeftMinor().get() < ctx.cardPriceMinor()) continue;
+            Partner p = new Partner("A", ms.ageDays(), ms.terms().depositMinor(), ms.budgetLeftMinor().get(), true, true,
+                    ms.terms().maxPerOrderMinor(), ms.terms().validityDays(), mandateId);
+            // Co-located with the exchange: no network hop, so latency is reported as zero.
+            if (bid(auctionId, new Bid(ms.nodeRef(), ask, 0, 0, p)).getStatus() == 202) placed++;
+        }
+        return placed;
+    }
+
+    /** What a buying partner sees about one mandate: what is left, what it won and earned, and its tier. */
+    @GET
+    @Path("/{pack}/mandates/{id}")
+    public Response mandateState(@PathParam("pack") String packId, @PathParam("id") long mandateId) {
+        Exchange.MandateState ms = exchange.mandate(mandateId);
+        if (ms == null || !ms.pack().equals(packId)) return Response.status(404).build();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("mandateId", mandateId);
+        out.put("partnerRef", ms.terms().partnerRef());
+        out.put("nodeRef", ms.nodeRef());
+        out.put("standing", ms.standing());
+        out.put("budgetTotalMinor", ms.terms().budgetTotalMinor());
+        out.put("budgetLeftMinor", ms.budgetLeftMinor().get());
+        out.put("awards", ms.awards().get());
+        out.put("yieldEarnedMinor", ms.yieldEarnedMinor().get());
+        out.put("minYieldPct", ms.terms().minYieldPct());
+        out.put("ageDays", ms.ageDays());
+        out.put("validityDays", ms.terms().validityDays());
+        out.put("tier", exchange.tierOf(packId, ms.nodeRef()).name());
+        return Response.ok(out).build();
     }
 
     @POST

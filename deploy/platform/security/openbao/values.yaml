@@ -1,7 +1,104 @@
 # PDF §5.8 — secrets management (OpenBao, ADR-001): dynamic DB creds TTL=1h, PKI CA, transit encryption-as-a-service.
+# Dev/verification (owner decision 2026-11-20): one Raft replica (the PDF's vault-0/1/2 HA belongs in production
+# overlays; three replicas can't schedule on one node). The static seal auto-unseals from a 32-byte dev key
+# (Secret openbao-unseal, made by dev-secrets.sh) after every restart, and self-initialization creates on first start
+# what SPIRE needs: the pki_int CA and a Kubernetes-auth role. The root token is revoked after self-init; production
+# replaces the static key with OpenBao's KMS/transit seal and gets recovery keys via `bao operator rotate-keys`.
 server:
-  ha: { enabled: true, replicas: 3, raft: { enabled: true, setNodeId: true } }   # vault-0/1/2 Raft HA in the PDF
-  resources: { requests: { cpu: 50m, memory: 128Mi } }
+  resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }
   dataStorage: { size: 2Gi }
+  extraSecretEnvironmentVars:
+    - { envName: BAO_UNSEAL_KEY, secretName: openbao-unseal, secretKey: key }
+  ha:
+    enabled: true
+    replicas: 1
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+        listener "tcp" {
+          tls_disable = 1          # in-cluster mTLS comes from the mesh
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+        storage "raft" {
+          path = "/openbao/data"
+        }
+        service_registration "kubernetes" {}
+        seal "static" {
+          current_key_id = "dev-1"
+          current_key = "env://BAO_UNSEAL_KEY"
+        }
+        initialize "spire-ca" {
+          request "mount-pki-int" {
+            operation = "update"
+            path = "sys/mounts/pki_int"
+            data = { type = "pki", config = { max_lease_ttl = "87600h" } }
+          }
+          request "generate-root" {
+            operation = "update"
+            path = "pki_int/root/generate/internal"
+            data = { common_name = "difme.local SPIRE upstream CA", ttl = "87600h" }
+          }
+        }
+        initialize "spire-auth" {
+          request "enable-k8s-auth" {
+            operation = "update"
+            path = "sys/auth/kubernetes"
+            data = { type = "kubernetes" }
+          }
+          request "k8s-auth-config" {
+            operation = "update"
+            path = "auth/kubernetes/config"
+            data = { kubernetes_host = "https://kubernetes.default.svc" }
+          }
+          request "spire-policy" {
+            operation = "update"
+            path = "sys/policies/acl/spire-server"
+            data = { policy = "path \"pki_int/root/sign-intermediate\" { capabilities = [\"update\"] }" }
+          }
+          request "spire-role" {
+            operation = "update"
+            path = "auth/kubernetes/role/spire-server"
+            data = {
+              bound_service_account_names = ["spire-server"]
+              bound_service_account_namespaces = ["security"]
+              audience = "vault"
+              token_policies = ["spire-server"]
+              token_ttl = "1h"
+            }
+          }
+        }
+        initialize "evidence-transit" {
+          # Evidence custody (decided 2026-11-20): the exchange's operator seal key lives here, non-exportable;
+          # exchange-svc may sign and read the public key, nothing else.
+          request "mount-transit" {
+            operation = "update"
+            path = "sys/mounts/transit"
+            data = { type = "transit" }
+          }
+          request "evidence-key" {
+            operation = "update"
+            path = "transit/keys/evidence-operator"
+            data = { type = "ed25519", exportable = false, allow_plaintext_backup = false }
+          }
+          request "evidence-policy" {
+            operation = "update"
+            path = "sys/policies/acl/exchange-evidence"
+            data = { policy = "path \"transit/sign/evidence-operator\" { capabilities = [\"update\"] }\npath \"transit/keys/evidence-operator\" { capabilities = [\"read\"] }" }
+          }
+          request "evidence-role" {
+            operation = "update"
+            path = "auth/kubernetes/role/exchange-evidence"
+            data = {
+              bound_service_account_names = ["exchange-svc"]
+              bound_service_account_namespaces = ["core-platform"]
+              audience = "vault"
+              token_policies = ["exchange-evidence"]
+              token_ttl = "1h"
+            }
+          }
+        }
 injector: { enabled: true }
 csi: { enabled: true }

@@ -1,5 +1,9 @@
 # PDF §5.8 — SPIFFE workload identity, X.509 SVIDs, 24h rotation, OpenBao as upstream CA.
 global:
+  # The chart's pre-/post-upgrade hooks patch the controller-manager webhook around `helm upgrade`. Argo CD runs
+  # pre-upgrade hooks as PreSync even on first install, where the webhook doesn't exist yet, so the hook failed and
+  # spire never synced (cluster-verify 2026-11-20).
+  installAndUpgradeHooks: { enabled: false }
   spire:
     trustDomain: difme.local
     clusterName: difme
@@ -11,6 +15,7 @@ spire-server:
       enabled: true
       vaultAddr: http://openbao.security.svc:8200
       pkiMountPoint: pki_int
+      insecureSkipVerify: true   # in-cluster OpenBao listens on plain HTTP (mesh mTLS); else the chart mounts a missing vault-ca Secret
       k8sAuth: { enabled: true, k8sAuthRoleName: spire-server }
   federation: { enabled: true }        # scenario C: on-prem ↔ cloud federated trust domains
   controllerManager:

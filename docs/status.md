@@ -177,8 +177,9 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 | `wip-security-dev` | OpenBao 1 replica, static seal, self-init; SPIRE hooks off + insecureSkipVerify; istio-system privileged; Veraison stores; verifier out | 44682927471 `core,security` | merge; then `hub` stays blocked (no code) |
 | `wip-tb-memory` | TigerBeetle 2151 → 1356 MiB (measured) | A/B re-run: 44684890534 (main) vs 44684975198 (branch), `core` + `measure 200 60s` (first try: dev batch size crashed the load-test seeding; fixed on main: batches of 100 + pipefail) | merge only if throughput/latency don't regress |
 | `wip-proc-report` | `ci/proc-report.sh`: per-process/thread memory after each profile | 44683717857 `core,observability,backoffice`, 44683720991 `core,streaming` | rank savings; propose JVM ActiveProcessorCount, GOMAXPROCS/GOMEMLIMIT, MALLOC_ARENA_MAX, UV_THREADPOOL_SIZE batches; A/B each |
-| `wip-rails` | exchange-rails (5 FR-01 rail ports + simulators, failover with FR-15 slashing; 10 tests) + exchange-svc `POST /auctions/{id}/execute` (escrow hold B, failover, principal release; end-to-end test) + exchange API in the OpenAPI contract | core-services gate (rails module ✅ on Java 25) | merge when the integration gate is green |
+| `wip-rails` | FR-01 money loop end to end: exchange-rails (5 rail ports + simulators, failover, FR-15 slashing) → `POST /execute` (escrow B, failover, principal A) → `POST /fulfilment` (Ed25519 invoice + carrier POD; fee F) → `POST /settle` (yield Y after the return window) → FR-16 reputation learned from outcomes; OpenAPI contract for the whole exchange | core-services ✅ on Java 25 (latest commit running) | merge when green |
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |
+| `wip-malloc-arena` | Kyverno default `MALLOC_ARENA_MAX=2` for every container (process-level memory) | A/B after `wip-proc-report` merges | merge only if it beats the baseline |
 
 **Waiting on the owner:** PC memory notes + session logs upload (to complete `owner-decisions.md`); canary SLO
 thresholds and the other open questions in `owner-decisions.md`.

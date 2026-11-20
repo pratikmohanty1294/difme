@@ -158,6 +158,7 @@ Details are in docs/knowledge-base/.
 
 ## HANDOFF 2026-11-20 ~07:00 UTC (session limit reached) — START HERE
 Everything is on GitHub: `main` plus the `wip-*` branches below. Rules and decisions: `docs/knowledge-base/owner-decisions.md`.
+cluster-verify now fails fast (`FAILFAST` lines) instead of waiting out 30-minute deadlines.
 Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/difme`), reading the per-profile
 `CONVERGED / TIMEOUT / SYNC FAILURE` lines in its log (the run's own status can mislead), then doing the "next action".
 

@@ -10,6 +10,15 @@ t=$(date +%s); make up PROFILE="$P" > "/tmp/up-$P.log" 2>&1; echo "UP_EXIT $? $(
 grep -E "⚠|error" "/tmp/up-$P.log" | head -5
 apps() { kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name} {.status.operationState.phase} {.status.sync.status} {.status.health.status}{"\n"}{end}'; }
 end=$(( $(date +%s) + DEADLINE )); firstfail=0; rc=1
+# Fail fast (owner request 2026-11-20): a pod that is clearly broken ends the wait instead of the full deadline.
+# Crash loop: >= 5 restarts and still crash-looping 3 min after first seen. Image/config errors: unchanged for 4 min.
+# Startup crashes that recover (a service waiting for its database) stay below these bounds.
+declare -A broken_since
+broken_pods() {
+  kubectl get pods -A --no-headers 2>/dev/null | awk '
+    $4 == "CrashLoopBackOff" && $5+0 >= 5 { print $1"/"$2" crashloop 180"; next }
+    $4 ~ /^(ImagePullBackOff|ErrImagePull|InvalidImageName|CreateContainerConfigError)$/ { print $1"/"$2" "$4" 240" }'
+}
 while :; do
   bad=$(apps | grep -vE "Succeeded Synced Healthy|^fleet-bundles|Synced Healthy$")
   [ -z "$bad" ] && { echo "CONVERGED $P $(( $(date +%s)-t ))s"; rc=0; break; }
@@ -21,6 +30,14 @@ while :; do
       break
     fi
   else firstfail=0; fi
+  failfast=""; now=$(date +%s); declare -A seen=()
+  while read -r pod why limit; do
+    [ -n "$pod" ] || continue
+    seen[$pod]=1; : "${broken_since[$pod]:=$now}"
+    [ $(( now - broken_since[$pod] )) -ge "$limit" ] && failfast="$failfast $pod($why)"
+  done < <(broken_pods)
+  for k in "${!broken_since[@]}"; do [ -n "${seen[$k]:-}" ] || unset "broken_since[$k]"; done   # recovered pods reset
+  [ -n "$failfast" ] && { echo "FAILFAST $P after $(( now - t ))s:$failfast"; echo "$bad"; break; }
   [ "$(date +%s)" -gt "$end" ] && { echo "TIMEOUT $P"; echo "$bad"; break; }
   sleep 20
 done

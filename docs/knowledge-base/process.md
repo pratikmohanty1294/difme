@@ -15,3 +15,4 @@
 10. **Owner answers go into [owner-decisions.md](owner-decisions.md)** the same day, never only into a chat.
 11. **Progress survives stoppages:** push each change to its `wip-*` branch immediately and update the PROGRESS LOG in `docs/status.md` on `main` after every step; run logs stream live and remain even if a runner dies.
 12. **Stash untracked files before switching branches** (`git stash -u`). A `git add -A` on another branch sweeps them into an unrelated commit; a stray `Bounded.java` landed on main that way and triggered a full image rebuild (2026-11-20).
+13. **cluster-verify fails fast:** a profile stops waiting when a pod crash-loops (≥ 5 restarts, still failing 3 min later) or sits in an image/config error for 4 min, and prints `FAILFAST <profile> after Ns: <pods>` plus the diagnostics. Read `CONVERGED / FAILFAST / TIMEOUT / SYNC FAILURE` per profile.

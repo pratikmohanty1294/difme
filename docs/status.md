@@ -168,6 +168,8 @@ backoffice writable /tmp (backoffice ✅); platform-ops fixes incl. Harbor on th
 cluster-verify Summary-step fix (runs had been marked failed when no baseline ran: read the per-profile CONVERGED lines).
 
 **Verified converged:** base, core, observability, backoffice, platform-ops.
+**Merged today (later):** FR-01 money loop (rails, execute, proof of delivery, settle, FR-16 reputation, OpenAPI contract); `ci/proc-report.sh` (memory, CPU, disk, network per process/thread; runs after every profile); Makefile build/test fixes.
+**Optimisation order (owner):** memory → CPU → disk I/O → network I/O.
 **Memory wins kept:** TigerBeetle 2170 → 1373 MiB (A/B, no throughput/latency regression).
 
 **In flight — branch → what it fixes → verify run → next action**
@@ -176,10 +178,9 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 | main (formio VM bundles) | process profile | `core,process` queued after the main image build | process ✅ |
 | `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`); verify-profile diagnostics | 44682308371 `core,streaming,lakehouse,ml` | merge; then extras (`streaming-extra`, `lakehouse-extra`) |
 | `wip-security-dev` | OpenBao 1 replica, static seal, self-init; SPIRE hooks off + insecureSkipVerify; istio-system privileged; Veraison stores; verifier out | 44682927471 `core,security` | merge; then `hub` stays blocked (no code) |
-| `wip-proc-report` | `ci/proc-report.sh`: per-process/thread memory after each profile | 44683717857 `core,observability,backoffice`, 44683720991 `core,streaming` | rank savings; propose JVM ActiveProcessorCount, GOMAXPROCS/GOMEMLIMIT, MALLOC_ARENA_MAX, UV_THREADPOOL_SIZE batches; A/B each |
-| `wip-rails` | FR-01 money loop end to end: exchange-rails (5 rail ports + simulators, failover, FR-15 slashing) → `POST /execute` (escrow B, failover, principal A) → `POST /fulfilment` (Ed25519 invoice + carrier POD; fee F) → `POST /settle` (yield Y after the return window) → FR-16 reputation learned from outcomes; OpenAPI contract for the whole exchange | core-services ✅ on Java 25 (latest commit running) | merge when green |
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |
-| `wip-malloc-arena` | Kyverno default `MALLOC_ARENA_MAX=2` for every container (process-level memory) | A/B after `wip-proc-report` merges | merge only if it beats the baseline |
+| `wip-malloc-arena` | Kyverno default `MALLOC_ARENA_MAX=2` for every container | A/B 44687672715 vs main 44687637776 (`core` + `measure 200 60s` + proc-report) | merge only if it beats main |
+| `wip-mem-batch1` | Envoy `concurrency: 1` (one Coraza Wasm VM instead of 4); Kyverno reports controller off in dev | A/B 44687640849 vs main 44687637776 | merge only if it beats main |
 
 **Waiting on the owner:** PC memory notes + session logs upload (to complete `owner-decisions.md`); canary SLO
 thresholds and the other open questions in `owner-decisions.md`.

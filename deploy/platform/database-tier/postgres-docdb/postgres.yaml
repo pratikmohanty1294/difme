@@ -21,6 +21,7 @@ spec:
             - { name: TEMPORAL_DB_PASSWORD, valueFrom: { secretKeyRef: { name: temporal-db, key: password } } }
             - { name: RISINGWAVE_DB_PASSWORD, valueFrom: { secretKeyRef: { name: risingwave-db, key: password } } }
             - { name: HARBOR_DB_PASSWORD, valueFrom: { secretKeyRef: { name: harbor-db, key: password } } }
+            - { name: MARQUEZ_DB_PASSWORD, valueFrom: { secretKeyRef: { name: marquez-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
@@ -31,6 +32,7 @@ spec:
             - { name: init, mountPath: /docker-entrypoint-initdb.d/20-temporal.sh, subPath: 20-temporal.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/30-risingwave.sh, subPath: 30-risingwave.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/40-harbor.sh, subPath: 40-harbor.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/50-marquez.sh, subPath: 50-marquez.sh }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
           readinessProbe: { exec: { command: [pg_isready, -U, difme] }, periodSeconds: 5 }
       volumes: [{ name: init, configMap: { name: postgres-docdb-init } }]
@@ -71,6 +73,14 @@ data:
     psql -v ON_ERROR_STOP=1 -v pw="$HARBOR_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
     CREATE ROLE harbor LOGIN PASSWORD :'pw';
     CREATE DATABASE harbor OWNER harbor;
+    SQL
+  # Marquez (lineage, instead of DataHub; owner decision 2026-11-20). Its Flyway migrations run on startup.
+  50-marquez.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$MARQUEZ_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE marquez LOGIN PASSWORD :'pw';
+    CREATE DATABASE marquez OWNER marquez;
     SQL
 ---
 apiVersion: v1

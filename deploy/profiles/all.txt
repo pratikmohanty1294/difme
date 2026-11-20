@@ -41,6 +41,7 @@ analytics-jobs
 flink-archive
 marquez
 feast
+onnx-serving
 mlflow
 victoria-metrics
 loki

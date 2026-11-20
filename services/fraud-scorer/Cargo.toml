@@ -1,0 +1,29 @@
+[package]
+name = "difme-fraud-scorer"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Server-side fraud scorer (PDF §5.7): ONNX Runtime over the trained gradient-boosted model, the fallback when edge attestation fails."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1.54", features = ["rt", "macros", "net", "signal"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# ONNX Runtime loaded at start from ORT_DYLIB_PATH (the image ships libonnxruntime.so from the official wheel), so the
+# build needs no download and the runtime version is pinned in one place (deploy/images/fraud-scorer/Dockerfile).
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

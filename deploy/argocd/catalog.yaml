@@ -76,7 +76,7 @@ components:
   # ── AI / ML plane (profile: ml) ────────────────────────────────────────────
   - { name: feast,             ns: ml-platform,     kind: path, profile: ml, wave: 0, pdf: "5.7" }
   # Vector search: pgvector on the shared Postgres (database "ml"), not Weaviate (owner 2026-11-20).
-  # onnx-serving (server-side fraud scorer) returns once its code and a trained model exist (like the attestation verifier did).
+  - { name: onnx-serving,      ns: ml-platform,     kind: path, profile: ml, wave: 1, pdf: "5.7" }   # services/fraud-scorer
   - { name: mlflow,            ns: ml-platform,     kind: helm, profile: ml, wave: 0, pdf: "5.7", repo: https://community-charts.github.io/helm-charts, chart: mlflow, version: 0.17.2 }
 
   # ── Layers 9–10 · Observability + FinOps (profile: observability) ──────────

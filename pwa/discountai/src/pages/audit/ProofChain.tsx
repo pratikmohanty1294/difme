@@ -6,6 +6,8 @@ import { dateTime, shortHash, inr } from '../../sim/format';
 import type { ProofKind, ProofObject } from '../../sim/types';
 import { Badge, Callout, Card, Empty, JsonView, KV, PageHeader, cx } from '../../components/ui';
 import { EvidenceView } from './EvidenceView';
+import { LiveEvidence } from './LiveEvidence';
+import { LIVE } from '../../api/exchange';
 
 const META: Record<ProofKind, { phase: string; by: string; purpose: string }> = {
   POI: { phase: '1 · Buyer intent', by: 'Buyer agent (ECDSA)', purpose: 'Signed purchase intent; anchors the chain' },
@@ -44,6 +46,7 @@ export default function ProofChain({ focus }: { focus?: string }) {
             </select>
           </>
         )} />
+      {LIVE && <LiveEvidence />}
       {req?.evidence && <div className="mb-6"><EvidenceView key={req.id} ev={req.evidence} /></div>}
       {req && !req.evidence && <div className="mb-6"><Callout tone="info" title="Evidence chains appear when the order settles">The three per-payment chains are sealed as the order completes.</Callout></div>}
       {!req ? <Empty title="No proofs yet">Submit a marketplace request from the buyer agent to generate a live chain.</Empty> : (

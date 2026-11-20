@@ -37,7 +37,11 @@ export interface SplitMinor { a: number; b: number; yield: number; fee: number; 
 export interface Award { winner: { nodeRef: number; askMinor: number; score: number }; split: SplitMinor; collateralMinor: number; tier?: string }
 export interface AuctionResult { auctionId: number; pack: string; ranked: number; top: { nodeRef: number; askMinor: number; score: number }[]; award: Award | null }
 export interface Execution { auctionId: number; fulfilled: boolean; boughtBy: number; slashedMinor: number; attempts: { partnerId: number; responseCode: string }[] }
-export interface EvidenceView { chain: string; sealed: boolean; verdict: { hashes: boolean; links: boolean; seal: boolean; witnesses: boolean; notes: string[] } }
+export interface EvidenceArtifact { seq: number; type: string; signal: string; payload: Record<string, unknown>; prevHash: string; hash: string; postSeal: boolean }
+export interface EvidenceView {
+  chain: string; sealed: boolean; artifacts?: EvidenceArtifact[];
+  verdict: { hashes: boolean; links: boolean; seal: boolean; witnesses: boolean; notes: string[] };
+}
 export interface Hold { holdId: string; heldMinor: number; releasedMinor: number; state: string }
 export interface Fulfilment { auctionId: number; verified: boolean; problems: string[]; escrow: Hold; yieldReleaseAtMs: number }
 export interface MandateIn {

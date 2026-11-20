@@ -11,6 +11,7 @@ on:
       runner:   { description: "Runner", default: "ubuntu-24.04", type: choice, options: ["ubuntu-24.04", "ubuntu-24.04-arm"] }
       deadline: { description: "Per-profile convergence deadline (s)", default: "1800", type: string }
       measure:  { description: "Payment baseline after the profiles: ci/measure.sh args, e.g. '200 60s' (empty = skip)", default: "", type: string }
+      settle:   { description: "Seconds to wait after convergence before the process report (idle I/O measurements; 0 = none)", default: "0", type: string }
 permissions: { contents: read }
 concurrency: { group: "cluster-verify-${{ github.ref }}-${{ inputs.profiles }}-${{ inputs.runner }}", cancel-in-progress: false }
 
@@ -64,7 +65,7 @@ jobs:
           rc=0
           for p in $(echo "${{ inputs.profiles }}" | tr ',' ' '); do
             echo "::group::$p"
-            bash ci/verify-profile.sh "$p" "${{ inputs.deadline }}" 2>&1 | tee -a /tmp/report.txt
+            PROC_SETTLE="${{ inputs.settle }}" bash ci/verify-profile.sh "$p" "${{ inputs.deadline }}" 2>&1 | tee -a /tmp/report.txt
             r=${PIPESTATUS[0]}; echo "::endgroup::"
             echo "$p: $([ $r -eq 0 ] && echo converged || echo FAILED)" >> /tmp/verdicts.txt
             [ $r -ne 0 ] && { rc=$r; break; }    # later profiles would run on a broken base

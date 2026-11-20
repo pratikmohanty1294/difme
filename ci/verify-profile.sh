@@ -89,5 +89,7 @@ if [ $rc -ne 0 ]; then
 fi
 echo "== $P: after"; bash ci/mem-report.sh 12
 # Process/thread level (owner rule 2026-11-20): every process in every pod, its PSS, threads and thread groups.
+# Idle measurements need the startup burst (jar and catalog loading) to pass first (2026-11-20 io pass).
+if [ "${PROC_SETTLE:-0}" -gt 0 ] 2>/dev/null; then echo "== settling ${PROC_SETTLE}s before the process report"; sleep "$PROC_SETTLE"; fi
 echo "== $P: processes"; sudo -n env "PATH=$PATH" "KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}" bash ci/proc-report.sh 45 2>/dev/null || bash ci/proc-report.sh 45
 exit $rc

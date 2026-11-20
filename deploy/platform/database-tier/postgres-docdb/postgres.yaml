@@ -32,6 +32,7 @@ spec:
             # One file per script (subPath), not the whole directory: mounting the ConfigMap over
             # /docker-entrypoint-initdb.d hid the image's own init, which creates the DocumentDB extension FerretDB needs
             # (formio: 'schema "documentdb_api" does not exist'; creating it by hand failed and stopped the init chain).
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/05-settings.sql, subPath: 05-settings.sql }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/10-fluxnova.sql, subPath: 10-fluxnova.sql }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/20-temporal.sh, subPath: 20-temporal.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/30-risingwave.sh, subPath: 30-risingwave.sh }
@@ -51,6 +52,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata: { name: postgres-docdb-init }
 data:
+  # Ten tools share this server (Temporal alone opens several pools). The default 100 connections ran out with all
+  # profiles up, and new connections were dropped at the SSL handshake (Polaris bootstrap, all-at-once run 3). Set via
+  # ALTER SYSTEM, not container args, so the image's own start command (DocumentDB preload settings) stays untouched;
+  # the entrypoint restarts the server after the init scripts, which applies it. ~2 MB of shared memory per 100.
+  05-settings.sql: |
+    ALTER SYSTEM SET max_connections = 300;
   10-fluxnova.sql: |
     CREATE DATABASE fluxnova;
     CREATE DATABASE keycloak;

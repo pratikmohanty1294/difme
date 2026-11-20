@@ -18,8 +18,10 @@ kubectl -n argocd patch configmap argocd-cm --type merge --patch-file deploy/boo
 # downloads on slow links don't fail a sync (ADR-012 network I/O).
 kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"controller.diff.server.side":"true","controller.repo.server.timeout.seconds":"300","reposerver.parallelism.limit":"2","controller.status.processors":"6","controller.operation.processors":"3","controller.kubectl.parallelism.limit":"4"}}'
 kubectl -n argocd set env deploy/argocd-repo-server ARGOCD_EXEC_TIMEOUT=300s ARGOCD_GIT_ATTEMPTS_COUNT=5 >/dev/null
-# Tier 2 memory (Go): soft heap limit + earlier GC for the controller (~480 Mi RSS measured at idle, live heap far lower).
-kubectl -n argocd set env statefulset/argocd-application-controller GOMEMLIMIT=350MiB GOGC=75 >/dev/null
+# Tier 2 memory (Go): soft heap limit + earlier GC for the controller. The limit must sit well above the live heap: with
+# all 12 profiles (~100 apps) the controller needed ~420 MiB, and a 350 MiB limit made Go collect continuously
+# (5.3 cores, node CPU 95%; cluster-verify 2026-11-20, all-at-once run 3). GOGC=75 still keeps the heap tight below it.
+kubectl -n argocd set env statefulset/argocd-application-controller GOMEMLIMIT=700MiB GOGC=75 >/dev/null
 kubectl -n argocd rollout restart statefulset/argocd-application-controller deploy/argocd-repo-server >/dev/null
 # Argo Rollouts lives in its own namespace: its RBAC binds the argo-rollouts/argo-rollouts service account (found live).
 kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -

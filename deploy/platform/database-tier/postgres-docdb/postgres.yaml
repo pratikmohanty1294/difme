@@ -21,6 +21,9 @@ spec:
             - { name: TEMPORAL_DB_PASSWORD, valueFrom: { secretKeyRef: { name: temporal-db, key: password } } }
             - { name: RISINGWAVE_DB_PASSWORD, valueFrom: { secretKeyRef: { name: risingwave-db, key: password } } }
             - { name: HARBOR_DB_PASSWORD, valueFrom: { secretKeyRef: { name: harbor-db, key: password } } }
+            - { name: MARQUEZ_DB_PASSWORD, valueFrom: { secretKeyRef: { name: marquez-db, key: password } } }
+            - { name: ML_DB_PASSWORD, valueFrom: { secretKeyRef: { name: ml-db, key: password } } }
+            - { name: MLFLOW_DB_PASSWORD, valueFrom: { secretKeyRef: { name: mlflow-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
@@ -31,6 +34,8 @@ spec:
             - { name: init, mountPath: /docker-entrypoint-initdb.d/20-temporal.sh, subPath: 20-temporal.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/30-risingwave.sh, subPath: 30-risingwave.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/40-harbor.sh, subPath: 40-harbor.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/50-marquez.sh, subPath: 50-marquez.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/60-ml-vectors.sh, subPath: 60-ml-vectors.sh }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
           readinessProbe: { exec: { command: [pg_isready, -U, difme] }, periodSeconds: 5 }
       volumes: [{ name: init, configMap: { name: postgres-docdb-init } }]
@@ -72,6 +77,30 @@ data:
     CREATE ROLE harbor LOGIN PASSWORD :'pw';
     CREATE DATABASE harbor OWNER harbor;
     SQL
+  # Marquez (lineage, instead of DataHub; owner decision 2026-11-20). Its Flyway migrations run on startup.
+  50-marquez.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$MARQUEZ_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE marquez LOGIN PASSWORD :'pw';
+    CREATE DATABASE marquez OWNER marquez;
+    SQL
+  # Vector search (owner decision 2026-11-20: pgvector instead of Weaviate). The image ships pgvector (DocumentDB
+  # depends on it). The extension step can't stop the init chain: a failure there would leave core without Temporal.
+  60-ml-vectors.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$ML_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE ml LOGIN PASSWORD :'pw';
+    CREATE DATABASE ml OWNER ml;
+    SQL
+    # MLflow's backend store (moved off YugabyteDB, see deploy/platform/ml-platform/mlflow/values.yaml).
+    psql -v ON_ERROR_STOP=1 -v pw="$MLFLOW_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE mlflow LOGIN PASSWORD :'pw';
+    CREATE DATABASE mlflow OWNER mlflow;
+    SQL
+    psql --username "$POSTGRES_USER" --dbname ml -c 'CREATE EXTENSION IF NOT EXISTS vector' \
+      || echo "WARNING: pgvector extension not created in database ml" >&2
 ---
 apiVersion: v1
 kind: Service

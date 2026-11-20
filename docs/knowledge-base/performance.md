@@ -59,3 +59,5 @@ The reports controller was the single largest idle CPU consumer in the cluster, 
 The temporal chart 0.62.0 defaults to `numHistoryShards: 512`; each shard keeps its own caches, task queues and timers inside `temporal-history` (151 MiB PSS, 12 threads at idle in the core profile). Dev runs one history pod with a handful of workflows, so 4 shards. The count is fixed when the persistence schema is first set up; production must choose its own (512+) before its first install.
 ### Notary footprint (2026-11-20, release build)
 `services/notary`: 1.1 MiB binary, single-threaded tokio runtime. Pod 16/64 Mi like the attestation verifier until measured in-cluster.
+### Marquez instead of DataHub (2026-11-20)
+Marquez 0.50 API (`-Xmx256m`, SerialGC) 187 MiB PSS + web UI 51 MiB, on the shared Postgres, search off. DataHub would have needed OpenSearch, GMS, frontend and setup jobs (est. 3–5 GB).

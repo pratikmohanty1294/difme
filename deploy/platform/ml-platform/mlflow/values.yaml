@@ -1,6 +1,8 @@
-# PDF §5.7 — experiment tracking + model registry; artifacts on SeaweedFS, backend store on YugabyteDB.
+# PDF §5.7 — experiment tracking + model registry; artifacts on SeaweedFS, backend store on the shared Postgres:
+# its Alembic migrations half-applied on YugabyteDB and re-ran ("column step already exists", cluster-verify 44733255772),
+# the same failure Temporal, RisingWave and Harbor had (ADR-019 pattern).
 backendStore:
-  postgres: { enabled: true, host: yb-tservers.database-tier.svc, port: 5433, database: mlflow, user: mlflow }
+  postgres: { enabled: true, host: postgres-docdb.database-tier.svc, port: 5432, database: mlflow, user: mlflow }
   existingDatabaseSecret: { name: mlflow-db, usernameKey: username, passwordKey: password }
 artifactRoot: { s3: { enabled: true, bucket: mlflow } }   # S3 credentials come from the mlflow-s3 secret via extraSecretNamesForEnvFrom
 extraEnvVars: { MLFLOW_S3_ENDPOINT_URL: http://seaweedfs-s3.lakehouse.svc:8333 }

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: datahub
+  name: marquez
   namespace: argocd
   labels:
     difme/profile: lakehouse-extra
@@ -28,14 +28,7 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
-  sources:
-  - repoURL: https://helm.datahubproject.io
-    chart: datahub
-    targetRevision: 0.5.10
-    helm:
-      releaseName: datahub
-      valueFiles:
-      - $values/deploy/platform/governance/datahub/values.yaml
-  - repoURL: https://github.com/pratikmohanty1294/difme.git
+  source:
+    repoURL: https://github.com/pratikmohanty1294/difme.git
     targetRevision: main
-    ref: values
+    path: deploy/platform/governance/marquez

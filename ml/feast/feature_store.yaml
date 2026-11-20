@@ -1,4 +1,4 @@
-# PDF §5.7 — online store on Valkey (<5ms retrieval), offline store on Iceberg via Trino, registry in YugabyteDB.
+# PDF §5.7 — online store on Valkey (<5ms retrieval), offline store on Iceberg via Trino, registry in YugabyteDB (Postgres protocol).
 project: difme
 provider: local
 registry:
@@ -12,5 +12,7 @@ offline_store:
   host: trino.lakehouse.svc
   port: 8080
   catalog: iceberg
+  user: feast          # required by Feast 0.47's Trino store (with auth); Trino has no auth in dev
+  auth: null
   connector: { type: iceberg, file_format: parquet }
 entity_key_serialization_version: 3

@@ -43,7 +43,9 @@ secret streaming     risingwave-db username=risingwave password="$RW_PG"
 secret database-tier risingwave-db password="$RW_PG"
 secret streaming     debezium-db password="$YB"
 secret ml-platform   mlflow-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET"
-secret ml-platform   mlflow-db username=mlflow password="$YB"
+MLFLOW_PG=$(rand)
+secret ml-platform   mlflow-db username=mlflow password="$MLFLOW_PG"
+secret database-tier mlflow-db username=mlflow password="$MLFLOW_PG"
 secret ml-platform   postgresml-db password="$(rand)"
 secret backup        velero-s3 cloud="$(printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$S3_KEY" "$S3_SECRET")"
 # Temporal persists on the shared platform Postgres (ADR-019). Reuse an existing password so both copies match.
@@ -55,6 +57,12 @@ secret database-tier temporal-db password="$TEMPORAL_PG"
 HARBOR_PG=$(kubectl -n harbor get secret harbor-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true); HARBOR_PG=${HARBOR_PG:-$(rand)}
 secret harbor        harbor-db password="$HARBOR_PG"
 secret database-tier harbor-db password="$HARBOR_PG"
+MARQUEZ_PG=$(rand)
+secret database-tier marquez-db password="$MARQUEZ_PG"
+secret governance    marquez-db password="$MARQUEZ_PG"
+ML_PG=$(rand)
+secret database-tier ml-db password="$ML_PG"
+secret ml-platform   ml-db password="$ML_PG"
 # Harbor's own secrets, fixed once per cluster: the chart would otherwise re-randomise them on every Argo CD render
 # (its lookup() sees nothing), rolling harbor-core mid-migration (cluster-verify 2026-11-20). See harbor/values.yaml.
 secret harbor        harbor-dev-secretkey secretKey="$(rand 16)"
@@ -75,7 +83,6 @@ if ! kubectl -n harbor get secret harbor-dev-token >/dev/null 2>&1; then
   kubectl -n harbor create secret tls harbor-dev-token --cert="$t/tls.crt" --key="$t/tls.key" >/dev/null && echo "+ harbor/harbor-dev-token"
   rm -rf "$t"
 fi
-secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"
 secret security      keycloak admin-password="$(rand)"
 # OpenBao static auto-unseal key (32 bytes, hex). Dev only; production uses a KMS/transit seal.

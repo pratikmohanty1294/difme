@@ -20,7 +20,7 @@ spec:
             - { name: HUB_GRPC_CORE, value: "http://quarkus-cmd-svc.core-platform.svc:9000" }
             - { name: HUB_KAFKA_BROKERS, value: "difme-kafka-bootstrap.streaming.svc:9092" }
             - { name: HUB_VALKEY_URL, value: "redis://valkey.cache-tier.svc:6379/1" }
-            - { name: HUB_ATTESTATION_URL, value: "https://attestation-verifier.security.svc:8443" }
+            - { name: HUB_ATTESTATION_URL, value: "http://attestation-verifier.security.svc:8443" }   # h2c; mTLS from the mesh
             - { name: SPIFFE_ENDPOINT_SOCKET, value: "unix:///spiffe-workload-api/spire-agent.sock" }
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.observability.svc:4317" }
             - { name: PYROSCOPE_URL, value: "http://pyroscope.observability.svc:4040" }

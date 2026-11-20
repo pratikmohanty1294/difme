@@ -15,9 +15,9 @@ public final class SimMerchantCheckout implements MerchantCheckoutPort {
     private final SimAgentCredential credentials;
     private final Map<Long, Long> availableLimitMinor = new ConcurrentHashMap<>();
     private final Map<Long, String> scriptedCode = new ConcurrentHashMap<>();
-    private final Map<String, Response> byStan = new ConcurrentHashMap<>();
-    private final Map<String, Long> approvedAmountByRrn = new ConcurrentHashMap<>();
-    private final Map<String, Long> partnerByRrn = new ConcurrentHashMap<>();
+    private final Map<String, Response> byStan = Bounded.map();
+    private final Map<String, Long> approvedAmountByRrn = Bounded.map();
+    private final Map<String, Long> partnerByRrn = Bounded.map();
     private final AtomicLong rrn = new AtomicLong(100_000_000_000L);
 
     public SimMerchantCheckout(SimAgentCredential credentials) { this.credentials = credentials; }

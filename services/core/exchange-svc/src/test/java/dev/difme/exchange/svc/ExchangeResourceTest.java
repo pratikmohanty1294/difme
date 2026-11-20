@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
  */
 @QuarkusTest
 class ExchangeResourceTest {
+    @Inject Exchange exchange;
     static String intent(int risk, long maxPriceMinor) {
         return """
                 {"riskScore": %d, "offerSanctioned": true, "listMinor": 10000000, "discountBps": 2000,
@@ -146,5 +148,41 @@ class ExchangeResourceTest {
                 .body("verdict.witnesses", equalTo(true));
         given().get("/v1/exchange/keys").then().statusCode(200)
                 .body("'exchange-svc'", org.hamcrest.Matchers.notNullValue());
+    }
+
+    /** ADR-018 rails: escrow holds B, the winner's card can't cover A (51), the backup buys, the winner is slashed. */
+    @Test
+    void awardIsExecutedOverTheRailsWithFailoverToTheBackup() throws InterruptedException {
+        long id = given().contentType(ContentType.JSON).body(intent(900, 9_500_000))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
+                .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(409);   // still open: no award yet
+        given().contentType(ContentType.JSON).body(bid(41, 600_000, 80, 20_000, 3_000_000))
+                .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
+        given().contentType(ContentType.JSON).body(bid(42, 400_000, 95, 5_000, 3_000_000))
+                .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) {
+            Thread.sleep(20);
+        }
+        exchange.rails().checkout.limit(42, 1);            // the winner's card can't cover A = 8,000,000
+        given().contentType(ContentType.JSON).body("{}").post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(400);
+        given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
+                .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(200)
+                .body("fulfilled", equalTo(true))
+                .body("boughtBy", equalTo(41))
+                .body("attempts[0].partnerId", equalTo(42))
+                .body("attempts[0].responseCode", equalTo("51"))
+                .body("attempts[1].responseCode", equalTo("00"))
+                // FR-15: β = iso_51_bps 200 (2 % of A), μ = 1.2 seamless failover: 8,000,000 × 0.02 × 1.2
+                .body("slashedMinor", equalTo(192_000))
+                // escrow: B = A + Y + F = 8,000,000 + 400,000 + 100,000 held; principal A released; Y + F stay held
+                .body("escrow.heldMinor", equalTo(8_500_000))
+                .body("escrow.releasedMinor", equalTo(8_000_000))
+                .body("escrow.state", equalTo("PARTLY_RELEASED"));
+        given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
+                .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(200).body("boughtBy", equalTo(41));   // once only
+        given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
+                .post("/v1/exchange/auctions/987654321/execute").then().statusCode(404);
     }
 }

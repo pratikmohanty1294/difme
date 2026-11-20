@@ -1,5 +1,10 @@
 package dev.difme.exchange.svc;
 
+import dev.difme.exchange.rails.AgentCredentialPort;
+import dev.difme.exchange.rails.EscrowPort;
+import dev.difme.exchange.rails.Failover;
+import dev.difme.exchange.rails.MerchantCheckoutPort;
+import dev.difme.exchange.rails.sim.SimRails;
 import dev.difme.exchange.kernel.BidBook;
 import dev.difme.exchange.kernel.CommerceSplit;
 import dev.difme.exchange.kernel.EvidenceChain;
@@ -23,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.agrona.concurrent.AgentRunner;
@@ -55,6 +61,19 @@ public class Exchange {
     public record Context(long cardPriceMinor, long yieldRoomMinor, long depositNeededMinor) {}
 
     public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
+
+    /**
+     * The award carried out over the rails: the buyer's B held in escrow, the winner and hot backups tried in rank
+     * order (silent failover, FR-15 slashing), principal A released to whoever bought. Yield Y and fee F stay held
+     * until the fulfilment proof (pack {@code settlement.split_release}); with nobody able to buy, B is refunded.
+     */
+    public record Execution(long auctionId, String merchantId, long boughtBy, boolean fulfilled, List<Failover.Attempt> attempts,
+                            long slashedMinor, EscrowPort.Hold escrow) {}
+
+    /** Dev and verification clusters run a simulator on every rail (ADR-018); real providers register the same ports. */
+    private final SimRails rails = new SimRails();
+    private final AtomicLong stan = new AtomicLong();
+    private Map<Long, Execution> executions;
 
     @ConfigProperty(name = "difme.exchange.packs") List<String> packIds;
     @ConfigProperty(name = "difme.exchange.max-auctions") int maxAuctions;
@@ -98,6 +117,12 @@ public class Exchange {
                 return size() > keep;
             }
         });
+        executions = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Long, Execution> e) {
+                return size() > keep;
+            }
+        });
         for (String id : packIds) {
             VerticalPack pack;
             try {
@@ -105,6 +130,7 @@ public class Exchange {
             } catch (IOException e) {
                 throw new UncheckedIOException("cannot load vertical pack " + id, e);
             }
+            rails.registry.requireAll(id, pack.rails());   // a pack can't go live with a rail nobody implements
             ManyToOneRingBuffer ring = MatchingIntake.newRing(ringBytes);
             MatchingEngine engine = new MatchingEngine(pack.weights(), pack.latencyMaxMicros(), maxAuctions,
                     bidsPerAuction, ring, (auction, book, ranked) -> onClosed(id, pack.backups(), auction, book, ranked),
@@ -202,6 +228,54 @@ public class Exchange {
             return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    /** The rail implementations (a method, not a field: callers usually hold a CDI client proxy, whose fields are its own). */
+    SimRails rails() {
+        return rails;
+    }
+
+    /** Carries out an awarded auction once; repeated calls return the first outcome. Null when there is no award yet. */
+    public Execution execute(long auctionId, String merchantId) {
+        Result r = results.get(auctionId);
+        if (r == null || r.award() == null) return null;
+        synchronized (executions) {
+            Execution done = executions.get(auctionId);
+            if (done != null) return done;
+            VerticalPack p = packs.get(r.pack());
+            CommerceSplit s = r.award().split();
+            String holdId = "auction-" + auctionId;
+            rails.escrow.hold(holdId, "buyer-" + auctionId, s.b());
+            UUID instruction = new UUID(auctionId, 0L);          // the buyer's delegated purchase instruction
+            long now = System.currentTimeMillis();
+            List<Failover.Candidate> ranked = r.top().stream()
+                    .map(t -> new Failover.Candidate(t.nodeRef(), r.award().collateralMinor())).toList();
+            Failover.Result f = Failover.run(ranked, s.a(),
+                    new Failover.SlashingBps(p.slashing().fundsBps(), p.slashing().otherDeclineBps()), partner -> {
+                        var token = rails.credentials.issue(
+                                new AgentCredentialPort.Instruction(instruction, partner, merchantId, s.a(), "INR"), now);
+                        String field11 = String.format("%06d", stan.incrementAndGet() % 1_000_000);
+                        return rails.checkout.authorize(new MerchantCheckoutPort.Authorization(field11, token.token(),
+                                merchantId, s.a(), "INR"), now).responseCode();
+                    });
+            EscrowPort.Hold hold = f.fulfilled()
+                    ? rails.escrow.release(holdId, "principal", "partner-" + f.winner(), s.a())
+                    : rails.escrow.refund(holdId);
+            if (!f.fulfilled()) {
+                EvidenceChain chain = chains.get(auctionId);
+                if (chain != null) {
+                    Map<String, Object> refund = new LinkedHashMap<>();
+                    refund.put("reason", "no partner could buy");
+                    refund.put("amount", hold.refundedMinor());
+                    refund.put("currency", "INR");
+                    chain.append(EvidenceChain.Type.refund, EvidenceChain.Signal.Deterministic, refund);
+                }
+            }
+            metrics.counter("difme_exchange_executions_total", "pack", r.pack(), "fulfilled", f.fulfilled() ? "yes" : "no").increment();
+            Execution e = new Execution(auctionId, merchantId, f.winner(), f.fulfilled(), f.attempts(), f.totalSlashMinor(), hold);
+            executions.put(auctionId, e);
+            return e;
         }
     }
 

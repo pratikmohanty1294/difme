@@ -1,15 +1,13 @@
 package dev.difme.exchange.rails.sim;
 
 import dev.difme.exchange.rails.EscrowPort;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 /** In-memory escrow enforcing conservation (released + refunded ≤ held) with idempotent hold/release/refund. */
 public final class SimEscrow implements EscrowPort {
-    private final Map<String, Hold> holds = new HashMap<>();
-    private final Set<String> releases = new HashSet<>();
+    private final Map<String, Hold> holds = Bounded.map();
+    private final Set<String> releases = java.util.Collections.newSetFromMap(Bounded.map());
 
     @Override
     public synchronized Hold hold(String holdId, String payer, long amountMinor) {

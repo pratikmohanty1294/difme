@@ -8,13 +8,12 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** Deterministic agentic-token issuer: same instruction, same token; single use; amount and merchant capped. */
 public final class SimAgentCredential implements AgentCredentialPort {
     static final long TTL_MS = 15 * 60_000L;
-    private final Map<String, Token> issued = new ConcurrentHashMap<>();
-    private final Map<String, Boolean> spent = new ConcurrentHashMap<>();
+    private final Map<String, Token> issued = Bounded.map();
+    private final Map<String, Boolean> spent = Bounded.map();
 
     @Override
     public Token issue(Instruction in, long nowMs) {

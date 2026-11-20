@@ -13,6 +13,7 @@
   <dependencies>
     <dependency><groupId>dev.difme</groupId><artifactId>exchange-rules</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>dev.difme</groupId><artifactId>exchange-matching</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>dev.difme</groupId><artifactId>exchange-rails</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer-registry-prometheus</artifactId></dependency>

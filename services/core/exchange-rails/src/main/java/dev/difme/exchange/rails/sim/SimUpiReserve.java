@@ -1,15 +1,13 @@
 package dev.difme.exchange.rails.sim;
 
 import dev.difme.exchange.rails.UpiReservePort;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 /** In-memory UPI Reserve Pay: one block, many idempotent debits, never below zero, nothing after revoke. */
 public final class SimUpiReserve implements UpiReservePort {
-    private final Map<String, Block> blocks = new HashMap<>();
-    private final Set<String> debits = new HashSet<>();
+    private final Map<String, Block> blocks = Bounded.map();
+    private final Set<String> debits = java.util.Collections.newSetFromMap(Bounded.map());
 
     @Override
     public synchronized Block reserve(String blockId, String vpa, long amountMinor) {

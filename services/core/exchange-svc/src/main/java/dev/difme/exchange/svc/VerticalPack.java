@@ -12,7 +12,10 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /** One vertical pack as served: its FR-17 weights and auction parameters from vertical.yaml, plus compiled rules. */
 public record VerticalPack(String id, Weights weights, long windowNanos, long latencyMaxMicros, int backups, PackRules rules,
-                           Collateral collateral, int guaranteeFundBps) {
+                           Collateral collateral, int guaranteeFundBps, List<String> rails, Slashing slashing) {
+    /** FR-15 per-code bases from vertical.yaml {@code slashing:} (basis points of A). */
+    public record Slashing(int fundsBps, int otherDeclineBps) {}
+
     /** FR-14 inputs from vertical.yaml {@code collateral:} (alpha, gamma_rev, min_minor). */
     public record Collateral(double alpha, double gammaRev, long minMinor, int mandateDepositBps) {}
 
@@ -30,6 +33,8 @@ public record VerticalPack(String id, Weights weights, long windowNanos, long la
         List<String> rules = (List<String>) v.getOrDefault("rules", List.of());
         Map<String, Object> c = (Map<String, Object>) v.get("collateral");
         Map<String, Object> st = (Map<String, Object>) v.getOrDefault("settlement", Map.of());
+        Map<String, Object> sl = (Map<String, Object>) v.getOrDefault("slashing", Map.of());
+        List<String> rails = (List<String>) v.getOrDefault("rails", List.of());
         PackRules compiled = PackRules.load(id, rules, f -> cl.getResourceAsStream(base + f));
         return new VerticalPack(id,
                 new Weights(num(w, "price"), num(w, "reputation"), num(w, "latency")),
@@ -39,7 +44,10 @@ public record VerticalPack(String id, Weights weights, long windowNanos, long la
                 compiled,
                 new Collateral(num(c, "alpha"), num(c, "gamma_rev"), (long) num(c, "min_minor"),
                         c.get("mandate_deposit_bps") instanceof Number md ? md.intValue() : 0),
-                st.get("guarantee_fund_bps_of_fee") instanceof Number n ? n.intValue() : 0);
+                st.get("guarantee_fund_bps_of_fee") instanceof Number n ? n.intValue() : 0,
+                List.copyOf(rails),
+                new Slashing(sl.get("iso_51_bps") instanceof Number f ? f.intValue() : 0,
+                        sl.get("other_decline_bps") instanceof Number o ? o.intValue() : 0));
     }
 
     private static double num(Map<String, Object> m, String key) {

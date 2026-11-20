@@ -2,11 +2,10 @@ package dev.difme.exchange.rails.sim;
 
 import dev.difme.exchange.rails.StablecoinPort;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** Simulated stablecoin leg: confirmed at once, transaction reference derived from the request id (idempotent). */
 public final class SimStablecoin implements StablecoinPort {
-    private final Map<String, Receipt> receipts = new ConcurrentHashMap<>();
+    private final Map<String, Receipt> receipts = Bounded.map();
 
     @Override
     public Receipt transfer(Transfer t) {

@@ -165,6 +165,22 @@ public class ExchangeResource {
         return out;
     }
 
+    public record Execute(String merchantId) {}
+
+    /** Carries out the award over the rails (escrow hold, failover across winner and backups, principal release). */
+    @POST
+    @Path("/auctions/{id}/execute")
+    public Response execute(@PathParam("id") long auctionId, Execute req) {
+        if (req == null || req.merchantId() == null || req.merchantId().isBlank()) {
+            return Response.status(400).entity(Map.of("error", "merchantId is required")).build();
+        }
+        Exchange.Execution e = exchange.execute(auctionId, req.merchantId());
+        if (e != null) return Response.ok(e).build();
+        return exchange.isOpen(auctionId) || exchange.result(auctionId) != null
+                ? Response.status(409).entity(Map.of("error", "auction has no award yet")).build()
+                : Response.status(404).build();
+    }
+
     @GET
     @Path("/auctions/{id}")
     public Response result(@PathParam("id") long auctionId) {

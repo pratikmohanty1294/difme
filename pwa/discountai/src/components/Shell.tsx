@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { LIVE, exchange } from '../api/exchange';
 import {
   Activity, BookOpen, Bot, Boxes, ClipboardList, ExternalLink, Gauge, Globe, Landmark, LayoutDashboard, Menu, Network, PlayCircle, RotateCcw, ScrollText,
   ShieldCheck, SlidersHorizontal, Sparkles, Wallet, X,
@@ -135,10 +136,12 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
               </a>
             )}
             <div className="ml-auto flex items-center gap-2">
-              <span className="hidden md:inline text-xs text-ink-500">Demo pace</span>
-              <Segmented<Speed> size="sm" value={state.speed} onChange={setSpeed}
-                options={[{ value: 'presenter', label: 'Presenter' }, { value: 'normal', label: 'Fast' }, { value: 'instant', label: 'Instant' }]} />
-              <button className="btn-ghost px-2.5 py-1.5 text-xs" onClick={reset} title="Reset demo data"><RotateCcw size={14} /> <span className="hidden md:inline">Reset</span></button>
+              {LIVE ? <ExchangeStatus /> : (<>
+                <span className="hidden md:inline text-xs text-ink-500">Demo pace</span>
+                <Segmented<Speed> size="sm" value={state.speed} onChange={setSpeed}
+                  options={[{ value: 'presenter', label: 'Presenter' }, { value: 'normal', label: 'Fast' }, { value: 'instant', label: 'Instant' }]} />
+                <button className="btn-ghost px-2.5 py-1.5 text-xs" onClick={reset} title="Reset demo data"><RotateCcw size={14} /> <span className="hidden md:inline">Reset</span></button>
+              </>)}
             </div>
           </div>
         </header>
@@ -163,5 +166,24 @@ function Brand() {
         <span className="block text-[10.5px] text-ink-400 uppercase tracking-[0.12em] whitespace-nowrap">{CURRENT ? `DiscountAI · ${CURRENT.tagline}` : 'Agentic commerce'}</span>
       </span>
     </a>
+  );
+}
+
+/** Live builds: whether the exchange answers (checked every 15 s). */
+function ExchangeStatus() {
+  const [up, setUp] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const check = () => exchange.ping().then((ok) => alive && setUp(ok));
+    check();
+    const t = setInterval(check, 15_000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  return (
+    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium',
+      up ? 'bg-emerald-50 text-emerald-700' : up === false ? 'bg-red-50 text-red-700' : 'bg-ink-100 text-ink-600')}>
+      <span className={cx('h-2 w-2 rounded-full', up ? 'bg-emerald-500' : up === false ? 'bg-red-500' : 'bg-ink-400')} />
+      {up ? 'Exchange live' : up === false ? 'Exchange unreachable' : 'Connecting…'}
+    </span>
   );
 }

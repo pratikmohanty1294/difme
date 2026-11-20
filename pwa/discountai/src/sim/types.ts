@@ -201,6 +201,7 @@ export interface Mandate {
   vicInstructionId?: string;  // card-network agentic commerce purchase instruction for this mandate
   customRules?: import('./dmn-compile').CustomTable; // buying partner's own fields + rules, compiled to DMN, run at each auction
   setupChain?: import('./evidence').Chain;            // evidence Chain S for this mandate
+  exchangeMandateId?: number; // id on the live exchange (role builds); budget, awards and yield are read back from it
 }
 
 export interface FeedItem {

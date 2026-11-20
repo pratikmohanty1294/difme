@@ -1,3 +1,4 @@
+import { LIVE, exchange, awaitResult, ExchangeError } from '../api/exchange';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { DEFAULT_CONFIG, NODES, SCENARIO, SEED_MANDATES, splitOf } from './data';
 import { makeProof, sha256, verifyChain } from './crypto';
@@ -232,6 +233,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
 
   // Ambient market activity for the buying partner's live race feed.
   useEffect(() => {
+    if (LIVE) return; // role builds show only what the live exchange reports
     const t = setInterval(() => {
       const r = Math.random();
       const auc = rid('auc_', 7);
@@ -247,12 +249,80 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, []);
 
+  // Live builds: read each registered mandate back from the exchange (what it spent, won and earned; still standing?).
+  useEffect(() => {
+    if (!LIVE) return;
+    const t = setInterval(() => {
+      for (const m of ref.current.mandates) {
+        if (!m.exchangeMandateId) continue;
+        exchange.mandate(m.exchangeMandateId).then((s) => dispatch({ type: 'patchMandate', id: m.id, patch: {
+          utilised: (s.budgetTotalMinor - s.budgetLeftMinor) / 100, yieldEarned: s.yieldEarnedMinor / 100, status: s.standing ? 'LIVE' : 'Paused',
+        } }), () => undefined);
+      }
+    }, 10_000);
+    return () => clearInterval(t);
+  }, []);
+
   const pace = useCallback(async (base: number) => {
     const f = ref.current.speed === 'presenter' ? 1 : ref.current.speed === 'normal' ? 0.35 : 0;
     await sleep(base * f);
   }, []);
 
+  /**
+   * Live path (role builds): the buy request goes to the exchange. The intent opens a 50 ms batch auction, standing
+   * mandates bid as resting orders, the award is executed over the rails, and the evidence chain is verified. Each
+   * state lands on the same request record the screens already render.
+   */
+  const liveSubmit = useCallback((maxPrice: number, expiry: string, outcome: Outcome): string => {
+    const P = SCENARIO.list;
+    const dP = Math.round((P * SCENARIO.discountPct) / 100);
+    const req: BuyRequest = {
+      id: rid('REQ-', 5).toUpperCase(), auctionId: '…', product: SCENARIO.product, icon: 'headphones', merchant: SCENARIO.merchant,
+      mcc: SCENARIO.mcc, instrument: SCENARIO.requiredCard, bin: SCENARIO.bin, list: P, quoteB: 0, maxPrice, expiry,
+      createdAt: new Date().toISOString(), status: 'Pending', outcome, riskScore: 900, timeline: [], bids: [], proofs: [],
+    };
+    dispatch({ type: 'addRequest', req });
+    const id = req.id;
+    const t0 = performance.now();
+    const at = () => Math.round((performance.now() - t0) / 100) / 10;
+    const step = (actor: TimelineStep['actor'], label: string, phase: TimelineStep['phase'], detail?: string) =>
+      dispatch({ type: 'step', id, step: { t: at(), actor, label, phase, detail } });
+    const fail = (why: string) => {
+      dispatch({ type: 'patchRequest', id, patch: { status: 'Timed Out', failReason: why } });
+      step('OME', why, 'POC');
+    };
+    (async () => {
+      try {
+        const opened = await exchange.openIntent({ riskScore: req.riskScore, offerSanctioned: true, listMinor: P * 100,
+          discountBps: SCENARIO.discountPct * 100, feeMinor: SCENARIO.fee * 100, maxPriceMinor: maxPrice * 100 });
+        dispatch({ type: 'patchRequest', id, patch: { auctionId: `auc_${opened.auctionId}` } });
+        step('Buyer Agent', `Intent accepted by the exchange · auction ${opened.auctionId}`, 'POI',
+          `${opened.standingBids ?? 0} standing mandate bid(s) · max yield ${inr(opened.maxYieldMinor / 100)}`);
+        const r = await awaitResult(opened.auctionId);
+        if (!r.award) return fail(r.ranked === 0 ? 'No buying partner matched this request' : 'The auction closed without an award');
+        const s = r.award.split;
+        const split: Split = { list: P, discountPct: SCENARIO.discountPct, discount: dP, A: s.a / 100, Y: s.yield / 100, F: s.fee / 100,
+          B: s.b / 100, buyerSaves: s.buyerSaves / 100, payout: (s.a + s.yield) / 100, guaranteeFund: Math.round(s.fee / 10) / 100 };
+        dispatch({ type: 'patchRequest', id, patch: { status: 'Matched', split, quoteB: split.B, winnerNodeId: `node-${r.award.winner.nodeRef}`,
+          backupIds: r.top.slice(1).map((b) => `node-${b.nodeRef}`) } });
+        step('OME', `Awarded to node ${r.award.winner.nodeRef} of ${r.ranked} ranked`, 'POL', `A ${inr(split.A)} · Y ${inr(split.Y)} · F ${inr(split.F)} · you pay ${inr(split.B)}`);
+        const e = await exchange.execute(opened.auctionId, SCENARIO.merchantId);
+        if (!e.fulfilled) return fail('No buying partner could complete the purchase; your hold was refunded');
+        dispatch({ type: 'patchRequest', id, patch: { status: 'Success', orderId: `ORD-${opened.auctionId}` } });
+        step('Merchant', `Bought by node ${e.boughtBy}${e.attempts.length > 1 ? ` after ${e.attempts.length - 1} failover(s)` : ''}`, 'POE');
+        const ev = await exchange.evidence(opened.auctionId);
+        const ok = ev.verdict.hashes && ev.verdict.links && ev.verdict.seal && ev.verdict.witnesses;
+        dispatch({ type: 'patchRequest', id, patch: { chainValid: ok } });
+        step('Compliance', ok ? 'Evidence chain verified (hashes, links, operator seal, witness)' : `Evidence chain did not verify: ${ev.verdict.notes.join('; ')}`, 'POC');
+      } catch (err) {
+        fail(err instanceof ExchangeError ? (err.status === 0 ? 'The exchange is unreachable; nothing was charged' : `Refused by the exchange: ${err.message}`) : String(err));
+      }
+    })();
+    return id;
+  }, []);
+
   const submitRequest = useCallback<Ctx['submitRequest']>(({ maxPrice, expiry, outcome, skipConfirm }) => {
+    if (LIVE) return liveSubmit(maxPrice, expiry, outcome);
     const myRun = runId.current;
     const cfg = ref.current.config;
     const P = SCENARIO.list;
@@ -664,6 +734,18 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const addMandate = useCallback((m: Mandate) => {
     const you = ref.current.nodes.find((n) => n.isYou)!;
     const deposit = m.deposit ?? Math.round((m.limit * ref.current.config.depositPct) / 100);
+    if (LIVE) {
+      // Register on the exchange; once accepted it bids automatically (a standing order) within its rules.
+      exchange.registerMandate({ partnerRef: you.id, limitMinor: m.limit * 100, maxPerOrderMinor: m.maxPerTx * 100, minYieldPct: m.minYieldPct,
+        depositMinor: deposit * 100, budgetTotalMinor: (m.budgetTotal ?? m.limit) * 100, merchantCount: Math.max(1, m.merchants?.length ?? 1),
+        goodsCount: Math.max(1, m.goods?.length ?? 1), validityDays: m.validityDays ?? 7, cardJurisdiction: 'IN_DOMESTIC_AFA' })
+        .then((r) => dispatch({ type: 'patchMandate', id: m.id, patch: { exchangeMandateId: r.mandateId, status: 'LIVE' } }))
+        .catch((e) => {
+          dispatch({ type: 'patchMandate', id: m.id, patch: { status: 'Paused' } });
+          dispatch({ type: 'notify', notice: { id: rid('n'), at: new Date().toISOString(), party: 'Buying Partner', title: 'Mandate not accepted',
+            body: e instanceof ExchangeError ? (e.status === 0 ? 'The exchange is unreachable.' : e.message) : String(e) } });
+        });
+    }
     const mandate: Mandate = { ...m, nodeId: you.id, deposit, intentType: m.flow === 'A' ? 'Delegated budget · no human present' : m.intentType, vppRefreshDue: m.vppRefreshDue ?? new Date(Date.now() + (m.validityDays ?? 7) * 864e5).toISOString() };
     dispatch({ type: 'mandate', mandate });
     // Chain S: the mandate setup (intent + passkey delegation), sealed when the the card network instruction is registered.

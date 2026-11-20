@@ -17,6 +17,9 @@ gflags:
     # uses a lock table instead, stops at Flyway 10 and Quarkus uses Flyway 12.
     ysql_yb_enable_advisory_locks: true
     allowed_preview_flags_csv: ysql_yb_enable_advisory_locks
+    # Network pass (A/B): tserver↔master traffic was ~500 KB/s each way at idle (cluster-verify 44733260505). Heartbeats
+    # every 3 s instead of 1 s; the master marks a tserver dead only after 60 s (tserver_unresponsive_timeout_ms).
+    heartbeat_interval_ms: 3000
   master:
     enable_automatic_tablet_splitting: true
     ysql_yb_enable_advisory_locks: true

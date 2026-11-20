@@ -1,0 +1,14 @@
+# The Rust attestation verifier (PDF §11.1): locked build and the EAT appraisal tests.
+name: attestation
+on:
+  push: { branches: [main, "wip-*"], paths: ["services/attestation/**", "api/proto/**", ".github/workflows/attestation.yml"] }
+  pull_request: { paths: ["services/attestation/**", "api/proto/**"] }
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo test (locked)
+        working-directory: services/attestation
+        run: cargo test --locked

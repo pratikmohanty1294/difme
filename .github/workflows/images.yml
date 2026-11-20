@@ -109,6 +109,11 @@ jobs:
     with:
       name: difme-quinn-hub
       dockerfile: deploy/images/quinn-hub/Dockerfile
+  attestation-verifier:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-attestation-verifier
+      dockerfile: deploy/images/attestation-verifier/Dockerfile
 
   debezium-connect:
     uses: ./.github/workflows/_image.yml

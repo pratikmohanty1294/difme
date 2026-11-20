@@ -11,11 +11,16 @@ spec:
       containers:
         - name: verifier
           image: ghcr.io/pratikmohanty1294/difme-attestation-verifier:0.1.0
+          # Policy (empty in dev, so every device fails closed to the server-side fraud check): device keys file
+          # ("device-id <SEC1 hex>"), approved Wasm module hashes from SLSA provenance, revoked devices.
           env:
-            - { name: VERAISON_URL, value: http://veraison.security.svc:8080 }
-            - { name: VALKEY_URL, value: redis://valkey.cache-tier.svc:6379/3 }
+            - { name: VERIFIER_APPROVED_WASM, value: "" }
+            - { name: VERIFIER_REVOKED, value: "" }
+            - { name: VERIFIER_WORKER_THREADS, value: "1" }   # appraisal is microseconds; one runtime worker
           ports: [{ containerPort: 8443 }]
-          resources: { requests: { cpu: 20m, memory: 32Mi }, limits: { memory: 128Mi } }
+          readinessProbe: { tcpSocket: { port: 8443 }, periodSeconds: 10 }
+          # Measured 2026-11-20: 3.7 MiB RSS, 2 threads idle (release build).
+          resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 64Mi } }
 ---
 apiVersion: v1
 kind: Service

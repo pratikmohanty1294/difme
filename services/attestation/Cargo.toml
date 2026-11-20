@@ -1,0 +1,29 @@
+[package]
+name = "difme-attestation-verifier"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "PDF §11.1 RATS verifier (RFC 9334) for the QUIC hub: nonce challenge, COSE-signed EAT appraisal, approved Wasm hash, revocation."
+
+[dependencies]
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
+tonic = "0.14"
+tonic-prost = "0.14"
+prost = "0.14"
+coset = "0.4"
+p256 = { version = "0.13", features = ["ecdsa"] }
+getrandom = "0.3"
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+protoc-bin-vendored = "3"
+
+[dev-dependencies]
+tokio-stream = { version = "0.1", features = ["net"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

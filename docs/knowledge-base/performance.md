@@ -53,3 +53,5 @@ Same-time `core` runs with the per-process report (main 44687637776 vs branch 44
 | load test: accepted / p50 / p99 | 59/s, 35 ms, 321 ms | 75/s, 25 ms, 313 ms |
 
 The reports controller was the single largest idle CPU consumer in the cluster, writing PolicyReports nobody reads. Next candidates seen in the same report: Cilium's embedded Envoy also runs 4 workers (`wrk:worker_×4`).
+### Attestation verifier footprint (measured 2026-11-20, release build)
+1.8 MiB binary, 3.7 MiB RSS and 2 threads at idle (one tokio worker via `VERIFIER_WORKER_THREADS`). Pod request/limit 16/64 Mi (was 32/128 Mi, written before the code existed).

@@ -181,11 +181,13 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |
 | `wip-malloc-arena` | Kyverno default `MALLOC_ARENA_MAX=2` for every container | A/B 44687672715 vs main 44687637776 (`core` + `measure 200 60s` + proc-report) | merge only if it beats main |
 | `wip-mem-batch1` | Envoy `concurrency: 1` (one Coraza Wasm VM instead of 4); Kyverno reports controller off in dev | A/B 44687640849 vs main 44687637776 | merge only if it beats main |
+| `wip-contract-tests` | ADR-014 Schemathesis against a live exchange-svc in core-services (1,220 cases; found and fixed null-body 500s) | core-services gate | merge when green |
+| `wip-hub` | Rust QUIC hub (quinn): payments over QUIC → gRPC core, SSE relay, metrics; round-trip test; distroless cross-built image; 6 MiB RSS | hub workflow | merge when green → images build `difme-quinn-hub` → verify `hub` profile |
 
 **Waiting on the owner:** PC memory notes + session logs upload (to complete `owner-decisions.md`); canary SLO
 thresholds and the other open questions in `owner-decisions.md`.
 
-**Blocked:** hub and attestation-verifier (no source or image yet; Platform section B).
+**Blocked:** attestation-verifier (no source yet). The hub now has code on `wip-hub`.
 
 ## HANDOFF 2026-11-20 08:10 IST: continue from a cloud session
 **Owner rule (hard):** nothing runs on the owner's PC: no builds, installs, scans, watchers, git or gh. Work from a claude.ai/code cloud session, GitHub Actions, or the runtime VM/Codespace only. The PC hit critical memory from local npm installs and watch loops.

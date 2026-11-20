@@ -12,10 +12,6 @@ spec:
             containers:
               - (name): "*"
                 securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
-    - name: GOMAXPROCS
-                    +(value): "2"
-                  - name: GOGC
-                    +(value): "50"
     # Third-party operators and charts (Strimzi, KEDA, Apicurio, Flink, RisingWave, ...) don't carry our
     # cost-attribution labels, so require-labels-and-limits rejected them and the streaming profile never came up.
     # Fill in shared-infrastructure defaults only where a label is missing; our own services keep theirs.

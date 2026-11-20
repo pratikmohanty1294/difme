@@ -12,7 +12,7 @@ N=${1:-40}
 WINDOW=${PROC_WINDOW:-15}
 KUBECTL=${KUBECTL:-kubectl}
 HZ=$(getconf CLK_TCK 2>/dev/null || echo 100)
-declare -A POD PODS PODNET
+declare -A POD PODS PODNET CGCACHE
 while read -r uid ns name; do [ -n "$uid" ] || continue; POD[$uid]="$ns/$name"; POD[${uid//-/_}]="$ns/$name"; done < <(
   $KUBECTL get pods -A -o jsonpath='{range .items[*]}{.metadata.uid} {.metadata.namespace} {.metadata.name}{"\n"}{end}' 2>/dev/null)
 
@@ -50,12 +50,17 @@ netsample() {  # netsample <file>: "ns/pod rx tx", read from one process per pod
   done
 }
 
-cgsample() {  # cgsample <file>: "ns/pod refaulted_file_pages current_bytes max" from the container cgroup of one process per pod
+cgsample() {  # cgsample <file>: "ns/pod refaulted_file_pages current_bytes max" from each pod's cgroup (found by pod UID)
   : > "$1"
-  local pod cg
+  local pod uid cg
   for pod in "${!PODNET[@]}"; do
-    cg=/sys/fs/cgroup$(awk -F: '$1=="0"{print $3}' "/proc/${PODNET[$pod]}/cgroup" 2>/dev/null)
-    [ -r "$cg/memory.stat" ] || continue
+    uid=$(grep -oE 'pod[0-9a-f_-]{36}' "/proc/${PODNET[$pod]}/cgroup" 2>/dev/null | head -1)
+    [ -n "$uid" ] || continue
+    # /proc/<pid>/cgroup paths are relative to the k3d node's cgroup namespace, so they don't resolve from the runner
+    # host (the first version printed nothing); search the host hierarchy for the pod directory instead.
+    cg=${CGCACHE[$uid]:-}
+    [ -n "$cg" ] || { cg=$(find /sys/fs/cgroup -maxdepth 8 -type d -name "*${uid}*" 2>/dev/null | awk '{ print length, $0 }' | sort -n | head -1 | cut -d' ' -f2-); CGCACHE[$uid]=$cg; }
+    [ -n "$cg" ] && [ -r "$cg/memory.stat" ] || continue
     printf '%s %s %s %s\n' "$pod" "$(awk '/^workingset_refault_file /{print $2}' "$cg/memory.stat")" \
       "$(cat "$cg/memory.current" 2>/dev/null || echo 0)" "$(cat "$cg/memory.max" 2>/dev/null || echo max)" >> "$1"
   done

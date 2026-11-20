@@ -10,6 +10,9 @@ spec:
     execution.checkpointing.interval: "10s"
     execution.checkpointing.mode: EXACTLY_ONCE
     state.backend.type: rocksdb
+    # Incremental checkpoints: only new RocksDB files go to S3. Full checkpoints every 10 s cost ~1 MB/s read + 0.9 MB/s
+    # write at idle (process report, cluster-verify 44733260505); the 10 s alert-commit latency is unchanged.
+    execution.checkpointing.incremental: "true"
     execution.checkpointing.dir: s3://flink/checkpoints/fraud-cep
     execution.checkpointing.savepoint-dir: s3://flink/savepoints/fraud-cep   # required by upgradeMode: savepoint
     s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333

@@ -11,4 +11,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21", cache: maven }
+      # Maven Central rate-limits and occasionally fails shared CI IPs (429 / "artifact absent" seen 2026-11-20);
+      # resolve through Google's public Maven Central mirror, as the image builds do.
+      - name: Maven mirror
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<'XML'
+          <settings><mirrors><mirror><id>central-gcs</id><mirrorOf>central</mirrorOf>
+          <url>https://maven-central.storage-download.googleapis.com/maven2/</url></mirror></mirrors></settings>
+          XML
       - run: mvn -B -ntp -f analytics/flink-jobs/pom.xml verify

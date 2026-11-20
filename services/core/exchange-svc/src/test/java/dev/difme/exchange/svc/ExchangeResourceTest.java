@@ -252,6 +252,40 @@ class ExchangeResourceTest {
                 .body("artifacts.type", hasItem("fulfillment"));
     }
 
+    /** §11.1 FAIL path: raw features → server-side score replaces the client's; no scorer → 503 (fails closed). */
+    @Test
+    void serverSideRiskScoring() throws Exception {
+        var stub = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 18091), 0);
+        stub.createContext("/v1/score", ex -> {
+            String body = new String(ex.getRequestBody().readAllBytes());
+            boolean risky = body.contains("\"amountZscore\":6.5");
+            byte[] out = (risky ? "{\"probability\":0.98,\"riskScore\":20,\"decision\":\"BLOCK\",\"model\":\"stub\"}"
+                                : "{\"probability\":0.01,\"riskScore\":990,\"decision\":\"ALLOW\",\"model\":\"stub\"}").getBytes();
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, out.length);
+            ex.getResponseBody().write(out);
+            ex.close();
+        });
+        stub.start();
+        String base = "{\"riskScore\": 999, \"offerSanctioned\": true, \"listMinor\": 2000000, \"discountBps\": 2000, "
+                + "\"feeMinor\": 20000, \"maxPriceMinor\": 1900000, \"fraudFeatures\": %s}";
+        String safe = "{\"amountZscore\":0.2,\"txnCount1h\":1,\"distinctCounterparties24h\":2,\"geoJumpKm1h\":3,\"newDeviceFlag\":0,\"edgeScoreMean24h\":860}";
+        String risky = "{\"amountZscore\":6.5,\"txnCount1h\":14,\"distinctCounterparties24h\":18,\"geoJumpKm1h\":1400,\"newDeviceFlag\":1,\"edgeScoreMean24h\":280}";
+        try {
+            given().contentType(ContentType.JSON).body(base.formatted(safe))
+                    .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).body("riskSource", equalTo("server:stub"));
+            // the client claimed 999; the server's 20 is what the pack rules see
+            given().contentType(ContentType.JSON).body(base.formatted(risky))
+                    .post("/v1/exchange/fr01-buy/intents").then().statusCode(422);
+        } finally {
+            stub.stop(0);
+        }
+        given().contentType(ContentType.JSON).body(base.formatted(safe))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(503);
+        given().contentType(ContentType.JSON).body(intent(900, 9_500_000))                  // no features: edge score as before
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).body("riskSource", equalTo("edge"));
+    }
+
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
                                               long amount, long deliveredAt) throws Exception {
         var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",

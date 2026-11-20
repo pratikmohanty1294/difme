@@ -24,7 +24,7 @@ public class ExchangeResource {
      * Y_max = d·P − F − 1, so the buyer always pays less than list (vertical.yaml price_basis).
      */
     public record Intent(double riskScore, boolean offerSanctioned, long listMinor, int discountBps, long feeMinor,
-                         long maxPriceMinor) {}
+                         long maxPriceMinor, FraudScorer.Features fraudFeatures) {}
 
     /**
      * The buying partner's facts for bid-time eligibility (FR-01 investor_eligibility). Minor units; the rule tables
@@ -40,6 +40,7 @@ public class ExchangeResource {
                           long budgetTotalMinor, int merchantCount, int goodsCount, int validityDays, String cardJurisdiction) {}
 
     @Inject Exchange exchange;
+    @Inject FraudScorer fraudScorer;
     /** Dev and verification clusters: a simulated merchant and carrier sign the proof of delivery (SimParties). */
     @org.eclipse.microprofile.config.inject.ConfigProperty(name = "difme.exchange.sim-parties", defaultValue = "true") boolean simParties;
 
@@ -85,10 +86,19 @@ public class ExchangeResource {
         if (in.listMinor() <= 0 || in.discountBps() <= 0 || in.discountBps() >= 10_000 || in.feeMinor() < 0) {
             return Response.status(400).entity(Map.of("error", "listMinor > 0, 0 < discountBps < 10000, feeMinor >= 0")).build();
         }
+        // §11.1 FAIL path: raw features instead of an attested edge score → the exchange scores them server-side and
+        // that score replaces the client's. No score (scorer down, slow, erroring) fails closed.
+        double riskScore = in.riskScore();
+        FraudScorer.Score server = null;
+        if (in.fraudFeatures() != null) {
+            server = fraudScorer.score(in.fraudFeatures()).orElse(null);
+            if (server == null) return Response.status(503).entity(Map.of("error", "server-side risk scoring is unavailable; retry")).build();
+            riskScore = server.riskScore();
+        }
         long discount = Math.round(in.listMinor() * (in.discountBps() / 10_000.0));
         long cardPrice = in.listMinor() - discount;
         List<Finding> findings = pack.rules().evaluate("buyer_intent_eligibility", Map.of(
-                "riskScore", in.riskScore(),
+                "riskScore", riskScore,
                 "maxPrice", in.maxPriceMinor() / 100.0,
                 "minViable", (cardPrice + in.feeMinor()) / 100.0,
                 "listPrice", in.listMinor() / 100.0,
@@ -97,7 +107,9 @@ public class ExchangeResource {
         long maxYield = discount - in.feeMinor() - 1;
         if (maxYield <= 0) return Response.status(422).entity(Map.of("error", "the fee leaves no yield inside the discount")).build();
         Map<String, Object> evidence = new LinkedHashMap<>();       // canonical JSON: integers, strings, booleans
-        evidence.put("riskScore", Math.round(in.riskScore()));
+        evidence.put("riskScore", Math.round(riskScore));
+        evidence.put("riskSource", server == null ? "edge" : "server:" + server.model());
+        if (server != null) evidence.put("riskDecision", server.decision());
         evidence.put("offerSanctioned", in.offerSanctioned());
         evidence.put("listMinor", in.listMinor());
         evidence.put("discountBps", in.discountBps());
@@ -107,7 +119,8 @@ public class ExchangeResource {
         long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor()), evidence);
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         int standing = standingBids(auction);
-        return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings, "standingBids", standing)).build();
+        return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings, "standingBids", standing,
+                "riskSource", evidence.get("riskSource"))).build();
     }
 
     /**

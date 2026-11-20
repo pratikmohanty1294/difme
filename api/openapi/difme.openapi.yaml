@@ -286,12 +286,24 @@ components:
         discountBps: { type: integer, minimum: 1, maximum: 9999 }
         feeMinor: { type: integer, format: int64, minimum: 0 }
         maxPriceMinor: { type: integer, format: int64, minimum: 1 }
+        fraudFeatures:
+          description: "PDF §11.1 FAIL path: edge attestation failed, so the exchange scores these server-side (services/fraud-scorer) and that score replaces riskScore. 503 when the scorer can't answer (fails closed)."
+          type: object
+          required: [amountZscore, txnCount1h, distinctCounterparties24h, geoJumpKm1h, newDeviceFlag, edgeScoreMean24h]
+          properties:
+            amountZscore: { type: number }
+            txnCount1h: { type: number, minimum: 0 }
+            distinctCounterparties24h: { type: number, minimum: 0 }
+            geoJumpKm1h: { type: number, minimum: 0 }
+            newDeviceFlag: { type: number, enum: [0, 1] }
+            edgeScoreMean24h: { type: number, minimum: 0, maximum: 1000 }
     IntentOpened:
       type: object
       properties:
         auctionId: { type: integer, format: int64 }
         maxYieldMinor: { type: integer, format: int64, description: "Y_max = d·P − F − 1" }
         findings: { type: array, items: { $ref: "#/components/schemas/Finding" } }
+        riskSource: { type: string, description: "edge (client score) or server:<model> (§11.1 FAIL path)" }
         standingBids: { type: integer, minimum: 0, description: "Bids the exchange placed for standing mandates when the intent opened" }
     MandateState:
       type: object

@@ -26,6 +26,9 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Decided
 | Date | Question | Owner's answer |
 |---|---|---|
+| 2026-11-20 | SQL engines (PDF §5.6 Trino + StarRocks) | **Trino only.** StarRocks dropped (overlapped Trino on Iceberg; ~2.5 GB requested; most lakehouse install failures). Superset queries Trino. |
+| 2026-11-20 | Vector search (PDF §5.7 Weaviate) | **pgvector on the shared Postgres** instead of Weaviate (no new service; SQL joins with our data). |
+| 2026-11-20 | Feature store (PDF §5.7 Feast) | **Keep Feast, minimal:** registry in Postgres, online store in Valkey, offline store on Iceberg via Trino. |
 | 2026-11-20 | Lineage/catalog (PDF §5.8 DataHub) | **OpenLineage + Marquez** instead of DataHub (DataHub needs OpenSearch + GMS/frontend, ~3–5 GB, and nothing emitted lineage yet). Marquez on the shared Postgres; emitters from Trino, dbt, Flink. Owners/PII tags as dbt meta, Apicurio labels, Polaris properties. |
 | 2026-11-20 | Business rules (owner: "do as you seem best fit for the requirements") — evidence custody | Operator key in OpenBao transit (non-exportable, signs via API); the witness is a separate notary service with its own key, never the operator. Dev keeps generated keys. *Implemented on wip-tier-history (2026-11-20): exchange signers + `services/notary`; OpenBao transit mount/key/auth still to wire after the security profile converges.* |
 | 2026-11-20 | — collateral basis and default tier | V = A (the partner's exposure at the merchant). New partners start COLD_START (φ 2.0) and become ESTABLISHED after verified deliveries. *Implemented on wip-tier-history (2026-11-20): threshold `reputation.established_after_deliveries: 3` in vertical.yaml, also needs reputation ≥ 80; ENTERPRISE only by agreement, never from history.* |

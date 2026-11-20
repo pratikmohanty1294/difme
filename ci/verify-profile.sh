@@ -44,7 +44,7 @@ done
 if [ $rc -ne 0 ]; then
   echo "== pods not ready"; kubectl get pods -A --no-headers | grep -vE "Running|Completed" | cut -c1-120 | head -25
   # Crash-looping pods, plus pods that run but never turn ready (e.g. a new revision failing its probe).
-  for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error/ || ($4 == "Running" && $3 ~ /^0\//) {print $1"/"$2}' | head -8); do
+  for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error|Pending/ || ($4 == "Running" && $3 ~ /^0\//) {print $1"/"$2}' | head -8); do
     echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=40 2>&1 | cut -c1-300
     kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous --tail=15 2>/dev/null | sed 's/^/  (previous) /' | cut -c1-300
     kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8

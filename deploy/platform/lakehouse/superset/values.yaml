@@ -8,6 +8,12 @@ supersetNode:
 postgresql: { enabled: false }
 redis: { enabled: false }
 extraEnv: { REDIS_HOST: valkey.cache-tier.svc, REDIS_PORT: "6379" }
+# Superset refuses to start with its default SECRET_KEY (cluster-verify 44717717115); the key comes from a Secret
+# made by dev-secrets.sh (OpenBao in production), never from values in git.
+extraEnvRaw:
+  - { name: SUPERSET_SECRET_KEY, valueFrom: { secretKeyRef: { name: superset-secret-key, key: key } } }
 configOverrides:
+  secret: |
+    SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
   roles: |
     FAB_ROLES = {"Compliance": [[".*", "can_read"]], "Settlements": [["Dashboard", "can_read"]]}

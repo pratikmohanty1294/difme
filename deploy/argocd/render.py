@@ -27,6 +27,16 @@ IGNORE = {
     ],
     # No ignore rules for "policies": with RespectIgnoreDifferences, Argo CD re-applied the OLD live .spec.rules that
     # Kyverno's webhook touches, silently dropping changes (found live). Server-side diff already handles defaults.
+    # istiod owns these at runtime: it injects its CA into the webhooks and switches the default validator's
+    # failurePolicy to Fail once it is serving (Istio's documented Argo CD setup). Without the rules both apps stay
+    # OutOfSync and self-heal fights istiod in a loop (cluster-verify 44718018139: argocd controller ~350m CPU).
+    "istio-base": [
+        {"group": "admissionregistration.k8s.io", "kind": "ValidatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.failurePolicy", ".webhooks[]?.clientConfig.caBundle"]},
+    ],
+    "istiod": [
+        {"group": "admissionregistration.k8s.io", "kind": "ValidatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.failurePolicy", ".webhooks[]?.clientConfig.caBundle"]},
+        {"group": "admissionregistration.k8s.io", "kind": "MutatingWebhookConfiguration", "jqPathExpressions": [".webhooks[]?.clientConfig.caBundle"]},
+    ],
     "envoy-gateway": [
         {"group": "rbac.authorization.k8s.io", "kind": "ClusterRole", "jqPathExpressions": [".rules"]},
         {"group": "rbac.authorization.k8s.io", "kind": "ClusterRoleBinding", "jqPathExpressions": [".subjects"]},

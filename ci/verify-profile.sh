@@ -71,6 +71,12 @@ if [ $rc -ne 0 ]; then
       echo "--- node $d: $(docker exec k3d-difme-server-0 ls -la "$d" 2>&1 | tail -n +2 | awk '{print $NF}' | tr '\n' ' ')"
     done
   fi
+  # Synced+Healthy is required; name what drifts (istio-base/istiod, 2026-11-20).
+  echo "== out-of-sync resources (Argo CD view)"
+  for a in $(apps | awk '$3 == "OutOfSync" {print $1}'); do
+    kubectl -n argocd get application "$a" -o jsonpath='{range .status.resources[?(@.status=="OutOfSync")]}{.kind} {.namespace} {.name}{"\n"}{end}' \
+      | head -8 | sed "s/^/  $a: /"
+  done
   kubectl get rollouts -A 2>/dev/null | head; kubectl get rs -n core-platform 2>/dev/null | head -15
   echo "== recent warning events"; kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>/dev/null | tail -20 | cut -c1-250
 fi

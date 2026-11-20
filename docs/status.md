@@ -170,7 +170,8 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 **Verified converged:** base, core, observability, backoffice, platform-ops.
 **Merged today (later):** ADR-014 Schemathesis contract gate; FR-01 money loop (rails, execute, proof of delivery, settle, FR-16 reputation, OpenAPI contract); `ci/proc-report.sh` (memory, CPU, disk, network per process/thread; runs after every profile); Makefile build/test fixes.
 **Optimisation order (owner):** memory → CPU → disk I/O → network I/O.
-**Memory wins kept:** TigerBeetle 2170 → 1373 MiB (A/B, no throughput/latency regression).
+**Memory wins kept:** TigerBeetle 2170 → 1373 MiB; batch 1 (Envoy 1 worker, Kyverno reports off): −333 MiB PSS and idle CPU 166 % → 18 % of a core. Both A/B-verified, no throughput/latency regression.
+**Merged (later still):** QUIC hub (Rust, 6 MiB RSS); Maven mirror for all Maven workflows.
 
 **In flight — branch → what it fixes → verify run → next action**
 | Branch | Fix | Run | When green |
@@ -180,11 +181,9 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 | `wip-security-dev` | OpenBao 1 replica, static seal, self-init; SPIRE hooks off + insecureSkipVerify; istio-system privileged; Veraison stores; verifier out | 44682927471 `core,security` | merge; then `hub` stays blocked (no code) |
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |
 | `wip-malloc-arena` | Kyverno default `MALLOC_ARENA_MAX=2` for every container | A/B 44687672715 vs main 44687637776 (`core` + `measure 200 60s` + proc-report) | merge only if it beats main |
-| `wip-mem-batch1` | Envoy `concurrency: 1` (one Coraza Wasm VM instead of 4); Kyverno reports controller off in dev | A/B 44687640849 vs main 44687637776 | merge only if it beats main |
-| `wip-hub` | Rust QUIC hub (quinn): payments over QUIC → gRPC core, SSE relay, metrics; round-trip test; distroless cross-built image; 6 MiB RSS | hub workflow | merge when green → images build `difme-quinn-hub` → verify `hub` profile |
+| `wip-mem-batch2` | Go runtime defaults (GOMAXPROCS=2, GOGC=50 where unset) + JVM ActiveProcessorCount=2 | A/B 44690021537 vs main 44690017534 | merge only if it beats main |
 | `wip-attestation` | Rust RATS verifier (nonce, COSE EAT, Wasm hash, revocation; fail-closed); 3.7 MiB RSS; back in the security profile | attestation workflow | merge after `wip-security-dev` (resolve: keep verifier.yaml in the attestation kustomization) |
 | `wip-formio-auth` | formio → FerretDB 2 with SCRAM credentials (process profile: next blocker after the VM bundles) | 44689378187 `core,process` | merge when green |
-| `wip-ci-mirror` | core-services and flink-jobs resolve Maven via Google's Central mirror | branch gates | merge when green |
 
 **Waiting on the owner:** PC memory notes + session logs upload (to complete `owner-decisions.md`); canary SLO
 thresholds and the other open questions in `owner-decisions.md`.

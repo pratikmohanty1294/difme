@@ -25,6 +25,8 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Decided
 | Date | Question | Owner's answer |
 |---|---|---|
+| 2026-11-20 | Payment routing: saga vs DIRECT | Keep saga (Temporal). |
+| 2026-11-20 | Canary SLO thresholds | "Best possible value achievable": p99 ≤ 400 ms (measured worst p99 346 ms under the 200 req/s baseline, ~15 % headroom); success rate stays ≥ 99.5 %. Tighten as the payment path speeds up. |
 | 2026-11-20 | Argo CD → Flux? | Keep Argo CD. |
 | 2026-11-20 | Istio → Cilium mesh? | Keep Istio ambient (fixed for Cilium the same day). |
 | 2026-11-20 | Kafka: replace Strimzi brokers with `apache/kafka-native`? | Allowed only if no functionality is lost. Before any switch: list everything Strimzi provides today (KRaft node pools, entity/topic operator and KafkaTopic resources, listeners/TLS, metrics, Debezium/Apicurio/Flink/RisingWave/KEDA integrations, rolling upgrades), show each one covered by the replacement, then A/B the footprint. |
@@ -48,8 +50,6 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Open (owner to decide)
 | Since | Question | Context |
 |---|---|---|
-| 2026-11-20 | Canary SLO thresholds | `slo-gate` wants p99 ≤ 5 ms; measured cmd-svc p99 is about 250–330 ms, so every real rollout would abort. |
-| 2026-11-19 | Payment routing: saga vs DIRECT | A/B in status.md: DIRECT p50 43 ms vs saga 97 ms at 15 req/s; 37.0 vs 33.4 req/s accepted at 200 req/s. Currently saga. |
 | 2026-11-19 | Evidence chain: who witnesses in production, and where the operator key lives | Dev keys are generated at start. OpenBao transit is the candidate for the operator key. |
 | 2026-11-19 | Collateral V = A, and the default partner tier | FR-14 collateral at close. |
 | 2026-11-19 | `min_minor` collateral floors per vertical | ₹500 placeholders. |

@@ -22,7 +22,11 @@ spec:
     - name: p99-latency
       interval: 1m
       count: 5
-      successCondition: result[0] <= 0.005
+      # p99 ≤ 400 ms (owner decision 2026-11-20: "best possible value achievable"). Measured cmd-svc p99 under the
+      # 200 req/s baseline was 297–346 ms across today's A/B runs (saturated, shedding); 400 ms is the tightest bound
+      # all of them pass with ~15 % headroom. The old 5 ms would have aborted every real rollout. Tighten as the
+      # payment path gets faster (re-measure with cluster-verify -f measure='200 60s').
+      successCondition: result[0] <= 0.4
       provider:
         prometheus:
           address: http://vmsingle-victoria-metrics-k8s-stack.observability.svc:8429

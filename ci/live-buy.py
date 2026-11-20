@@ -70,6 +70,14 @@ def run():
             raise RuntimeError(f"delivery refused: {f.get('problems')}")
         step(f"delivered: escrow released {f['escrow']['releasedMinor']} of {f['escrow']['heldMinor']}, yield after the return window")
         print("  live buy: ok")
+        # §11.1 FAIL path (only with the ml profile's scorer deployed): raw features, scored by the exchange itself.
+        if subprocess.run(["kubectl", "-n", "ml-platform", "get", "svc", "onnx-serving"], capture_output=True).returncode == 0:
+            feats = {"amountZscore": 0.2, "txnCount1h": 1, "distinctCounterparties24h": 2, "geoJumpKm1h": 3, "newDeviceFlag": 0,
+                     "edgeScoreMean24h": 860}
+            o = call("POST", "/fr01-buy/intents", {"riskScore": 0, "offerSanctioned": True, "listMinor": 2000000, "discountBps": 2000,
+                     "feeMinor": 20000, "maxPriceMinor": 1900000, "fraudFeatures": feats})
+            step(f"FAIL path: auction {o['auctionId']} opened on a server score ({o.get('riskSource')})")
+            print("  server-side scoring: ok" if str(o.get("riskSource", "")).startswith("server:") else "  server-side scoring: NOT USED")
     except Exception as ex:  # noqa: BLE001 - smoke reports any failure the same way
         print(f"  live buy: FAILED - {ex}")
         sys.exit(1)

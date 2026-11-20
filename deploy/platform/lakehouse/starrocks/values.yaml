@@ -5,7 +5,8 @@
 starrocks:
   starrocksFESpec:
     replicas: 1
-    runAsNonRoot: false   # the operator's CRD rejects null (cluster-verify 2026-11-20); the StarRocks images run as root
+    runAsNonRoot: true    # chart 1.10.1 renders false as null (its helper prints only truthy values) and the CRD rejects null;
+                          # true runs as uid 1000, which the chart recommends for a fresh cluster (no root-owned files yet)
     resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
     storageSpec: { name: fe, storageSize: 4Gi }
     feEnvVars: [{ name: MALLOC_ARENA_MAX, value: "2" }]
@@ -21,7 +22,8 @@ starrocks:
       sys_log_level = INFO
   starrocksBeSpec:
     replicas: 1
-    runAsNonRoot: false   # the operator's CRD rejects null (cluster-verify 2026-11-20); the StarRocks images run as root
+    runAsNonRoot: true    # chart 1.10.1 renders false as null (its helper prints only truthy values) and the CRD rejects null;
+                          # true runs as uid 1000, which the chart recommends for a fresh cluster (no root-owned files yet)
     resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }
     storageSpec: { name: be, storageSize: 8Gi }
     config: |

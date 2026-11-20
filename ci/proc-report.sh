@@ -50,12 +50,23 @@ netsample() {  # netsample <file>: "ns/pod rx tx", read from one process per pod
   done
 }
 
+cgsample() {  # cgsample <file>: "ns/pod refaulted_file_pages current_bytes max" from the container cgroup of one process per pod
+  : > "$1"
+  local pod cg
+  for pod in "${!PODNET[@]}"; do
+    cg=/sys/fs/cgroup$(awk -F: '$1=="0"{print $3}' "/proc/${PODNET[$pod]}/cgroup" 2>/dev/null)
+    [ -r "$cg/memory.stat" ] || continue
+    printf '%s %s %s %s\n' "$pod" "$(awk '/^workingset_refault_file /{print $2}' "$cg/memory.stat")" \
+      "$(cat "$cg/memory.current" 2>/dev/null || echo 0)" "$(cat "$cg/memory.max" 2>/dev/null || echo max)" >> "$1"
+  done
+}
+
 for d in /proc/[0-9]*; do
   p=${d#/proc/}; pod=$(podof "$p"); [ -n "$pod" ] || continue
   PODS[$p]=$pod; [ -n "${PODNET[$pod]:-}" ] || PODNET[$pod]=$p
 done
-rows=$(mktemp); s1=$(mktemp); s2=$(mktemp); n1=$(mktemp); n2=$(mktemp)
-sample "$s1"; netsample "$n1"; sleep "$WINDOW"; sample "$s2"; netsample "$n2"
+rows=$(mktemp); s1=$(mktemp); s2=$(mktemp); n1=$(mktemp); n2=$(mktemp); c1=$(mktemp); c2=$(mktemp)
+sample "$s1"; netsample "$n1"; cgsample "$c1"; sleep "$WINDOW"; sample "$s2"; netsample "$n2"; cgsample "$c2"
 
 # Per-process CPU %, disk KB/s and the three CPU-heaviest thread groups over the window (one awk pass for all).
 awk -v hz="$HZ" -v w="$WINDOW" '
@@ -91,7 +102,12 @@ sort -t$'\t' -k7,7nr "$rows" | head -10 | awk -F'\t' '{printf "  %6.1f%%  %-44s 
 echo "== top 10 by disk I/O (read+write KB/s)"
 awk -F'\t' '{printf "%.1f\t%s\t%s\t%s\t%s\n", $8+$9, $8, $9, $2, $3}' "$rows" | sort -t$'\t' -k1,1nr | head -10 \
   | awk -F'\t' '$1>0 {printf "  %8.1f (r %.1f w %.1f)  %-44s %s\n", $1, $2, $3, substr($4,1,44), $5}'
+# Disk reads at idle are often page-cache thrash: a container near its memory limit drops file pages (jar, AOT cache,
+# binary text) and reads them back. Refaults/s > 0 with current near max confirms it (added 2026-11-20, cmd-svc).
+echo "== top 10 containers by file refaults/s (memory current / limit MiB)"
+awk -v w="$WINDOW" 'FNR==NR {r[$1]=$2; next} ($1 in r) {d=($2-r[$1])/w; m=($4=="max")?"none":int($4/1048576); printf "%.1f %s %d %s\n", d, $1, $3/1048576, m}' "$c1" "$c2" \
+  | sort -k1,1nr | head -10 | awk '$1>0 {printf "  %8.1f pages/s  %-44s %d / %s\n", $1, $2, $3, $4}'
 echo "== top 10 pods by network (rx+tx KB/s, loopback excluded)"
 awk -v w="$WINDOW" 'FNR==NR {r[$1]=$2; t[$1]=$3; next} ($1 in r) {rx=($2-r[$1])/1024/w; tx=($3-t[$1])/1024/w; printf "%.1f %.1f %.1f %s\n", rx+tx, rx, tx, $1}' "$n1" "$n2" \
   | sort -k1,1nr | head -10 | awk '$1>0 {printf "  %8.1f (rx %.1f tx %.1f)  %s\n", $1, $2, $3, $4}'
-rm -f "$rows" "$rows.rate" "$s1" "$s2" "$n1" "$n2"
+rm -f "$rows" "$rows.rate" "$s1" "$s2" "$n1" "$n2" "$c1" "$c2"

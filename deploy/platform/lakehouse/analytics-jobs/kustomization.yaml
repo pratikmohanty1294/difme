@@ -1,1 +1,1 @@
-resources: [dbt-cron.yaml]
+resources: [dbt-cron.yaml, iceberg-maintenance.yaml]

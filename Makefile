@@ -58,15 +58,13 @@ ui:              ## Port-forward Argo CD, Grafana and Temporal UIs
 
 build:           ## Build all services
 	mvn -q -B -f services/core/pom.xml package -DskipTests
-	cd services/hub && cargo build --release
-	cd services/attestation && cargo build --release
-	cd edge/core && cargo build --release
-	cd backoffice && pnpm install && pnpm turbo build
+	@# Rust components (Platform section B) build once their source exists.
+	@for d in services/hub services/attestation edge/core; do if [ -d $$d ]; then (cd $$d && cargo build --release) || exit 1; else echo "skip $$d (not written yet)"; fi; done
+	cd backoffice && pnpm install --frozen-lockfile && pnpm turbo build
 
 test:            ## Unit plus contract tests
 	mvn -q -B -f services/core/pom.xml verify
-	cd services/hub && cargo test
-	cd edge/core && cargo test
+	@for d in services/hub edge/core; do if [ -d $$d ]; then (cd $$d && cargo test) || exit 1; else echo "skip $$d (not written yet)"; fi; done
 	cd backoffice && pnpm turbo test
 
 tla:             ## Model-check every TLA+ spec

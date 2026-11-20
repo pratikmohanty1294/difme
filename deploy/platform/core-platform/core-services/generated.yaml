@@ -36,6 +36,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2
         readinessProbe:
           httpGet:
             path: /q/health/ready
@@ -118,6 +120,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2
         readinessProbe:
           httpGet:
             path: /q/health/ready
@@ -200,6 +204,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2
         readinessProbe:
           httpGet:
             path: /q/health/ready
@@ -282,6 +288,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2
         readinessProbe:
           httpGet:
             path: /q/health/ready
@@ -364,6 +372,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2
         readinessProbe:
           httpGet:
             path: /q/health/ready
@@ -446,6 +456,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2
         readinessProbe:
           httpGet:
             path: /q/health/ready

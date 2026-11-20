@@ -12,6 +12,22 @@ spec:
             containers:
               - (name): "*"
                 securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+    # Go runtime defaults (memory batch 2, measured 2026-11-20: Go daemons were 2.4 GiB PSS over 34 processes with 4
+    # schedulers each and the default GOGC=100, i.e. heaps up to 2x live data). GOMAXPROCS=2 and GOGC=50 where a
+    # container sets neither; non-Go processes ignore both. kube-system (Cilium, CoreDNS) starts before Kyverno anyway.
+    - name: default-go-runtime
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      exclude: { any: [{ resources: { namespaces: [kube-system] } }] }
+      mutate:
+        patchStrategicMerge:
+          spec:
+            containers:
+              - (name): "*"
+                env:
+                  - name: GOMAXPROCS
+                    +(value): "2"
+                  - name: GOGC
+                    +(value): "50"
     # Third-party operators and charts (Strimzi, KEDA, Apicurio, Flink, RisingWave, ...) don't carry our
     # cost-attribution labels, so require-labels-and-limits rejected them and the streaming profile never came up.
     # Fill in shared-infrastructure defaults only where a label is missing; our own services keep theirs.

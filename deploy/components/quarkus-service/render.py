@@ -21,6 +21,9 @@ def manifests(s: dict) -> list[dict]:
         {"name": "QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://alloy.observability.svc:4317"},
         {"name": "QUARKUS_OTEL_SDK_DISABLED", "value": "true"},  # enabled by the observability overlay
         {"name": "FLAGD_HOST", "value": "flagd.core-platform.svc"},
+        # Memory batch 2: the JVM sizes JIT, GC and ForkJoin threads for 2 CPUs, not the node's 4 (cmd-svc ran 59
+        # threads idle, measured 2026-11-20). Native-image services ignore this variable.
+        {"name": "JAVA_TOOL_OPTIONS", "value": "-XX:ActiveProcessorCount=2"},
     ]
     # Root filesystem is read-only (policies/kyverno/mutate-defaults.yaml); Quarkus/Vert.x needs a small writable /tmp
     # for its file cache (found live). Disk-backed so it doesn't count against the memory limit.

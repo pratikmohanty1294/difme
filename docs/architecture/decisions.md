@@ -42,7 +42,7 @@ The owner chose each of these when offered a newer free alternative to the PDF c
 | Java 21 | **Java 25 LTS** | Current LTS. Fixes virtual-thread pinning on `synchronized`, adds scoped values and compact object headers. |
 | React 18 / Svelte 4 / Angular 17 + Webpack 5 Module Federation | **React 19 / Svelte 5 / Angular 20 + Module Federation 2.0 on Rspack** | The old majors are out of support. MF 2.0 adds manifest-based remotes and type hints, and Rspack builds faster. |
 | Native Android shell + uniffi | **Tauri 2 mobile** (Vue 3 UI + Rust core; Kotlin plugins for HCE/NFC/KeyStore) | One Rust codebase shared with the hub, first-class Android and iOS. |
-| Iceberg catalog (unspecified) | **Apache Polaris** (Iceberg REST) | One catalog with RBAC and credential vending for Trino, Spark, Flink and StarRocks. |
+| Iceberg catalog (unspecified) | **Apache Polaris** (Iceberg REST) | One catalog with RBAC and credential vending for Trino, Spark and Flink (StarRocks dropped, ADR-021). |
 | Kong + APISIX | **Kept as in the PDF** | Owner's choice: Kong external, APISIX back-office, both behind Envoy Gateway. |
 
 ## ADR-006 — Kafka tiered storage (decided 2026-11-17)
@@ -149,7 +149,7 @@ Unit tests stay in each stack's native runner (JUnit 5, Vitest, Rust `cargo test
 Kept on purpose:
 - **Temporal + Fluxnova:** system orchestration vs business processes.
 - **RisingWave + Flink:** serving SQL views vs CEP and sinks.
-- **Trino + StarRocks:** federated SQL vs OLAP.
+- ~~**Trino + StarRocks:** federated SQL vs OLAP.~~ Superseded by ADR-021: Trino only.
 - **Loki/Tempo/Pyroscope:** logs, traces, profiles.
 - **Harbor/Tekton/Fleet/external-dns:** the owner had no preference.
 
@@ -239,3 +239,18 @@ DIFME PRD §3–5. The prototype becomes the real system, and its pipeline is ge
   Aeron Cluster (ADR-018) wraps it for replication.
 - **Vendor-hosted pieces of the prototype** (serverless functions, edge KV, card-network SDK bridge) map to ports and
   open-source simulators (ADR-018). No vendor SDK sits in the core path.
+
+## ADR-021 — Lighter alternatives to PDF components (owner-approved 2026-11-20)
+Owner rule: the stack PDF is a reference; before installing a PDF component, check for a lighter or better current free
+alternative and ask. Decisions from that review:
+
+| PDF component | Chosen | Why | Footprint (measured) |
+|---|---|---|---|
+| DataHub (+ OpenSearch) | **OpenLineage + Marquez 0.50** | Cross-system lineage and impact analysis without OpenSearch/GMS; emitters: Trino event listener, `dbt-ol`, Flink 2 job-status listener. Owners/PII tags live in dbt meta, Apicurio labels, Polaris table properties. | Marquez ~250 MiB vs DataHub est. 3–5 GB |
+| Trino + StarRocks | **Trino only** | Both queried the same Iceberg tables; StarRocks needed ~2.5 GB requested and caused most lakehouse install failures. qry-svc analytics query runs on Trino. | −2.5 GB requests |
+| Weaviate | **pgvector** on the shared Postgres (database `ml`) | No extra stateful service; SQL joins with our data. | no new pod |
+| Feast | **Feast, minimal** (0.67: registry SQL, online Valkey, offline Iceberg via Trino) | Point-in-time-correct training data for the fraud model. 0.47 failed the Trivy gate (two RCE CVEs). | Feast ~150 MiB |
+
+Also: third-party tools with their own schema migrations run on the shared Postgres, not YugabyteDB (Temporal,
+RisingWave, Harbor, MLflow and Polaris all broke on YugabyteDB DDL); YugabyteDB keeps DIFME's own data.
+

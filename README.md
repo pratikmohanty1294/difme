@@ -56,9 +56,9 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 5.5 | Event broker (Kafka API) | **Apache Kafka 4 (KRaft)** via Strimzi — OSI replacement | `deploy/platform/streaming/` |
 | 5.5 | Debezium (CloudEvents), Flink, Apicurio, Airbyte, KEDA | Same, with **Apache SeaTunnel** instead of Airbyte (ELv2, ADR-009) | `deploy/platform/streaming/` |
 | 5.5 | Streaming SQL views | **RisingWave** — OSI replacement | `deploy/platform/streaming/` |
-| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | SeaweedFS + Polaris (ADR-005); Spark covered by Flink + dbt (ADR-015); **StarRocks dropped, Trino serves analytics** (owner 2026-11-20) | `deploy/platform/lakehouse/`, `analytics/` |
-| 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | Same except PostgresML (covered by MLflow + ONNX, ADR-015) | `deploy/platform/ml-platform/`, `ml/` |
-| 5.8 | SPIFFE/SPIRE, Cilium, OPA Gatekeeper, Kyverno, Sigstore, OpenTelemetry, Alloy, DataHub + OpenLineage | Same, with **Kyverno as the single admission engine** (Gatekeeper and policy-controller removed, ADR-015) | `deploy/platform/security/`, `deploy/platform/governance/` |
+| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | SeaweedFS + Polaris (ADR-005); Spark covered by Flink + dbt (ADR-015); **StarRocks dropped, Trino serves analytics** (ADR-021) | `deploy/platform/lakehouse/`, `analytics/` |
+| 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | **pgvector instead of Weaviate** (ADR-021); PostgresML covered by MLflow + ONNX (ADR-015); server-side ONNX scorer parked until a model exists | `deploy/platform/ml-platform/`, `ml/` |
+| 5.8 | SPIFFE/SPIRE, Cilium, OPA Gatekeeper, Kyverno, Sigstore, OpenTelemetry, Alloy, DataHub + OpenLineage | **OpenLineage + Marquez instead of DataHub** (ADR-021), with **Kyverno as the single admission engine** (Gatekeeper and policy-controller removed, ADR-015) | `deploy/platform/security/`, `deploy/platform/governance/` |
 | 5.8 | Secrets management | **OpenBao** — OSI replacement | `deploy/platform/security/` |
 | 5.8 | Just-in-time access | **Warpgate** — OSI replacement | `deploy/platform/security/` |
 | 5.9 | React 18 shell + Module Federation, Settlements (TanStack Query), Compliance (SvelteKit), Analytics (Angular 17 + ECharts), Zustand, Turborepo + pnpm, Tailwind tokens, Storybook, Bundlesize | Same design on **React 19 / Svelte 5 / Angular 20 + Module Federation 2.0 (Rspack)** (ADR-005) | `backoffice/` |
@@ -74,7 +74,7 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 8 | Audit log store | **Iceberg Day-0 archive** + YugabyteDB outbox (ADR-015) | `deploy/platform/database-tier/cassandra/` |
 | 8 | FoundationDB | **YugabyteDB** serializable unique keys (ADR-015) | `deploy/platform/database-tier/foundationdb/` |
 | 8 | L2 cache + CRDT rate limits | **Valkey** (CRDT PN-counter implemented in Lua) — OSI replacement | `deploy/platform/cache-tier/` |
-| 8 | Weaviate | Same | `deploy/platform/ml-platform/` |
+| 8 | Weaviate | **pgvector** on the shared Postgres (ADR-021) | `deploy/platform/database-tier/postgres-docdb/` |
 | 9 | UUIDv7 idempotency at every layer, inbox/outbox | Same | `services/core/common/` |
 | 7 / 9 | Deterministic replay + Semgrep purity gate | Same | `services/core/replay-engine/`, `policies/semgrep/` |
 | 10 | VictoriaMetrics, Grafana, Loki, Tempo, Pyroscope, Alloy, Alertmanager, vmalert | Same | `deploy/platform/observability/` |

@@ -89,6 +89,13 @@ if [ $rc -ne 0 ]; then
   kubectl get rollouts -A 2>/dev/null | head; kubectl get rs -n core-platform 2>/dev/null | head -15
   echo "== recent warning events"; kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>/dev/null | tail -20 | cut -c1-250
 fi
+# Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
+if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then
+  echo "== lineage in Marquez"
+  m=/api/v1/namespaces/governance/services/marquez:5000/proxy/api/v1
+  kubectl get --raw "$m/namespaces" 2>/dev/null | python3 -c "import json,sys; print('  namespaces:', [n['name'] for n in json.load(sys.stdin).get('namespaces',[])])" 2>/dev/null || echo "  (Marquez API not reachable)"
+  kubectl get --raw "$m/namespaces/difme/jobs?limit=20" 2>/dev/null | python3 -c "import json,sys; j=json.load(sys.stdin).get('jobs',[]); print('  difme jobs:', len(j), [x['name'][:60] for x in j[:8]])" 2>/dev/null || true
+fi
 echo "== $P: after"; bash ci/mem-report.sh 12
 # Process/thread level (owner rule 2026-11-20): every process in every pod, its PSS, threads and thread groups.
 # Idle measurements need the startup burst (jar and catalog loading) to pass first (2026-11-20 io pass).

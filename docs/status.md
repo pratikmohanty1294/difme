@@ -166,7 +166,7 @@ Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/di
 |---|---|---|---|
 | `wip-formio-auth` | formio → FerretDB 2: SCRAM credentials (worked) + DocumentDB extension created at Postgres init | 44694741384 `core,process` (with fail-fast) | process converged → merge; else read the formio log for the next error |
 | `wip-security-dev` | OpenBao 1 replica + static seal + self-init; SPIRE hooks off; Istio ambient on Cilium (probe CCNP 169.254.7.127, cni.exclusive=false, istio-cni k3d paths); Veraison stores; verifier kept | 44691132238 `core,security` | needs the `difme-attestation-verifier` image from the main image build; converged → merge |
-| `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`) | 44689754881 `core,streaming,lakehouse,ml` (first run lost its runner) | converged → rebase on main (keep-both doc conflicts) → merge; then extras |
+| `wip-lakehouse-fix` (to create) | **streaming ✅ verified and merged (event-archive → lakehouse).** Lakehouse failed in run 44689754881: (1) StarRocks pods need Secret `starrocks-root` (add to dev-secrets.sh) and the StarRocksCluster CR rejects `starRocksFeSpec.runAsNonRoot: null` (set it in starrocks values); (2) trino-coordinator crash-loops (log cut before the error: re-run to see it); (3) superset, event-archive and all core-platform pods went Pending after lakehouse installed (no FailedScheduling event captured: check node memory/CPU requests with `kubectl describe pod`) | re-run `core,streaming,lakehouse,ml` after fixes | fix → verify → merge; then ml, then extras |
 | `wip-mem-batch2` | Go defaults GOMAXPROCS=2/GOGC=50 (Kyverno, where unset); JVM ActiveProcessorCount=2 | A/B 44690021537 vs main 44690017534 (`core` + `measure 200 60s`) | merge only if PSS/CPU drop and accepted/p50/p99 don't regress |
 | `wip-malloc-arena` | Kyverno MALLOC_ARENA_MAX=2 default | A/B 44687672715 (compare with main 44687637776 or 44690017534) | same rule |
 | `wip-hub` (merged) | QUIC hub | main image build (latest images run on main) | verify `core,hub` profile once `difme-quinn-hub:0.1.0` exists |
@@ -189,7 +189,7 @@ Actions parity (gates on `wip-*` pushes, properties gate, `measure` input); owne
 backoffice writable /tmp (backoffice ✅); platform-ops fixes incl. Harbor on the shared Postgres (platform-ops ✅);
 cluster-verify Summary-step fix (runs had been marked failed when no baseline ran: read the per-profile CONVERGED lines).
 
-**Verified converged:** base, core, observability, backoffice, platform-ops.
+**Verified converged:** base, core, observability, backoffice, platform-ops, streaming.
 **Merged today (later):** ADR-014 Schemathesis contract gate; FR-01 money loop (rails, execute, proof of delivery, settle, FR-16 reputation, OpenAPI contract); `ci/proc-report.sh` (memory, CPU, disk, network per process/thread; runs after every profile); Makefile build/test fixes.
 **Optimisation order (owner):** memory → CPU → disk I/O → network I/O.
 **Memory wins kept:** TigerBeetle 2170 → 1373 MiB; batch 1 (Envoy 1 worker, Kyverno reports off): −333 MiB PSS and idle CPU 166 % → 18 % of a core. Both A/B-verified, no throughput/latency regression.

@@ -87,3 +87,4 @@
 ### formio vs FerretDB 2: "listCollections requires authentication" (cluster-verify 2026-11-20)
 - **Root cause:** FerretDB 2 enables authentication by default and validates client credentials against PostgreSQL roles (SCRAM-SHA-256 only); formio's `mongo-url` had none.
 - **Fix:** `dev-secrets.sh` gives formio `mongodb://difme:<pw>@ferretdb…/formio?authMechanism=SCRAM-SHA-256` (the shared Postgres role that already backs FerretDB).
+- **Next layer, same day:** `schema "documentdb_api" does not exist`. Our ConfigMap replaces the postgres-documentdb image's `/docker-entrypoint-initdb.d`, which hid the image's own `CREATE EXTENSION documentdb`. **Fix:** `05-documentdb.sql` in our init scripts (first boot only; an existing cluster runs it by hand once).

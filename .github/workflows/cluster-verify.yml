@@ -65,6 +65,7 @@ jobs:
         run: |
           # k6 runs as an in-cluster Job in "k6"; that namespace otherwise comes only with platform-ops (k6-operator).
           kubectl create namespace k6 --dry-run=client -o yaml | kubectl apply -f -
+          set -o pipefail   # a failed baseline must fail the step, not hide behind tee (2026-11-20)
           bash ci/measure.sh ${{ inputs.measure }} 2>&1 | tee /tmp/measure.txt
       - name: Summary
         if: always()

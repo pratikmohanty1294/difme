@@ -175,9 +175,9 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 | main (formio VM bundles) | process profile | `core,process` queued after the main image build | process ✅ |
 | `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`); verify-profile diagnostics | 44682308371 `core,streaming,lakehouse,ml` | merge; then extras (`streaming-extra`, `lakehouse-extra`) |
 | `wip-security-dev` | OpenBao 1 replica, static seal, self-init; SPIRE hooks off + insecureSkipVerify; istio-system privileged; Veraison stores; verifier out | 44682927471 `core,security` | merge; then `hub` stays blocked (no code) |
-| `wip-tb-memory` | TigerBeetle 2151 → 1356 MiB (measured) | A/B 44683333718 (main) vs 44683336388 (branch), both `core` + `measure 200 60s` | merge only if throughput/latency don't regress |
+| `wip-tb-memory` | TigerBeetle 2151 → 1356 MiB (measured) | A/B re-run: 44684890534 (main) vs 44684975198 (branch), `core` + `measure 200 60s` (first try: dev batch size crashed the load-test seeding; fixed on main: batches of 100 + pipefail) | merge only if throughput/latency don't regress |
 | `wip-proc-report` | `ci/proc-report.sh`: per-process/thread memory after each profile | 44683717857 `core,observability,backoffice`, 44683720991 `core,streaming` | rank savings; propose JVM ActiveProcessorCount, GOMAXPROCS/GOMEMLIMIT, MALLOC_ARENA_MAX, UV_THREADPOOL_SIZE batches; A/B each |
-| `wip-rails` | exchange-rails: 5 FR-01 rail ports + simulators, failover with FR-15 slashing; next: wire into exchange-svc (`/execute`) | core-services gate on push | merge when green |
+| `wip-rails` | exchange-rails (5 FR-01 rail ports + simulators, failover with FR-15 slashing; 10 tests) + exchange-svc `POST /auctions/{id}/execute` (escrow hold B, failover, principal release; end-to-end test) + exchange API in the OpenAPI contract | core-services gate (rails module ✅ on Java 25) | merge when the integration gate is green |
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |
 
 **Waiting on the owner:** PC memory notes + session logs upload (to complete `owner-decisions.md`); canary SLO

@@ -25,8 +25,8 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Decided
 | Date | Question | Owner's answer |
 |---|---|---|
-| 2026-11-20 | Business rules (owner: "do as you seem best fit for the requirements") — evidence custody | Operator key in OpenBao transit (non-exportable, signs via API); the witness is a separate notary service with its own key, never the operator. Dev keeps generated keys. *Implementation pending.* |
-| 2026-11-20 | — collateral basis and default tier | V = A (the partner's exposure at the merchant). New partners start COLD_START (φ 2.0) and become ESTABLISHED after verified deliveries. *Tier-from-history pending; intents still default to ESTABLISHED.* |
+| 2026-11-20 | Business rules (owner: "do as you seem best fit for the requirements") — evidence custody | Operator key in OpenBao transit (non-exportable, signs via API); the witness is a separate notary service with its own key, never the operator. Dev keeps generated keys. *Implemented on wip-tier-history (2026-11-20): exchange signers + `services/notary`; OpenBao transit mount/key/auth still to wire after the security profile converges.* |
+| 2026-11-20 | — collateral basis and default tier | V = A (the partner's exposure at the merchant). New partners start COLD_START (φ 2.0) and become ESTABLISHED after verified deliveries. *Implemented on wip-tier-history (2026-11-20): threshold `reputation.established_after_deliveries: 3` in vertical.yaml, also needs reputation ≥ 80; ENTERPRISE only by agreement, never from history.* |
 | 2026-11-20 | — `min_minor` floors | FR-01 keeps ₹500 (minimum stake; small next to typical order values). Other verticals set theirs when they go live. |
 | 2026-11-20 | — FR-01 return window | 10 days before yield Y is released (covers 7–10-day return policies plus confirmation lag). Applied in vertical.yaml. |
 | 2026-11-20 | — reputation cold start, V_ref | Partners without history rank at the fixed prior 80; self-reported scores are ignored (gameable). V_ref stays ₹50,000. Applied in exchange-svc. |

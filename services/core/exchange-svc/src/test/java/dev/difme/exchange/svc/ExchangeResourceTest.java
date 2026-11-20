@@ -81,11 +81,11 @@ class ExchangeResourceTest {
 
     @Test
     void mandateBudgetIsTheExchangesToTrackAndIsDrawnDownByAwards() throws InterruptedException {
-        // Budget ₹40,000, deposit ₹6,000 (covers the FR-14 collateral for A = ₹16,000: 5,760); limits from the mandate,
+        // Budget ₹40,000, deposit ₹12,000 (covers the COLD_START FR-14 collateral for A = ₹16,000: 11,520); limits from the mandate,
         // not from the bid (the bid claims a huge budget and zero limits, which the exchange ignores).
         long mandateId = given().contentType(ContentType.JSON).body("""
                 {"partnerRef": "bp-9", "limitMinor": 5000000, "maxPerOrderMinor": 2000000, "minYieldPct": 4,
-                 "depositMinor": 600000, "budgetTotalMinor": 4000000, "merchantCount": 2, "goodsCount": 5,
+                 "depositMinor": 1200000, "budgetTotalMinor": 4000000, "merchantCount": 2, "goodsCount": 5,
                  "validityDays": 5, "cardJurisdiction": "IN_DOMESTIC_AFA"}""")
                 .post("/v1/exchange/fr01-buy/mandates").then().statusCode(201).extract().jsonPath().getLong("mandateId");
         org.junit.jupiter.api.Assertions.assertEquals(202, auctionWithMandate(mandateId));   // budget 40,000 -> 24,000
@@ -115,15 +115,15 @@ class ExchangeResourceTest {
         long id = opened.getLong("auctionId");
         // Y_max = d·P − F − 1 = 2,000,000 − 100,000 − 1
         org.junit.jupiter.api.Assertions.assertEquals(1_899_999L, opened.getLong("maxYieldMinor"));
-        String[] bids = {bid(1, 600_000, 80, 20_000, 3_000_000), bid(2, 400_000, 95, 5_000, 3_000_000)};
+        String[] bids = {bid(1, 600_000, 80, 20_000, 6_000_000), bid(2, 400_000, 95, 5_000, 6_000_000)};
         for (String b : bids) {
             given().contentType(ContentType.JSON).body(b).post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
         }
         // Refused at the door by investor_eligibility: the yield asked exceeds the room (Y_max), ...
-        given().contentType(ContentType.JSON).body(bid(3, 2_500_000, 99, 1_000, 3_000_000))
+        given().contentType(ContentType.JSON).body(bid(3, 2_500_000, 99, 1_000, 6_000_000))
                 .post("/v1/exchange/auctions/" + id + "/bids")
                 .then().statusCode(422).body("findings.code", hasItem("PRICE_ABOVE_MAX"));
-        // ... and the deposit is below the FR-14 collateral the exchange computes for A (2,880,000).
+        // ... and the deposit is below the FR-14 collateral the exchange computes for A at the new partner's tier (5,760,000).
         given().contentType(ContentType.JSON).body(bid(4, 300_000, 99, 1_000, 1_000_000))
                 .post("/v1/exchange/auctions/" + id + "/bids")
                 .then().statusCode(422).body("findings.code", hasItem("DEPOSIT_SHORT"));
@@ -140,8 +140,9 @@ class ExchangeResourceTest {
                 .body("award.split.a", equalTo(8_000_000))
                 .body("award.split.b", equalTo(8_500_000))
                 .body("award.split.buyerSaves", equalTo(1_500_000))
-                // D_req = max(50,000, 8,000,000 × 0.20 × 1.8 × φ(ESTABLISHED)=1.0) = 2,880,000
-                .body("award.collateralMinor", equalTo(2_880_000));
+                // D_req = max(50,000, 8,000,000 × 0.20 × 1.8 × φ) with φ(COLD_START) = 2.0: no deliveries on record yet
+                .body("award.tier", equalTo("COLD_START"))
+                .body("award.collateralMinor", equalTo(5_760_000));
         given().contentType(ContentType.JSON).body(bids[0])
                 .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(409);
         // Evidence: intent + authorization, hash-linked, operator-sealed with a witness, and it verifies.
@@ -165,9 +166,9 @@ class ExchangeResourceTest {
                 .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
         given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
                 .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(409);   // still open: no award yet
-        given().contentType(ContentType.JSON).body(bid(41, 600_000, 80, 20_000, 3_000_000))
+        given().contentType(ContentType.JSON).body(bid(41, 600_000, 80, 20_000, 6_000_000))
                 .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
-        given().contentType(ContentType.JSON).body(bid(42, 400_000, 95, 5_000, 3_000_000))
+        given().contentType(ContentType.JSON).body(bid(42, 400_000, 95, 5_000, 6_000_000))
                 .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
         long deadline = System.currentTimeMillis() + 10_000;
         while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) {
@@ -197,7 +198,8 @@ class ExchangeResourceTest {
         var p42 = given().get("/v1/exchange/fr01-buy/partners/42").then().statusCode(200).body("tracked", equalTo(true))
                 .extract().jsonPath();
         org.junit.jupiter.api.Assertions.assertEquals(60.889771, p42.getDouble("reputation"), 0.001);
-        given().get("/v1/exchange/fr01-buy/partners/41").then().statusCode(200).body("tracked", equalTo(false));
+        given().get("/v1/exchange/fr01-buy/partners/41").then().statusCode(200).body("tracked", equalTo(false))
+                .body("tier", equalTo("COLD_START")).body("verifiedDeliveries", equalTo(0));
         // ---- FR-01 proof of delivery: signed invoice + carrier event, then fee F now and yield Y after the window ----
         java.security.KeyPair merchant = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         java.security.KeyPair carrier = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
@@ -220,6 +222,8 @@ class ExchangeResourceTest {
                 .body("releasedMinor", equalTo(8_500_000));                                      // A + F + Y = B
         org.junit.jupiter.api.Assertions.assertEquals(81.911023,                                 // delivered: slow gain
                 given().get("/v1/exchange/fr01-buy/partners/41").then().statusCode(200).extract().jsonPath().getDouble("reputation"), 0.001);
+        given().get("/v1/exchange/fr01-buy/partners/41").then().statusCode(200)
+                .body("verifiedDeliveries", equalTo(1)).body("tier", equalTo("COLD_START"));   // 1 of 3 deliveries
         given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200)
                 .body("artifacts.type", hasItem("fulfillment"))
                 .body("verdict.hashes", equalTo(true));
@@ -243,5 +247,14 @@ class ExchangeResourceTest {
         payload.remove("signature");
         s.update(dev.difme.exchange.kernel.Canonical.json(payload).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return java.util.Base64.getEncoder().encodeToString(s.sign());
+    }
+
+    /** Decided 2026-11-20: the tier comes from the exchange's history, never from the intent or the bid. */
+    @Test
+    void tierIsEarnedByVerifiedDeliveriesWithAGoodRecord() {
+        org.junit.jupiter.api.Assertions.assertEquals(dev.difme.exchange.kernel.Risk.Tier.COLD_START, Exchange.tierFor(0, null, 3));
+        org.junit.jupiter.api.Assertions.assertEquals(dev.difme.exchange.kernel.Risk.Tier.COLD_START, Exchange.tierFor(2, 90.0, 3));
+        org.junit.jupiter.api.Assertions.assertEquals(dev.difme.exchange.kernel.Risk.Tier.COLD_START, Exchange.tierFor(5, 79.9, 3));
+        org.junit.jupiter.api.Assertions.assertEquals(dev.difme.exchange.kernel.Risk.Tier.ESTABLISHED, Exchange.tierFor(3, 80.0, 3));
     }
 }

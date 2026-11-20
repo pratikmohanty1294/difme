@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 RATE=${1:-200}; DURATION=${2:-60s}; ACCOUNTS=${ACCOUNTS:-1000}
+case "$RATE" in (*[!0-9]*|"") echo "measure.sh: RATE must be a number of requests/s, got '$RATE' (e.g. -f measure='200 60s')" >&2; exit 2 ;; esac
 K6_IMAGE=grafana/k6:1.8.2
 OUT=/tmp/difme-measure; mkdir -p "$OUT"
 

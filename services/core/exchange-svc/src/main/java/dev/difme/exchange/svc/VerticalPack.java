@@ -13,7 +13,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 /** One vertical pack as served: its FR-17 weights and auction parameters from vertical.yaml, plus compiled rules. */
 public record VerticalPack(String id, Weights weights, long windowNanos, long latencyMaxMicros, int backups, PackRules rules,
                            Collateral collateral, int guaranteeFundBps, List<String> rails, Slashing slashing, int returnWindowDays,
-                           double reputationAlphaBase, long reputationReferenceMinor) {
+                           double reputationAlphaBase, long reputationReferenceMinor, int establishedAfterDeliveries) {
     /** FR-15 per-code bases from vertical.yaml {@code slashing:} (basis points of A). */
     public record Slashing(int fundsBps, int otherDeclineBps) {}
 
@@ -52,7 +52,8 @@ public record VerticalPack(String id, Weights weights, long windowNanos, long la
                         sl.get("other_decline_bps") instanceof Number o ? o.intValue() : 0),
                 st.get("return_window_days") instanceof Number rw ? rw.intValue() : 0,
                 rep.get("alpha_base") instanceof Number ab ? ab.doubleValue() : 0.10,
-                rep.get("reference_minor") instanceof Number rm ? rm.longValue() : 5_000_000L);
+                rep.get("reference_minor") instanceof Number rm ? rm.longValue() : 5_000_000L,
+                rep.get("established_after_deliveries") instanceof Number ea ? ea.intValue() : 3);
     }
 
     private static double num(Map<String, Object> m, String key) {

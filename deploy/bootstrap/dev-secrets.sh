@@ -41,7 +41,9 @@ secret streaming     risingwave-db username=risingwave password="$RW_PG"
 secret database-tier risingwave-db password="$RW_PG"
 secret streaming     debezium-db password="$YB"
 secret ml-platform   mlflow-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET"
-secret ml-platform   mlflow-db username=mlflow password="$YB"
+MLFLOW_PG=$(rand)
+secret ml-platform   mlflow-db username=mlflow password="$MLFLOW_PG"
+secret database-tier mlflow-db username=mlflow password="$MLFLOW_PG"
 secret ml-platform   postgresml-db password="$(rand)"
 secret backup        velero-s3 cloud="$(printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$S3_KEY" "$S3_SECRET")"
 # Temporal persists on the shared platform Postgres (ADR-019). Reuse an existing password so both copies match.

@@ -22,6 +22,7 @@ spec:
             - { name: RISINGWAVE_DB_PASSWORD, valueFrom: { secretKeyRef: { name: risingwave-db, key: password } } }
             - { name: HARBOR_DB_PASSWORD, valueFrom: { secretKeyRef: { name: harbor-db, key: password } } }
             - { name: ML_DB_PASSWORD, valueFrom: { secretKeyRef: { name: ml-db, key: password } } }
+            - { name: MLFLOW_DB_PASSWORD, valueFrom: { secretKeyRef: { name: mlflow-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
@@ -82,6 +83,11 @@ data:
     psql -v ON_ERROR_STOP=1 -v pw="$ML_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
     CREATE ROLE ml LOGIN PASSWORD :'pw';
     CREATE DATABASE ml OWNER ml;
+    SQL
+    # MLflow's backend store (moved off YugabyteDB, see deploy/platform/ml-platform/mlflow/values.yaml).
+    psql -v ON_ERROR_STOP=1 -v pw="$MLFLOW_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE mlflow LOGIN PASSWORD :'pw';
+    CREATE DATABASE mlflow OWNER mlflow;
     SQL
     psql --username "$POSTGRES_USER" --dbname ml -c 'CREATE EXTENSION IF NOT EXISTS vector' \
       || echo "WARNING: pgvector extension not created in database ml" >&2

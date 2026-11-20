@@ -94,6 +94,18 @@ echo "== $P: after"; bash ci/mem-report.sh 12
 # Idle measurements need the startup burst (jar and catalog loading) to pass first (2026-11-20 io pass).
 if [ "${PROC_SETTLE:-0}" -gt 0 ] 2>/dev/null; then echo "== settling ${PROC_SETTLE}s before the process report"; sleep "$PROC_SETTLE"; fi
 echo "== $P: processes"; sudo -n env "PATH=$PATH" "KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}" bash ci/proc-report.sh 45 2>/dev/null || bash ci/proc-report.sh 45
+# YugabyteDB RPC mix (informational): which RPCs drive the idle tserver<->master traffic (2026-11-20: not heartbeats,
+# not tablet count). Two samples of the *_count handler metrics 15 s apart; top methods by calls/s.
+if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1; then
+  echo "== YugabyteDB RPC calls/s (top methods)"
+  for t in "yb-master-0:7000" "yb-tserver-0:9000"; do
+    u="/api/v1/namespaces/database-tier/pods/$t/proxy/prometheus-metrics"
+    kubectl get --raw "$u" 2>/dev/null | grep -E '^handler_latency_.*_count' > /tmp/yb1.txt; sleep 15
+    kubectl get --raw "$u" 2>/dev/null | grep -E '^handler_latency_.*_count' > /tmp/yb2.txt
+    awk 'FNR==NR {a[$1]=$2; next} ($1 in a) {d=($2-a[$1])/15; if (d>0) printf "%.1f %s\n", d, $1}' /tmp/yb1.txt /tmp/yb2.txt \
+      | sed -E 's/handler_latency_//; s/\{[^}]*\}//' | sort -nr | head -6 | sed "s|^|  ${t%%:*}: |"
+  done
+fi
 # Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
 if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then
   echo "== lineage in Marquez"

@@ -130,3 +130,6 @@
 
 ### The hub profile depends on security (2026-11-20)
 `quinn-hub` mounts its SVID through the SPIFFE CSI driver (`csi.spiffe.io`), installed by SPIRE in the security profile. `core,hub` alone leaves the pod in ContainerCreating (`driver name csi.spiffe.io not found`). Verify as `core,security,hub`.
+
+### YugabyteDB and third-party schema migrations (2026-11-20)
+Five tools broke on YugabyteDB DDL (Temporal, RisingWave, Harbor, MLflow half-applied Alembic, Polaris). Rule: third-party tools with their own migrations go on the shared Postgres (`postgres-docdb`, one role/db per tool via a first-boot init script); YugabyteDB keeps our own data.

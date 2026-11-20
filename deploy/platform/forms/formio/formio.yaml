@@ -18,6 +18,9 @@ spec:
             - { name: ROOT_EMAIL, valueFrom: { secretKeyRef: { name: formio, key: root-email } } }
             - { name: ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: formio, key: root-password } } }
             - { name: PORT, value: "3001" }
+            # Diagnosis (2026-11-20): /health answers 400 because the schema lock is missing or mismatched, and formio
+            # swallows database-setup errors at start. Debug logs for the db/update modules show which step fails.
+            - { name: DEBUG, value: "formio:db,formio:update" }
           ports: [{ containerPort: 3001 }]
           readinessProbe: { httpGet: { path: /health, port: 3001 }, periodSeconds: 10 }
           resources: { requests: { cpu: 50m, memory: 192Mi }, limits: { memory: 448Mi } }

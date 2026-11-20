@@ -48,6 +48,11 @@ if [ $rc -ne 0 ]; then
     echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=40 2>&1 | cut -c1-300
     kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous --tail=15 2>/dev/null | sed 's/^/  (previous) /' | cut -c1-300
     kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8
+    # The body of a failing HTTP readiness probe often names the cause (formio's /health 400, 2026-11-20).
+    probe=$(kubectl -n "${p%%/*}" get pod "${p#*/}" -o jsonpath='{.spec.containers[0].readinessProbe.httpGet.port} {.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)
+    if [ -n "${probe% *}" ] && [ "${probe#* }" != "$probe" ]; then
+      echo "  readiness body (${probe#* }):"; kubectl get --raw "/api/v1/namespaces/${p%%/*}/pods/${p#*/}:${probe% *}/proxy${probe#* }" 2>&1 | head -c 600; echo
+    fi
   done
   # Apps can stay Progressing while every pod is Ready (a FlinkDeployment whose job keeps failing, a Rollout, a Job).
   # Print the resources Argo CD itself marks unhealthy, with their status and events (found 2026-11-20: flink-jobs).

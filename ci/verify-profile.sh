@@ -106,6 +106,23 @@ if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1; then
       | sed -E 's/handler_latency_//; s/\{[^}]*\}//' | sort -nr | head -6 | sed "s|^|  ${t%%:*}: |"
   done
 fi
+# A/B for the catalog reads (2026-11-20: ~230 master Read/s from the streaming profile on): stop the Debezium
+# connectors (YugabyteDB logical replication) for 45 s and sample the master's Read rate again, then resume them.
+yb_reads() {
+  u=/api/v1/namespaces/database-tier/pods/yb-master-0:7000/proxy/prometheus-metrics
+  a=$(kubectl get --raw "$u" 2>/dev/null | awk '/^handler_latency_yb_tserver_TabletServerService_Read_count/ {s+=$2} END {print s+0}'); sleep 15
+  b=$(kubectl get --raw "$u" 2>/dev/null | awk '/^handler_latency_yb_tserver_TabletServerService_Read_count/ {s+=$2} END {print s+0}')
+  awk -v a="$a" -v b="$b" 'BEGIN {printf "%.1f", (b - a) / 15}'
+}
+if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1 && kubectl -n streaming get kafkaconnector core-outbox >/dev/null 2>&1; then
+  echo "== catalog reads A/B (Debezium connectors running vs stopped)"
+  echo "  running: $(yb_reads) Read/s"
+  conns=$(kubectl -n streaming get kafkaconnector -o name 2>/dev/null)
+  for c in $conns; do kubectl -n streaming patch "$c" --type merge -p '{"spec":{"state":"stopped"}}' >/dev/null 2>&1; done
+  sleep 45
+  echo "  stopped: $(yb_reads) Read/s"
+  for c in $conns; do kubectl -n streaming patch "$c" --type merge -p '{"spec":{"state":"running"}}' >/dev/null 2>&1; done
+fi
 # Evidence custody smoke: with the security switch present, the published keys must be the transit operator key and the
 # notary's own key (local dev keys are named exchange-svc / exchange-witness).
 if [ "$rc" -eq 0 ] && kubectl -n core-platform get configmap exchange-evidence >/dev/null 2>&1; then

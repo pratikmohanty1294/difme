@@ -127,3 +127,6 @@
 - **Root cause:** event-archive was parked with `job.state: suspended` until the lakehouse existed. A suspended FlinkDeployment is never deployed, so Argo CD's health check keeps it Progressing.
 - **Fix:** event-archive moved to its own component `flink-archive` in the **lakehouse** profile (after Polaris) and runs there; `flink-jobs` keeps fraud-cep only.
 - **Rule:** don't park workloads in a suspended state inside a profile that must converge; put them in the profile that provides their dependencies.
+
+### The hub profile depends on security (2026-11-20)
+`quinn-hub` mounts its SVID through the SPIFFE CSI driver (`csi.spiffe.io`), installed by SPIRE in the security profile. `core,hub` alone leaves the pod in ContainerCreating (`driver name csi.spiffe.io not found`). Verify as `core,security,hub`.

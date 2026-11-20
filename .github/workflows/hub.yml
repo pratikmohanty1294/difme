@@ -1,0 +1,14 @@
+# The Rust QUIC hub (PDF §5.2): locked build and the QUIC round-trip integration test.
+name: hub
+on:
+  push: { branches: [main, "wip-*"], paths: ["services/hub/**", "api/proto/**", ".github/workflows/hub.yml"] }
+  pull_request: { paths: ["services/hub/**", "api/proto/**"] }
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo test (locked)
+        working-directory: services/hub
+        run: cargo test --locked

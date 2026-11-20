@@ -104,6 +104,12 @@ jobs:
       context: vendor/formio/server
       dockerfile: deploy/images/formio/Dockerfile
 
+  quinn-hub:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-quinn-hub
+      dockerfile: deploy/images/quinn-hub/Dockerfile
+
   debezium-connect:
     uses: ./.github/workflows/_image.yml
     with:

@@ -24,8 +24,11 @@ spec:
             - { name: SPIFFE_ENDPOINT_SOCKET, value: "unix:///spiffe-workload-api/spire-agent.sock" }
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.observability.svc:4317" }
             - { name: PYROSCOPE_URL, value: "http://pyroscope.observability.svc:4040" }
+            - { name: HUB_WORKER_THREADS, value: "2" }   # process-level memory: 2 runtime workers, not one per node CPU
+          readinessProbe: { httpGet: { path: /healthz, port: 9100 }, periodSeconds: 10 }
           volumeMounts: [{ name: spiffe, mountPath: /spiffe-workload-api, readOnly: true }]
-          resources: { requests: { cpu: 100m, memory: 64Mi }, limits: { memory: 256Mi } }
+          # Measured 2026-11-20: ~6 MiB RSS and 3 threads idle (release build); the limit leaves room for load.
+          resources: { requests: { cpu: 50m, memory: 24Mi }, limits: { memory: 96Mi } }
       volumes: [{ name: spiffe, csi: { driver: csi.spiffe.io, readOnly: true } }]
 ---
 apiVersion: v1

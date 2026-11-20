@@ -1,23 +1,42 @@
 #!/usr/bin/env python3
 """Live buy smoke through the shopbot PWA's own web server (its /api proxy to exchange-svc), the path a phone takes:
 standing mandate -> intent -> auction -> execute -> evidence -> simulated delivery. Prints one line per step; exit 1 on
-the first failure. Uses the API server's service proxy, so it needs only kubectl."""
-import json, subprocess, sys, time
+the first failure. Reaches the PWA through `kubectl port-forward` (the API server's service proxy can't send JSON
+bodies: `kubectl create --raw` got 415 from the exchange)."""
+import json, subprocess, sys, time, urllib.error, urllib.request
 
-BASE = "/api/v1/namespaces/core-platform/services/pwa-shopbot:8080/proxy/api/v1/exchange"
+PORT = 18080
+BASE = f"http://127.0.0.1:{PORT}/api/v1/exchange"
 
 
 def call(method, path, body=None):
-    cmd = ["kubectl", "get" if method == "GET" else "create", "--raw", BASE + path]
-    if body is not None:
-        cmd += ["-f", "-"]
-    p = subprocess.run(cmd, input=json.dumps(body) if body is not None else None, capture_output=True, text=True, timeout=30)
-    if p.returncode != 0:
-        raise RuntimeError(f"{method} {path}: {(p.stderr or p.stdout).strip()[:300]}")
-    return json.loads(p.stdout) if p.stdout.strip() else {}
+    data = json.dumps(body).encode() if body is not None else (b"" if method == "POST" else None)
+    req = urllib.request.Request(BASE + path, data=data, method=method,
+                                 headers={"Content-Type": "application/json", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            text = r.read().decode()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"{method} {path}: HTTP {e.code} {e.read().decode()[:300]}") from None
+    return json.loads(text) if text.strip() else {}
 
 
 def main():
+    pf = subprocess.Popen(["kubectl", "-n", "core-platform", "port-forward", "svc/pwa-shopbot", f"{PORT}:8080"],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(50):
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/", timeout=1).read()
+                break
+            except OSError:
+                time.sleep(0.2)
+        run()
+    finally:
+        pf.terminate()
+
+
+def run():
     t0 = time.time()
     step = lambda msg: print(f"  {time.time() - t0:5.1f}s {msg}")
     try:

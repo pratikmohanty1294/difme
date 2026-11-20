@@ -15,8 +15,10 @@ RUN python -I train.py --out /model/model.onnx
 FROM --platform=$BUILDPLATFORM python:3.12-slim AS runtime
 ARG TARGETARCH
 ARG ORT_VERSION
-RUN P=$([ "$TARGETARCH" = arm64 ] && echo manylinux_2_27_aarch64 || echo manylinux_2_27_x86_64) \
-    && pip download -q --no-deps --only-binary=:all: --platform "$P" --python-version 3.12 -d /w "onnxruntime==${ORT_VERSION}" \
+# Newer onnxruntime wheels are tagged manylinux_2_28 (glibc 2.28; distroless debian12 has 2.36).
+RUN A=$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x86_64) \
+    && pip download -q --no-deps --only-binary=:all: --platform "manylinux_2_28_$A" --platform "manylinux_2_27_$A" \
+       --python-version 3.12 -d /w "onnxruntime==${ORT_VERSION}" \
     && python -c "import zipfile,glob,sys; z=zipfile.ZipFile(glob.glob('/w/*.whl')[0]); n=[x for x in z.namelist() if '/capi/libonnxruntime.so.' in x][0]; open('/libonnxruntime.so','wb').write(z.read(n)); print(n)"
 
 FROM --platform=$BUILDPLATFORM rust:1.97-bookworm AS build

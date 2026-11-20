@@ -35,6 +35,15 @@ def manifests(s: dict) -> list[dict]:
         "livenessProbe": {"httpGet": {"path": "/q/health/live", "port": s["port"]}, "initialDelaySeconds": 30},
         "resources": {"requests": {"cpu": s["cpu"], "memory": s["mem"]}, "limits": {"memory": s["mem"]}},
     }
+    # Evidence custody (decided 2026-11-20): with the security profile, the operator seal is signed by OpenBao transit
+    # and the notary witnesses. The settings arrive in an optional ConfigMap that only the security profile creates
+    # (deploy/platform/core-platform/exchange-evidence); without it the service keeps local dev keys. The projected
+    # token (audience "vault") is what the exchange presents to OpenBao's Kubernetes auth.
+    if s.get("evidence"):
+        container["envFrom"] = [{"configMapRef": {"name": "exchange-evidence", "optional": True}}]
+        volumes.append({"name": "openbao-sa", "projected": {"sources": [{"serviceAccountToken": {
+            "audience": "vault", "expirationSeconds": 3600, "path": "token"}}]}})
+        mounts.append({"name": "openbao-sa", "mountPath": "/var/run/secrets/openbao-sa", "readOnly": True})
     if mounts:
         container["volumeMounts"] = mounts
     # No service-link env (KUBERNETES-style <SVC>_PORT=tcp://...): our services resolve by DNS, and those variables

@@ -1,0 +1,48 @@
+# Evidence custody switch (decided 2026-11-20), installed with the security profile: exchange-svc (core profile) reads
+# this optional ConfigMap, so with security present the operator seal is signed by OpenBao transit (non-exportable
+# ed25519 key "evidence-operator", Kubernetes auth role "exchange-evidence") and the independent notary witnesses.
+# Without the security profile there is no ConfigMap and the exchange uses local dev keys.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: exchange-evidence }
+data:
+  DIFME_EVIDENCE_OPERATOR: transit
+  DIFME_EVIDENCE_OPENBAO_ADDR: http://openbao.security.svc:8200
+  DIFME_EVIDENCE_NOTARY_URL: http://notary.security.svc:8080
+---
+# exchange-svc reads its environment at start: restart it once after each sync so it picks up the switch.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: exchange-evidence-restart }
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: exchange-evidence-restart }
+rules:
+  - { apiGroups: [apps], resources: [deployments], resourceNames: [exchange-svc], verbs: [get, patch] }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: exchange-evidence-restart }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: exchange-evidence-restart }
+subjects: [{ kind: ServiceAccount, name: exchange-evidence-restart }]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: exchange-evidence-restart
+  annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: exchange-evidence-restart
+      restartPolicy: Never
+      containers:
+        - name: restart
+          image: registry.k8s.io/kubectl:v1.32.3
+          command: [kubectl, --cache-dir=/tmp/kube, -n, core-platform, rollout, restart, deployment/exchange-svc]
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 96Mi } }
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 16Mi } }]

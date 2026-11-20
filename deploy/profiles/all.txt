@@ -19,6 +19,7 @@ db-init
 temporal
 flagd
 core-services
+discountai-pwa
 quinn-hub
 strimzi
 kafka

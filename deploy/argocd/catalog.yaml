@@ -43,6 +43,7 @@ components:
   - { name: temporal,          ns: temporal,        kind: helm, profile: core, wave: 0,  pdf: "6.1", repo: https://go.temporal.io/helm-charts, chart: temporal, version: 0.62.0 }
   - { name: flagd,             ns: core-platform,   kind: path, profile: core, wave: 0,  pdf: "6.3" }
   - { name: core-services,     ns: core-platform,   kind: path, profile: core, wave: 1,  pdf: "5.3" }
+  - { name: discountai-pwa,    ns: core-platform,   kind: path, profile: core, wave: 2,  pdf: "ADR-020" }   # ShopBot / Buying Partner / Exchange OME PWAs
 
   # ── Audit / extra data stores (profile: data) ──────────────────────────────
 

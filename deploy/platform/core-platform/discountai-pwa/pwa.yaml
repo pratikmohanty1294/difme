@@ -1,0 +1,70 @@
+# DiscountAI role apps (ADR-020): ShopBot (buyer), Buying Partner (investor) and Exchange OME as installable PWAs.
+# Static nginx; each proxies /api/ to exchange-svc on the same origin. Exposed through the platform gateway.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: pwa-shopbot, labels: { app: pwa-shopbot } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: pwa-shopbot } }
+  template:
+    metadata: { labels: { app: pwa-shopbot, difme/team: exchange, business.metric: buyer-app } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/pratikmohanty1294/difme-pwa-shopbot:0.1.0
+          ports: [{ containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 5m, memory: 16Mi }, limits: { memory: 48Mi } }
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 16Mi } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: pwa-investor, labels: { app: pwa-investor } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: pwa-investor } }
+  template:
+    metadata: { labels: { app: pwa-investor, difme/team: exchange, business.metric: partner-app } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/pratikmohanty1294/difme-pwa-investor:0.1.0
+          ports: [{ containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 5m, memory: 16Mi }, limits: { memory: 48Mi } }
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 16Mi } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: pwa-exchange, labels: { app: pwa-exchange } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: pwa-exchange } }
+  template:
+    metadata: { labels: { app: pwa-exchange, difme/team: exchange, business.metric: exchange-app } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/pratikmohanty1294/difme-pwa-exchange:0.1.0
+          ports: [{ containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /, port: 8080 }, periodSeconds: 10 }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 5m, memory: 16Mi }, limits: { memory: 48Mi } }
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 16Mi } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pwa-shopbot }
+spec: { selector: { app: pwa-shopbot }, ports: [{ port: 8080 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pwa-investor }
+spec: { selector: { app: pwa-investor }, ports: [{ port: 8080 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pwa-exchange }
+spec: { selector: { app: pwa-exchange }, ports: [{ port: 8080 }] }

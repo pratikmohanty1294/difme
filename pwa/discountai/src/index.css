@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { @apply bg-ink-50 text-ink-900 font-sans antialiased; font-size: 14px; }
+  h1, h2, h3 { @apply font-display; text-wrap: balance; }
+  :focus-visible { outline: 2px solid #178a90; outline-offset: 2px; border-radius: 4px; }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  .card { @apply bg-white border border-ink-200 rounded-xl shadow-card; }
+  .label { @apply text-[11px] font-medium uppercase tracking-[0.07em] text-ink-500; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
+  .btn-secondary { @apply btn bg-white text-ink-800 border border-ink-200 hover:bg-ink-50; }
+  .btn-ghost { @apply btn text-ink-600 hover:bg-ink-100; }
+  .input { @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100; }
+  .th { @apply px-3 py-2 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-ink-500 bg-ink-50 border-b border-ink-200 whitespace-nowrap; }
+  .td { @apply px-3 py-2.5 border-b border-ink-100 align-top; }
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: rise .25s ease-out both; }
+  .live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+}

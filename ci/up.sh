@@ -31,6 +31,11 @@ fi
 # installs, so it is applied here rather than in `make cluster`. Idempotent.
 if kubectl get crd clusterpolicies.kyverno.io >/dev/null 2>&1; then
   kubectl apply -f deploy/bootstrap/dev-sizing.yaml >/dev/null && echo "▶ dev request scaling active"
+  # Opt-in (DIFME_MEM_SCALE=1): halve memory requests too, to fit many profiles on one node. Off by default: on hosts
+  # with earlyoom (Codespaces) lower requests make a pod the first to be killed.
+  if [ -n "${DIFME_MEM_SCALE:-}" ]; then
+    kubectl apply -f deploy/bootstrap/dev-sizing-memory.yaml >/dev/null && echo "▶ dev memory request scaling active (÷2)"
+  fi
 fi
 
 # Apps of this profile grouped by sync wave (ascending).

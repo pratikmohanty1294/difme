@@ -1,0 +1,45 @@
+# Opt-in memory request scaling for running many profiles on one node (owner, 2026-11-20: run everything at once).
+# Applied by ci/up.sh only when DIFME_MEM_SCALE=1, never by Argo CD.
+#
+# Scheduling fails on requests, not use: with core + streaming + lakehouse the node reported "Insufficient memory"
+# at 78 % real use, because pods reserve far more than they use (TigerBeetle, RisingWave, Flink, Kafka...). Halving
+# requests lets the scheduler place everything; limits are unchanged, so no pod can use more than in production.
+#
+# Exclusions keep their declared requests (and so their lower OOM scores): the system namespaces, and the stateful
+# core of the payment path (ledger, databases, Kafka). Under memory pressure the kernel then picks analytics, UIs and
+# operators before the money path.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: dev-memory-request-scaling
+  annotations: { pod-policies.kyverno.io/autogen-controllers: none }
+spec:
+  rules:
+    - name: scale-memory-requests
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      exclude:
+        any:
+          - resources: { namespaces: [kube-system, security, argocd, istio-system, database-tier] }
+          - resources: { selector: { matchLabels: { strimzi.io/kind: Kafka } } }
+      preconditions:
+        all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/memory-scaled\" || '' }}", operator: Equals, value: "" }]
+      mutate:
+        foreach:
+          - list: "request.object.spec.containers"
+            preconditions: { all: [{ key: "{{ element.resources.requests.memory || '' }}", operator: NotEquals, value: "" }] }
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    resources: { requests: { memory: "{{ divide('{{ element.resources.requests.memory }}', `2`) }}" } }
+    - name: mark-memory-scaled
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      exclude:
+        any:
+          - resources: { namespaces: [kube-system, security, argocd, istio-system, database-tier] }
+          - resources: { selector: { matchLabels: { strimzi.io/kind: Kafka } } }
+      preconditions:
+        all: [{ key: "{{ request.object.metadata.annotations.\"difme.dev/memory-scaled\" || '' }}", operator: Equals, value: "" }]
+      mutate:
+        patchStrategicMerge:
+          metadata: { annotations: { difme.dev/memory-scaled: "memory/2" } }

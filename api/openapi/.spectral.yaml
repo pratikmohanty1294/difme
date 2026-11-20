@@ -7,6 +7,7 @@ rules:
     then: { field: parameters, function: truthy }
   difme-no-float-money:
     description: Money must be integer minor units
-    given: "$..properties[?(@property.match(/amount|Minor/))]"
+    # amountZscore is a statistic (standard deviations), not money.
+    given: "$..properties[?(@property.match(/amount(?!Zscore)|Minor/))]"
     severity: error
     then: { field: type, function: pattern, functionOptions: { notMatch: "^number$" } }

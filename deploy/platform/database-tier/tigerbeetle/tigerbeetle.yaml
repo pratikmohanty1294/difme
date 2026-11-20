@@ -12,16 +12,21 @@ spec:
       initContainers:
         - name: format
           image: ghcr.io/tigerbeetle/tigerbeetle:0.16.78
-          command: [sh, -c, "[ -f /data/0_0.tigerbeetle ] || /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 /data/0_0.tigerbeetle"]
+          command: [sh, -c, "[ -f /data/0_0.tigerbeetle ] || /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 --development /data/0_0.tigerbeetle"]
           volumeMounts: [{ name: data, mountPath: /data }]
       containers:
         - name: tigerbeetle
           image: ghcr.io/tigerbeetle/tigerbeetle:0.16.78
-          # Lean caches (measured: ~2.1 GiB RSS; TigerBeetle allocates statically, its 1 GiB journal dominates).
-          args: [start, --addresses=0.0.0.0:3000, --experimental, --cache-grid=128MiB, --cache-accounts=32MiB,
-                 --cache-transfers=32MiB, --cache-transfers-pending=16MiB, /data/0_0.tigerbeetle]
+          # Dev sizing, measured 2026-11-20 on 0.16.78 (RSS right after start, throwaway instance; owner rule: optimise
+          # for memory). Old flags: 2151 MiB. --development (smaller batch size and default buffers; also on format):
+          # 1641. + --memory-lsm-manifest=1MiB and --cache-grid=32MiB: 1415. + object caches 8/8/4 MiB: 1358 MiB.
+          # Floor without object caches: 1334 MiB (static message pool and journal). Not tried: --limit-request
+          # (raises memory under --development). Production overlays drop --development and raise the caches.
+          args: [start, --addresses=0.0.0.0:3000, --experimental, --development, --memory-lsm-manifest=1MiB,
+                 --cache-grid=32MiB, --cache-accounts=8MiB, --cache-transfers=8MiB, --cache-transfers-pending=4MiB,
+                 /data/0_0.tigerbeetle]
           ports: [{ containerPort: 3000 }]
-          resources: { requests: { cpu: 200m, memory: 2200Mi }, limits: { memory: 2560Mi } }
+          resources: { requests: { cpu: 200m, memory: 1400Mi }, limits: { memory: 1536Mi } }
           volumeMounts: [{ name: data, mountPath: /data }]
   volumeClaimTemplates:
     - metadata: { name: data }

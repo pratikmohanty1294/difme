@@ -38,6 +38,9 @@ secret lakehouse     polaris-bootstrap credentials="POLARIS,root,$POLARIS_SECRET
 POLARIS_PG=$(rand)
 secret lakehouse     polaris-db password="$POLARIS_PG"
 secret database-tier polaris-db password="$POLARIS_PG"
+APICURIO_PG=$(rand)
+secret streaming     apicurio-db password="$APICURIO_PG"
+secret database-tier apicurio-db password="$APICURIO_PG"
 secret lakehouse     superset-secret-key key="$(rand 48)"
 secret streaming     risingwave-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET"   # key names the chart requires
 # RisingWave meta store is on the shared Postgres (ADR-019 pattern); both copies must match, so reuse an existing one.

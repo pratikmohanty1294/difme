@@ -23,8 +23,12 @@ spec:
             - { name: MALLOC_ARENA_MAX, value: "2" }   # the UI image listens on 8080 in 3.x; they share the pod
             - { name: APICURIO_STORAGE_KIND, value: sql }
             - { name: APICURIO_STORAGE_SQL_KIND, value: postgresql }
-            - { name: APICURIO_DATASOURCE_URL, value: "jdbc:postgresql://yb-tservers.database-tier.svc:5433/apicurio" }
-            - { name: APICURIO_DATASOURCE_USERNAME, value: apicurio }   # role from db-init; without it the image defaults to "sa"
+            # Shared Postgres, not YugabyteDB: under load its schema bootstrap ran twice on YugabyteDB and left two version
+            # rows, so Apicurio 3 took the database for a legacy 2.x one and refused to start (all-at-once run 44773866522;
+            # the same migration race as Temporal, RisingWave, Harbor, MLflow and Polaris).
+            - { name: APICURIO_DATASOURCE_URL, value: "jdbc:postgresql://postgres-docdb.database-tier.svc:5432/apicurio" }
+            - { name: APICURIO_DATASOURCE_USERNAME, value: apicurio }
+            - { name: APICURIO_DATASOURCE_PASSWORD, valueFrom: { secretKeyRef: { name: apicurio-db, key: password } } }
             - { name: APICURIO_REST_DELETION_ARTIFACT_ENABLED, value: "false" }
             - { name: APICURIO_RULES_GLOBAL_COMPATIBILITY, value: BACKWARD_TRANSITIVE }
             - { name: APICURIO_RULES_GLOBAL_VALIDITY, value: FULL }

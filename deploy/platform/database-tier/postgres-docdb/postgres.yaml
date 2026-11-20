@@ -25,6 +25,7 @@ spec:
             - { name: ML_DB_PASSWORD, valueFrom: { secretKeyRef: { name: ml-db, key: password } } }
             - { name: MLFLOW_DB_PASSWORD, valueFrom: { secretKeyRef: { name: mlflow-db, key: password } } }
             - { name: POLARIS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: polaris-db, key: password } } }
+            - { name: APICURIO_DB_PASSWORD, valueFrom: { secretKeyRef: { name: apicurio-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
@@ -38,6 +39,7 @@ spec:
             - { name: init, mountPath: /docker-entrypoint-initdb.d/50-marquez.sh, subPath: 50-marquez.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/60-ml-vectors.sh, subPath: 60-ml-vectors.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/70-polaris.sh, subPath: 70-polaris.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/80-apicurio.sh, subPath: 80-apicurio.sh }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
           readinessProbe: { exec: { command: [pg_isready, -U, difme] }, periodSeconds: 5 }
       volumes: [{ name: init, configMap: { name: postgres-docdb-init } }]
@@ -110,6 +112,14 @@ data:
     psql -v ON_ERROR_STOP=1 -v pw="$POLARIS_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
     CREATE ROLE polaris LOGIN PASSWORD :'pw';
     CREATE DATABASE polaris OWNER polaris;
+    SQL
+  # Apicurio Registry storage, moved off YugabyteDB (duplicate version rows under load).
+  80-apicurio.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$APICURIO_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE apicurio LOGIN PASSWORD :'pw';
+    CREATE DATABASE apicurio OWNER apicurio;
     SQL
 ---
 apiVersion: v1

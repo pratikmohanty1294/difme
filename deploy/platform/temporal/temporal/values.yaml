@@ -5,6 +5,10 @@ server:
   additionalEnv: [{ name: GOGC, value: "50" }]
   replicaCount: 1
   config:
+    # Chart default is 512 history shards; each shard keeps its own caches, queues and timers in temporal-history.
+    # Dev runs one history pod with a handful of workflows, so 4 shards. The count is fixed when the database is first
+    # set up and can't be changed later: production must set its own (512+) before its first install.
+    numHistoryShards: 4
     persistence:
       default:
         driver: sql

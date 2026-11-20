@@ -21,7 +21,9 @@ spec:
             - { name: JAVA_OPTS, value: "-Xms128m -Xmx512m -XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Xss256k" }
             - { name: MALLOC_ARENA_MAX, value: "2" }
           ports: [{ containerPort: 8080 }]
-          readinessProbe: { httpGet: { path: /engine-rest/version, port: 8080 }, initialDelaySeconds: 40, periodSeconds: 10 }
+          # TCP, not GET /engine-rest/version: run.auth puts Basic auth on the whole REST path, so the kubelet got 401 and
+          # the pod never turned ready (cluster-verify 2026-11-20). Spring Boot opens 8080 only after the engine has started.
+          readinessProbe: { tcpSocket: { port: 8080 }, initialDelaySeconds: 40, periodSeconds: 10 }
           volumeMounts: [{ name: config, mountPath: /difme }]
           resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 1Gi } }
       volumes: [{ name: config, configMap: { name: fluxnova-config } }]

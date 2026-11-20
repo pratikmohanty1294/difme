@@ -110,3 +110,9 @@
   - exactly one owner per resource (the chart keeps the Flink RBAC);
   - no `replicas` on autoscaled workloads (the `autoscaled: true` flag in `services.yaml`).
 - **Effect:** idle CPU 0.6–0.9 cores; accepted payments 6.6 → 10.3 req/s.
+
+### Fluxnova never turned ready: the readiness probe hit an authenticated endpoint (found 2026-11-20)
+- **Symptom:** in the process profile, Fluxnova ran but stayed 0/1, and `deploy-process-models` waited on it forever.
+- **Root cause:** `fluxnova.bpm.run.auth.enabled: true` registers the Basic-auth filter on the whole REST path (`FluxnovaBpmRunRestConfiguration`, URL pattern = Jersey application path, i.e. `/engine-rest/*`). The probe's unauthenticated `GET /engine-rest/version` got 401, which the kubelet counts as a failure.
+- **Fix:** `tcpSocket` probe on 8080. Spring Boot starts Tomcat's connector only after the context, including the engine and schema update, is up.
+- **Rule:** a probe must target an endpoint that needs no credentials. Check the app's auth filter coverage when turning auth on.

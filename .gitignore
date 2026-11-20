@@ -18,3 +18,8 @@ states/
 .gradle/
 local.properties
 *.onnx.tmp
+
+# PWA build output and dependencies
+pwa/**/node_modules/
+pwa/**/dist/
+pwa/**/dist-*/

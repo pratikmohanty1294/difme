@@ -48,6 +48,8 @@ if [ $rc -ne 0 ]; then
     echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=40 2>&1 | cut -c1-300
     kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous --tail=15 2>/dev/null | sed 's/^/  (previous) /' | cut -c1-300
     kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8
+    # Startup lines: setup steps log once at start and scroll out of --tail (formio's db setup, 2026-11-20).
+    echo "  (startup)"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers 2>/dev/null | grep -v '^    at ' | head -40 | cut -c1-300
     # The body of a failing HTTP readiness probe often names the cause (formio's /health 400, 2026-11-20).
     probe=$(kubectl -n "${p%%/*}" get pod "${p#*/}" -o jsonpath='{.spec.containers[0].readinessProbe.httpGet.port} {.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)
     if [ -n "${probe% *}" ] && [ "${probe#* }" != "$probe" ]; then

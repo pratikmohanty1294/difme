@@ -45,8 +45,11 @@ def manifests(s: dict) -> list[dict]:
     deploy_spec = {"selector": {"matchLabels": {"app": s["name"]}},
                    "template": {"metadata": {"labels": labels}, "spec": spec}}
     # KEDA owns the replica count of autoscaled services; declaring it here made Argo CD and the HPA reset each
-    # other's value in a loop (found live). Everyone else runs one replica in the Codespace.
-    if not s.get("autoscaled"):
+    # other's value in a loop (found live). Same for services behind a canary Rollout (canary-gates, workloadRef with
+    # scaleDown): Argo Rollouts scales the Deployment to 0 and Argo CD self-heal put it back to 1, so a fresh pod was
+    # started and killed about once a minute (cluster-verify 2026-11-20). Left out, the API default of 1 still applies
+    # when the profile has no Rollout. Everyone else runs one replica in the Codespace.
+    if not (s.get("autoscaled") or s.get("rollout")):
         deploy_spec = {"replicas": 1, **deploy_spec}
     return [
         {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": s["name"], "labels": {"app": s["name"]}},

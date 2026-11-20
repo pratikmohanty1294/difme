@@ -10,7 +10,11 @@ gflags:
   tserver:
     yb_enable_read_committed_isolation: true
     ysql_enable_packed_row: true
-    enable_automatic_tablet_splitting: true
+    # CPU/network pass (A/B, 2026-11-20): yb-tserver + yb-master were the top idle CPU (7 % + 6 %) and exchanged ~270 KB/s
+    # each way. One tablet per table on a single node, and no automatic splitting (production overlays restore both).
+    enable_automatic_tablet_splitting: false
+    ysql_num_shards_per_tserver: 1
+    yb_num_shards_per_tserver: 1
     ysql_pg_conf_csv: "default_transaction_isolation='serializable'"
     # Flyway serialises migrations with pg_advisory_lock; YugabyteDB 2.25 ships advisory locks as a preview feature
     # (found live: "advisory locks feature is currently in preview"). The community Flyway YugabyteDB module, which
@@ -18,7 +22,7 @@ gflags:
     ysql_yb_enable_advisory_locks: true
     allowed_preview_flags_csv: ysql_yb_enable_advisory_locks
   master:
-    enable_automatic_tablet_splitting: true
+    enable_automatic_tablet_splitting: false
     ysql_yb_enable_advisory_locks: true
     allowed_preview_flags_csv: ysql_yb_enable_advisory_locks
 tls: { enabled: false }   # Codespace: in-cluster encryption via the mesh; production overlay enables YB TLS + auth

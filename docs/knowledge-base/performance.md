@@ -39,3 +39,17 @@ Method: a throwaway replica in a cloud container, formatted fresh per variant, R
 
 ### QUIC hub footprint (measured 2026-11-20, release build)
 4.2 MiB binary, 6 MiB RSS and 3 threads at idle (2 tokio workers via `HUB_WORKER_THREADS`, hand-rolled atomic metrics, no metrics crate). Pod request/limit set to 24/96 Mi (was 64/256 Mi, written before the code existed).
+
+### Memory batch 1: Envoy one worker + Kyverno reports controller off (A/B 2026-11-20, kept)
+Same-time `core` runs with the per-process report (main 44687637776 vs branch 44687640849):
+
+| | main | batch 1 |
+|---|---|---|
+| PSS, all pod processes (base + core) | 5,922 MiB | 5,589 MiB |
+| process CPU at idle, all pods | 166 % of a core | 18 % |
+| node CPU at idle | 809m | 297m |
+| Envoy proxy | 324 MiB, 4 workers | 242 MiB, 1 worker |
+| Kyverno reports controller | 251 MiB, 141 % CPU, 35 KB/s disk read | — |
+| load test: accepted / p50 / p99 | 59/s, 35 ms, 321 ms | 75/s, 25 ms, 313 ms |
+
+The reports controller was the single largest idle CPU consumer in the cluster, writing PolicyReports nobody reads. Next candidates seen in the same report: Cilium's embedded Envoy also runs 4 workers (`wrk:worker_×4`).

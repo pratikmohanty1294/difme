@@ -27,7 +27,7 @@ import org.jboss.resteasy.reactive.RestStreamElementType;
  * Back-office read APIs (PDF §5.9):
  *   settlements → RisingWave streaming materialized view (sub-second refresh, SSE push)
  *   audit       → Iceberg time-travel through Trino
- *   analytics   → StarRocks OLAP
+ *   analytics   → Iceberg marts through Trino (StarRocks dropped, owner decision 2026-11-20)
  */
 @Path("/v1")
 public class BackofficeResource {
@@ -39,7 +39,6 @@ public class BackofficeResource {
 
     @Inject @DataSource("risingwave") AgroalDataSource risingwave;
     @Inject @DataSource("trino") AgroalDataSource trino;
-    @Inject @DataSource("starrocks") AgroalDataSource starrocks;
 
     @GET @Path("/settlements/positions")
     @RunOnVirtualThread
@@ -90,8 +89,8 @@ public class BackofficeResource {
     @RunOnVirtualThread
     public List<FraudDay> fraudDaily(@QueryParam("days") Integer days) throws Exception {
         int n = days == null ? 30 : Math.min(Math.max(days, 1), 365);
-        try (Connection c = starrocks.getConnection(); PreparedStatement ps = c.prepareStatement(
-                "SELECT CAST(day AS CHAR), alerts, hard_blocks, false_positives, COALESCE(cost_per_txn_usd, 0) FROM iceberg.marts.fraud_daily ORDER BY day DESC LIMIT ?")) {
+        try (Connection c = trino.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT CAST(day AS VARCHAR), alerts, hard_blocks, false_positives, COALESCE(cost_per_txn_usd, 0) FROM iceberg.marts.fraud_daily ORDER BY day DESC LIMIT ?")) {
             ps.setInt(1, n);
             List<FraudDay> out = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {

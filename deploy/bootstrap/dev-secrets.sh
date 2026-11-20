@@ -36,7 +36,6 @@ secret lakehouse     seaweedfs-s3-admin RCLONE_CONFIG_SW_TYPE=s3 RCLONE_CONFIG_S
 POLARIS_SECRET=$(rand)   # one secret for the bootstrap principal and the clients (they were generated separately and could never match)
 secret lakehouse     polaris-bootstrap credentials="POLARIS,root,$POLARIS_SECRET"
 secret lakehouse     superset-secret-key key="$(rand 48)"
-secret lakehouse     starrocks-root password="$(rand)"   # kube-starrocks initPassword.passwordSecret (cluster-verify 2026-11-20: secret not found)
 secret streaming     risingwave-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET"   # key names the chart requires
 # RisingWave meta store is on the shared Postgres (ADR-019 pattern); both copies must match, so reuse an existing one.
 RW_PG=$(kubectl -n streaming get secret risingwave-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true); RW_PG=${RW_PG:-$(rand)}

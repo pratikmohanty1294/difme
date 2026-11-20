@@ -1,4 +1,4 @@
-# Iceberg REST catalog (ADR-005): shared by Trino, Spark, Flink, StarRocks; metadata on YugabyteDB.
+# Iceberg REST catalog (ADR-005): shared by Trino, Spark and Flink; metadata on YugabyteDB.
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: polaris, labels: { app: polaris } }

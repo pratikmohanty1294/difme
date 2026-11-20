@@ -214,6 +214,9 @@ Source documents: DIFME PRD/FRD v1.0 and DiscountAI E2E Architecture v4.1. The f
   fail on YugabyteDB: DDL is slow, the init migration is re-applied after being recorded, and the process crashes.
   Apicurio initialises cleanly on YugabyteDB and stays there. In the same decision, SeaweedFS (S3) moves from the
   lakehouse profile into streaming, because Flink checkpoints and the RisingWave state store need it.
+- **Amendment (owner-approved 2026-11-20):** Harbor's database moves here from YugabyteDB. Harbor supports PostgreSQL
+  only, and its first schema migration failed on YugabyteDB, leaving the migration "dirty" (cluster-verify). Role and
+  database come from the `40-harbor.sh` init script; the password is the `harbor-db` Secret in both namespaces.
 
 ## ADR-020 — One vertical kernel, nine vertical packs; DiscountAI built in parallel (owner-approved 2026-11-18)
 Source: the DiscountAI prototype (browser-only React simulation, DMN rules, evidence chains), E2E architecture v4.1 and

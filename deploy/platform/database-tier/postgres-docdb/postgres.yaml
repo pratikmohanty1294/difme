@@ -1,5 +1,5 @@
 # Shared platform Postgres (ADR-008, ADR-019): PostgreSQL 17 + DocumentDB extension (MIT). Hosts FerretDB (formio),
-# Fluxnova, Keycloak and Temporal (default + visibility stores). Payments stay on YugabyteDB.
+# Fluxnova, Keycloak, Temporal (default + visibility stores), RisingWave meta and Harbor. Payments stay on YugabyteDB.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata: { name: postgres-docdb, labels: { app: postgres-docdb } }
@@ -20,6 +20,7 @@ spec:
             - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
             - { name: TEMPORAL_DB_PASSWORD, valueFrom: { secretKeyRef: { name: temporal-db, key: password } } }
             - { name: RISINGWAVE_DB_PASSWORD, valueFrom: { secretKeyRef: { name: risingwave-db, key: password } } }
+            - { name: HARBOR_DB_PASSWORD, valueFrom: { secretKeyRef: { name: harbor-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
@@ -55,6 +56,15 @@ data:
     psql -v ON_ERROR_STOP=1 -v pw="$RISINGWAVE_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
     CREATE ROLE risingwave LOGIN PASSWORD :'pw';
     CREATE DATABASE risingwave OWNER risingwave;
+    SQL
+  # Harbor (platform-ops) supports PostgreSQL only; its first schema migration failed on YugabyteDB and left the
+  # migration "dirty" (cluster-verify 2026-11-20; owner decision: shared Postgres).
+  40-harbor.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 -v pw="$HARBOR_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE harbor LOGIN PASSWORD :'pw';
+    CREATE DATABASE harbor OWNER harbor;
     SQL
 ---
 apiVersion: v1

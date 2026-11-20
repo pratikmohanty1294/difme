@@ -3,7 +3,8 @@ expose: { type: clusterIP, tls: { enabled: false } }
 persistence:
   imageChartStorage: { type: s3, s3: { regionendpoint: http://seaweedfs-s3.lakehouse.svc:8333, bucket: harbor, secure: false, v4auth: true } }
 trivy: { enabled: true }
-database: { type: external, external: { host: yb-tservers.database-tier.svc, port: "5433", username: harbor, coreDatabase: harbor, existingSecret: harbor-db } }
+# Shared platform Postgres (ADR-019): Harbor supports PostgreSQL only (its migrations failed on YugabyteDB, 2026-11-20).
+database: { type: external, external: { host: postgres-docdb.database-tier.svc, port: "5432", username: harbor, coreDatabase: harbor, sslmode: disable, existingSecret: harbor-db } }
 redis: { type: external, external: { addr: valkey.cache-tier.svc:6379 } }
 # Stable secrets (created by deploy/bootstrap/dev-secrets.sh; OpenBao in production). Without them the chart generates
 # new random values on every render: its `lookup` of the previous Secret returns nothing under Argo CD's helm template.

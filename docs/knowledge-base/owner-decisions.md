@@ -23,6 +23,10 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Decided
 | Date | Question | Owner's answer |
 |---|---|---|
+| 2026-11-20 | Harbor fails its first migration on YugabyteDB (it supports PostgreSQL only). Where should its database live? | Shared platform Postgres (ADR-019). |
+| 2026-11-20 | OpenBao is 3-replica HA (unschedulable on one node) and never initialized. How should it run in dev/verification? | 1 Raft replica plus a bootstrap Job (init, unseal with a dev key in a Secret, PKI mount and Kubernetes auth for SPIRE); HA stays for production overlays. |
+| 2026-11-20 | attestation-verifier has no source and no image yet. What until the code exists? | Take it out of the security profile for now (Veraison stays); it returns with its code. |
+| 2026-11-20 | Commit identity (the vendor rule) | Commits use `pratikmohanty1294@users.noreply.github.com`; only unmerged branch commits were re-authored, main history left as is. |
 | 2026-11-20 | Where does the agent live, given nothing may run on the PC? | A cloud agent session (it can be driven from a phone). Heavy work runs in GitHub Actions. |
 | 2026-11-20 | How does work continue with zero local execution? | Cloud session; even `git` and `gh` move off the PC. |
 | 2026-11-20 | formio 4.11 hard-requires the proprietary `@formio/feature-flags`. Which way? | Shim it out (MIT stand-in in `vendor/formio/server/shims/`). |

@@ -12,6 +12,11 @@ Newest first within each section. When the owner answers a question, move it fro
 - **Commit before switching branches** (an uncommitted edit once leaked into another branch). Time each step of a long sequence.
 - **No company or vendor references and no assistant attribution** in the repo, commits or PRs; no assistant-instruction files.
 - **Security:** the owner's personal email stays private and never goes to outside services. Tokens never go into the repo, files, logs or chat. A token pasted in chat is treated as leaked: revoke and rotate it.
+- **Open source with no limitations** (2026-11-17, "make sure everything we use should be open source and free to use with no limitations"): OSI-approved **and** no watermark/attribution-display terms, no BSL/SSPL/ELv2/source-available, no usage-capped free tiers or paid feature gates; copyleft is fine. This overrode the earlier bpmn-js watermark exception. State unavoidable platform quotas honestly (e.g. Codespaces hours).
+- **When something fails or a better free option exists, offer the alternatives as a choice** and let the owner pick before adopting.
+- **Everything is driven from the cloud** (2026-11-18, from the phone: "Can't the watcher not be in the remote server, so that I can control everything from this cloud session"). Watchers and long waits run remotely (Actions, runtime VM), never on the PC. Lockfile generation and licence scans go into a small `workflow_dispatch` job.
+- **Parallel when safe; lightweight with maximum throughput** (named owner rules, see Footprint in CONVENTIONS.md).
+- **Prava skills in every session** (2026-11-17, "make sure they are available in any future sessions also"): `prava-pay` and `prava-shopping` are installed globally by the Default cloud environment's setup script and on the PC.
 - Licence, footprint, alternatives, contract-first and dev-loop rules: see [CONVENTIONS.md](../CONVENTIONS.md).
 
 ## Decided
@@ -40,6 +45,13 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-19 | v4.1 money letters | A charged at the merchant, B = A + Y + F paid by the buyer; the PRD has them swapped. |
 | 2026-11-19 | Istio → Cilium mesh; Argo CD → Flux | Footprint candidates (status.md, next step 2). |
 | 2026-11-19 | Kafka: `apache/kafka-native` vs Strimzi brokers | kafka-native can't run under Strimzi; adopting it means a plain StatefulSet broker. |
+
+## Product requirement context (owner's questions, 2026-11-17)
+`docs/GOALS.md` still says "product goals: to be defined by the owner". The owner's research questions show the direction of DIFME/DiscountAI (ADR-020):
+- Is there an aggregator (like quick-commerce APIs) that gives one integration for product-feed discovery across merchants?
+- How to get the best price for a product, including affiliate coupons? Do affiliate coupons apply when merchant PWAs open inside affiliate sites?
+- How does agent payment-credential handover work in recently launched agent wallets, which global standards apply, and does it happen in the browser or through APIs?
+- Paying with the user's own card through an agent wallet (Prava skills installed for this).
 
 ## Carried-over pending items
 - Resume `event-archive` once the lakehouse profile (Polaris) is up.

@@ -97,6 +97,14 @@ echo "== $P: processes"; sudo -n env "PATH=$PATH" "KUBECONFIG=${KUBECONFIG:-$HOM
 # Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
 if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then
   echo "== lineage in Marquez"
+  # Active smoke: run dbt now (it goes through dbt-ol and Trino, so both emitters fire) instead of waiting for the cron.
+  if kubectl -n lakehouse get cronjob dbt-run >/dev/null 2>&1; then
+    kubectl -n lakehouse delete job dbt-lineage-smoke --ignore-not-found >/dev/null 2>&1
+    kubectl -n lakehouse create job --from=cronjob/dbt-run dbt-lineage-smoke >/dev/null 2>&1 \
+      && kubectl -n lakehouse wait --for=condition=complete job/dbt-lineage-smoke --timeout=420s >/dev/null 2>&1 \
+      && echo "  dbt run: complete" || { echo "  dbt run: not complete"; kubectl -n lakehouse logs job/dbt-lineage-smoke --tail=15 2>/dev/null | cut -c1-200; }
+    sleep 10
+  fi
   m=/api/v1/namespaces/governance/services/marquez:5000/proxy/api/v1
   kubectl get --raw "$m/namespaces" 2>/dev/null | python3 -c "import json,sys; print('  namespaces:', [n['name'] for n in json.load(sys.stdin).get('namespaces',[])])" 2>/dev/null || echo "  (Marquez API not reachable)"
   kubectl get --raw "$m/namespaces/difme/jobs?limit=20" 2>/dev/null | python3 -c "import json,sys; j=json.load(sys.stdin).get('jobs',[]); print('  difme jobs:', len(j), [x['name'][:60] for x in j[:8]])" 2>/dev/null || true

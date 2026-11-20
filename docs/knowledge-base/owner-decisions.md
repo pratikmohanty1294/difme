@@ -29,6 +29,7 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-20 | OpenBao is 3-replica HA (unschedulable on one node) and never initialized. How should it run in dev/verification? | 1 Raft replica plus a bootstrap Job (init, unseal with a dev key in a Secret, PKI mount and Kubernetes auth for SPIRE); HA stays for production overlays. |
 | 2026-11-20 | attestation-verifier has no source and no image yet. What until the code exists? | Take it out of the security profile for now (Veraison stays); it returns with its code. |
 | 2026-11-20 | Commit identity (the vendor rule) | Commits use `pratikmohanty1294@users.noreply.github.com`; only unmerged branch commits were re-authored, main history left as is. |
+| 2026-11-20 | Remove YugabyteDB (~440 MiB in dev) and move everything to the shared Postgres? | Keep it; measure first what the move would save on the runners and bring the numbers before any change. |
 | 2026-11-20 | Where does the agent live, given nothing may run on the PC? | A cloud agent session (it can be driven from a phone). Heavy work runs in GitHub Actions. |
 | 2026-11-20 | How does work continue with zero local execution? | Cloud session; even `git` and `gh` move off the PC. |
 | 2026-11-20 | formio 4.11 hard-requires the proprietary `@formio/feature-flags`. Which way? | Shim it out (MIT stand-in in `vendor/formio/server/shims/`). |
@@ -61,6 +62,7 @@ Newest first within each section. When the owner answers a question, move it fro
 - Paying with the user's own card through an agent wallet (Prava skills installed for this).
 
 ## Carried-over pending items
+- Measure the memory saving of running payments + tools on the shared Postgres instead of YugabyteDB (owner asked for numbers before any move).
 - Resume `event-archive` once the lakehouse profile (Polaris) is up.
 - A startup smoke test for config parsing (the `.properties` inline-comment crash only showed at runtime).
 - The Makefile `build` and `test` targets still name `services/hub`, `services/attestation` and `edge/core`, which don't exist yet.

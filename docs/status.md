@@ -156,6 +156,39 @@ Details are in docs/knowledge-base/.
     - dev keys are generated at start. Open owner question: who witnesses in production, and where the operator key lives (OpenBao transit?).
   - Next: investor/mandate rules at bid time; an Aeron transport onto the same ring; rail simulators; PWAs.
 
+## HANDOFF 2026-11-20 08:10 IST: continue from a cloud session
+**Owner rule (hard):** nothing runs on the owner's PC: no builds, installs, scans, watchers, git or gh. Work from a claude.ai/code cloud session, GitHub Actions, or the runtime VM/Codespace only. The PC hit critical memory from local npm installs and watch loops.
+
+**How work is verified without a runtime:**
+- The manual workflow `cluster-verify.yml` runs on a free 4 vCPU / 16 GB runner (inputs: `profiles` e.g. `core,observability`, `runner` = `ubuntu-24.04` or `ubuntu-24.04-arm`, `deadline`).
+- It runs `make cluster` → base → each profile via `ci/verify-profile.sh`, and Argo CD tracks the dispatched branch.
+- Results land in the run summary and the `cluster-report-*` artifact. Independent runs can go in parallel.
+
+**Verified so far:** base and core converge from scratch on x64 and arm64 (core about 2.5 min, about 4.3 GB used, 7.7–8 GB free of 16).
+
+**In flight:**
+- Branch `wip-formio-oss` (not merged), formio made open source only (owner chose "shim it out"):
+  - an MIT stand-in for the proprietary `@formio/feature-flags` (in `vendor/formio/server/shims/`);
+  - `@formio/vm` (OSL-3.0) and `@formio/nextgen` (ISC) declared;
+  - `ckeditor5` overridden from the commercial 47.x "LTS Edition" to the GPL-2.0-or-later 49.1.0 line;
+  - a lockfile plus `npm ci`.
+  - A full licence scan of the 577 production packages came back clean.
+  - Also on this branch: the `canary-gates` no-traffic fix (merged from `wip-canary-nodata`) and better not-ready diagnostics in `ci/verify-profile.sh`.
+  - Check runs: images 44654907680 and cluster-verify (core,observability) 44654967897. Merge when green; after `main` rebuilds formio, verify `core,process`.
+- **Observability:** after the canary fix, the new `quarkus-cmd-svc` revision never turns ready, and its pods are replaced about once a minute. Run 44654967897 carries the diagnostics. Find the cause (pod-template change from the observability profile? probe timing?), then fix it.
+- **Process:** formio was crash-looping on the missing `@formio/vm` (fixed by the branch above). Fluxnova runs but never turns ready (logs not yet captured; check the new JVM options `-Xmx512m`, the readiness probe and DB connectivity). `deploy-process-models` waits on Fluxnova.
+- **Canary SLO thresholds:** `slo-gate` requires p99 ≤ 5 ms, but measured cmd-svc p99 is about 250–330 ms, so every real rollout would abort. **Owner decision needed.**
+
+**Runtime status:**
+- **Oracle Cloud** (Free Trial, Hyderabad, single AD): VM `difme-runtime` (A1.Flex 4/24, Ubuntu 24.04, 150 GB) was refused with "Out of capacity". The in-browser retry loop stopped when the console session expired; it needs the owner to sign in again. The SSH public key lives on the owner's PC.
+- **Codespace** `difme-dev-97rgj4pqrvpjh6j9`: still HTTP 402 (billing). Retention runs to 2026-12-19; any successful start resets it. A cloud session can retry `gh codespace ssh` once the monthly hours reset.
+
+**CI lessons applied** (see `.github/workflows`):
+- Release tags (`:0.1.0`) move only on `main`; branch builds push `sha-*` tags only.
+- Kyverno trusts `_image.yml` or `_manifest.yml` signatures from `main` (`subjectRegExp`).
+- Maven resolves through Google's Central mirror (repo1 returned HTTP 429 to runners).
+- The backoffice and formio builds use lockfiles with frozen installs.
+
 ## Next steps (owner decides the order)
 1. **Payment path throughput:** cut the DB checkouts per payment (one connection per request; make the idempotency `find` part of the accept transaction; batch `markDispatched`), and find out where the ~360 ms of YugabyteDB time goes (statement timings; WAL fsync on the Codespace disk; read-committed vs serializable per ADR-001). Then re-run the baseline.
 2. **Footprint candidates, with the numbers above:** TigerBeetle dev sizing (2.2 GiB idle), Istio → Cilium mesh, Argo CD → Flux, native images for the JVM services, and Kyverno report sizing.

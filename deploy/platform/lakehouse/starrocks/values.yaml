@@ -5,6 +5,7 @@
 starrocks:
   starrocksFESpec:
     replicas: 1
+    runAsNonRoot: false   # the operator's CRD rejects null (cluster-verify 2026-11-20); the StarRocks images run as root
     resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1536Mi } }
     storageSpec: { name: fe, storageSize: 4Gi }
     feEnvVars: [{ name: MALLOC_ARENA_MAX, value: "2" }]
@@ -20,6 +21,7 @@ starrocks:
       sys_log_level = INFO
   starrocksBeSpec:
     replicas: 1
+    runAsNonRoot: false   # the operator's CRD rejects null (cluster-verify 2026-11-20); the StarRocks images run as root
     resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 2Gi } }
     storageSpec: { name: be, storageSize: 8Gi }
     config: |

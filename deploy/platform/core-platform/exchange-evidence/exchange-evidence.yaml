@@ -4,13 +4,13 @@
 # Without the security profile there is no ConfigMap and the exchange uses local dev keys.
 apiVersion: v1
 kind: ConfigMap
-metadata: { name: exchange-evidence }
+metadata: { name: exchange-evidence, annotations: { argocd.argoproj.io/sync-wave: "0" } }
 data:
   DIFME_EVIDENCE_OPERATOR: transit
   DIFME_EVIDENCE_OPENBAO_ADDR: http://openbao.security.svc:8200
   DIFME_EVIDENCE_NOTARY_URL: http://notary.security.svc:8080
 ---
-# exchange-svc reads its environment at start: restart it once after each sync so it picks up the switch.
+# exchange-svc reads its environment at start: restart it once, after the ConfigMap exists, so it picks up the switch.
 apiVersion: v1
 kind: ServiceAccount
 metadata: { name: exchange-evidence-restart }
@@ -32,7 +32,9 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: exchange-evidence-restart
-  annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation }
+  # A plain Job in a later sync wave than the ConfigMap (a PostSync hook never ran: cluster-verify 44779382760 found no
+  # Job and an unrestarted exchange). Argo CD applies it once; the completed Job stays as the record.
+  annotations: { argocd.argoproj.io/sync-wave: "1" }
 spec:
   backoffLimit: 3
   template:

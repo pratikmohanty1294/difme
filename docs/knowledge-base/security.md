@@ -34,3 +34,8 @@
 - **Istio ambient:** `istio-system` enforced Pod Security "baseline", which rejects istio-cni (AppArmor unconfined) and ztunnel (extra capabilities). **Fix:** `privileged` for that namespace only, like the other node-agent namespaces.
 - **Veraison:** the verification and provisioning containers create `/opt/veraison/stores` at start-up on a read-only root filesystem. **Fix:** they mount the pod's `stores` emptyDir too.
 - **attestation-verifier:** no source and no image exist yet. **Fix (owner decision):** left out of the profile until its code exists.
+
+### Istio ambient on Cilium: core services crash-looped once their namespaces joined the mesh (cluster-verify 2026-11-20)
+- **Symptom:** after the security profile installed, every pod in core-platform and temporal failed its probes ("context deadline exceeded") and was restarted by its liveness probe; istio-cni stayed Progressing.
+- **Root causes (Istio's Cilium prerequisites, none applied):** kubelet probes into ambient pods are SNAT-ed to 169.254.7.127, which our default-deny Cilium policies dropped; Cilium's exclusive CNI mode removes istio-cni's chained plugin; istio-cni looked for the CNI config in /etc/cni/net.d, but k3s keeps it under /var/lib/rancher/k3s/agent/etc/cni/net.d.
+- **Fix (owner decision: keep Istio ambient):** `istio-config/allow-ambient-probes.yaml` (CiliumClusterwideNetworkPolicy from 169.254.7.127/32, `enableDefaultDeny` off so it only adds an allow); Cilium `cni.exclusive: false`; istio-cni `global.platform: k3d`.

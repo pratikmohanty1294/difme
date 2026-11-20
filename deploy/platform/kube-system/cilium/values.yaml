@@ -16,6 +16,9 @@ bpf:
   # Verified on the first live run (2026-11-17). Bare-metal / VM overlays set this to false for full eBPF routing.
   hostLegacyRouting: true
 socketLB: { enabled: false }
+# Istio ambient prerequisite (security profile, cluster-verify 2026-11-20): Cilium must not remove istio-cni's plugin
+# from the chained CNI config, or ambient pods lose their traffic redirection.
+cni: { exclusive: false }
 encryption: { enabled: true, type: wireguard }
 hubble:
   enabled: true

@@ -36,6 +36,7 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-20 | Argo CD → Flux? | Keep Argo CD. |
 | 2026-11-20 | Istio → Cilium mesh? | Keep Istio ambient (fixed for Cilium the same day). |
 | 2026-11-20 | Kafka: replace Strimzi brokers with `apache/kafka-native`? | Allowed only if no functionality is lost. Before any switch: list everything Strimzi provides today (KRaft node pools, entity/topic operator and KafkaTopic resources, listeners/TLS, metrics, Debezium/Apicurio/Flink/RisingWave/KEDA integrations, rolling upgrades), show each one covered by the replacement, then A/B the footprint. |
+| 2026-11-20 | Istio ambient broke the core services on Cilium (probes from 169.254.7.127 dropped, CNI chaining, k3s paths). Fix, replace with Cilium mesh, or mesh off in dev? | Fix Istio ambient (three config changes). |
 | 2026-11-20 | Harbor fails its first migration on YugabyteDB (it supports PostgreSQL only). Where should its database live? | Shared platform Postgres (ADR-019). |
 | 2026-11-20 | OpenBao is 3-replica HA (unschedulable on one node) and never initialized. How should it run in dev/verification? | 1 Raft replica plus a bootstrap Job (init, unseal with a dev key in a Secret, PKI mount and Kubernetes auth for SPIRE); HA stays for production overlays. |
 | 2026-11-20 | attestation-verifier has no source and no image yet. What until the code exists? | Take it out of the security profile for now (Veraison stays); it returns with its code. |

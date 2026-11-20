@@ -1,1 +1,1 @@
-resources: [mtls.yaml, waypoints.yaml, traffic.yaml, egress.yaml, telemetry.yaml]
+resources: [mtls.yaml, waypoints.yaml, traffic.yaml, egress.yaml, telemetry.yaml, allow-ambient-probes.yaml]

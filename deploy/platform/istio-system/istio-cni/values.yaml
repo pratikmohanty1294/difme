@@ -1,1 +1,4 @@
 profile: ambient
+# k3s keeps the CNI config in /var/lib/rancher/k3s/agent/etc/cni/net.d (Istio's k3d platform profile); with the default
+# /etc/cni/net.d istio-cni never found the primary (Cilium) config and stayed not ready (cluster-verify 2026-11-20).
+global: { platform: k3d }

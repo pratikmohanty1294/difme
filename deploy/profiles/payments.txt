@@ -6,6 +6,7 @@ db-init
 temporal
 flagd
 core-services
+discountai-pwa
 postgres-docdb
 strimzi
 kafka

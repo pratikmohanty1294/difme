@@ -120,9 +120,16 @@ if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; the
   # Active smoke: run dbt now (it goes through dbt-ol and Trino, so both emitters fire) instead of waiting for the cron.
   if kubectl -n lakehouse get cronjob dbt-run >/dev/null 2>&1; then
     kubectl -n lakehouse delete job dbt-lineage-smoke --ignore-not-found >/dev/null 2>&1
-    kubectl -n lakehouse create job --from=cronjob/dbt-run dbt-lineage-smoke >/dev/null 2>&1 \
-      && kubectl -n lakehouse wait --for=condition=complete job/dbt-lineage-smoke --timeout=420s >/dev/null 2>&1 \
-      && echo "  dbt run: complete" || { echo "  dbt run: not complete"; kubectl -n lakehouse logs job/dbt-lineage-smoke --tail=15 2>/dev/null | cut -c1-200; }
+    if ! out=$(kubectl -n lakehouse create job --from=cronjob/dbt-run dbt-lineage-smoke 2>&1); then
+      echo "  dbt run: could not create the job: $out" | cut -c1-300
+    elif kubectl -n lakehouse wait --for=condition=complete job/dbt-lineage-smoke --timeout=420s >/dev/null 2>&1; then
+      echo "  dbt run: complete"
+    else
+      echo "  dbt run: not complete"
+      kubectl -n lakehouse get pods -l job-name=dbt-lineage-smoke --no-headers 2>&1 | cut -c1-160
+      kubectl -n lakehouse logs -l job-name=dbt-lineage-smoke --all-containers --tail=25 2>&1 | cut -c1-220
+      kubectl -n lakehouse get events --field-selector involvedObject.kind=Pod --sort-by=.lastTimestamp 2>/dev/null | grep dbt-lineage | tail -5 | cut -c1-220
+    fi
     sleep 10
   fi
   m=/api/v1/namespaces/governance/services/marquez:5000/proxy/api/v1

@@ -139,7 +139,8 @@ public class ExchangeResource {
             if (!PackRules.allowed(findings)) return Response.status(422).entity(Map.of("findings", findings)).build();
         }
         if (b.partner() != null && b.partner().mandateId() != null) exchange.bindBidMandate(auctionId, b.nodeRef(), b.partner().mandateId());
-        if (!exchange.bid(auctionId, b.nodeRef(), b.askMinor(), b.reputation(), b.latencyMicros())) {
+        double rep = exchange.reputationOf(exchange.packOf(auctionId), b.nodeRef(), b.reputation());   // FR-16: tracked once known
+        if (!exchange.bid(auctionId, b.nodeRef(), b.askMinor(), rep, b.latencyMicros())) {
             return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         }
         return Response.accepted().build();
@@ -163,6 +164,20 @@ public class ExchangeResource {
         Map<String, String> out = new LinkedHashMap<>();
         exchange.publicKeys().forEach((name, k) -> out.put(name, Base64.getEncoder().encodeToString(k.getEncoded())));
         return out;
+    }
+
+    /** The exchange's FR-16 reputation for a partner in a vertical (null until its first outcome). */
+    @GET
+    @Path("/{pack}/partners/{nodeRef}")
+    public Response partner(@PathParam("pack") String packId, @PathParam("nodeRef") int nodeRef) {
+        if (exchange.pack(packId) == null) return Response.status(404).build();
+        Double tracked = exchange.trackedReputation(packId, nodeRef);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pack", packId);
+        out.put("nodeRef", nodeRef);
+        out.put("reputation", tracked);
+        out.put("tracked", tracked != null);
+        return Response.ok(out).build();
     }
 
     public record Execute(String merchantId) {}

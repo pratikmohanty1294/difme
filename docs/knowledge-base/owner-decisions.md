@@ -51,7 +51,7 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-19 | Collateral V = A, and the default partner tier | FR-14 collateral at close. |
 | 2026-11-19 | `min_minor` collateral floors per vertical | ₹500 placeholders. |
 | 2026-11-20 | FR-01 return window before the yield Y is released | `return_window_days: 7` placeholder in `verticals/fr01-buy/vertical.yaml`. |
-| 2026-11-20 | Exchange-tracked partner reputation | Bids still carry a self-reported reputation; FR-16 updates from fulfilment/slashing are the next step. |
+| 2026-11-20 | FR-16 reputation: cold start and V_ref | The exchange now learns reputation from outcomes (fault-driven decline = failed task, verified delivery = success) and ranks known partners on it. Open: should a partner with no history use a fixed prior (80) instead of its self-reported value, and is V_ref ₹50,000 right for FR-01? |
 | 2026-11-19 | v4.1 money letters | A charged at the merchant, B = A + Y + F paid by the buyer; the PRD has them swapped. |
 | 2026-11-19 | Istio → Cilium mesh; Argo CD → Flux | Footprint candidates (status.md, next step 2). |
 | 2026-11-19 | Kafka: `apache/kafka-native` vs Strimzi brokers | kafka-native can't run under Strimzi; adopting it means a plain StatefulSet broker. |

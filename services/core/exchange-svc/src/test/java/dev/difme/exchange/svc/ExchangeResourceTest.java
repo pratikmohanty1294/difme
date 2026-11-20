@@ -185,6 +185,11 @@ class ExchangeResourceTest {
         given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
                 .post("/v1/exchange/auctions/987654321/execute").then().statusCode(404);
 
+        // FR-16: the 51 is a failed task for partner 42 (fast drop from the 80 prior, V = A, V_ref = 5,000,000)
+        var p42 = given().get("/v1/exchange/fr01-buy/partners/42").then().statusCode(200).body("tracked", equalTo(true))
+                .extract().jsonPath();
+        org.junit.jupiter.api.Assertions.assertEquals(60.889771, p42.getDouble("reputation"), 0.001);
+        given().get("/v1/exchange/fr01-buy/partners/41").then().statusCode(200).body("tracked", equalTo(false));
         // ---- FR-01 proof of delivery: signed invoice + carrier event, then fee F now and yield Y after the window ----
         java.security.KeyPair merchant = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         java.security.KeyPair carrier = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
@@ -205,6 +210,8 @@ class ExchangeResourceTest {
         given().post("/v1/exchange/auctions/" + id + "/settle").then().statusCode(200)
                 .body("state", equalTo("SETTLED"))
                 .body("releasedMinor", equalTo(8_500_000));                                      // A + F + Y = B
+        org.junit.jupiter.api.Assertions.assertEquals(81.911023,                                 // delivered: slow gain
+                given().get("/v1/exchange/fr01-buy/partners/41").then().statusCode(200).extract().jsonPath().getDouble("reputation"), 0.001);
         given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200)
                 .body("artifacts.type", hasItem("fulfillment"))
                 .body("verdict.hashes", equalTo(true));

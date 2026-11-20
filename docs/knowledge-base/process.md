@@ -14,3 +14,4 @@
 9. **Commit before switching branches;** an uncommitted edit once travelled into an unrelated branch.
 10. **Owner answers go into [owner-decisions.md](owner-decisions.md)** the same day, never only into a chat.
 11. **Progress survives stoppages:** push each change to its `wip-*` branch immediately and update the PROGRESS LOG in `docs/status.md` on `main` after every step; run logs stream live and remain even if a runner dies.
+12. **Stash untracked files before switching branches** (`git stash -u`). A `git add -A` on another branch sweeps them into an unrelated commit; a stray `Bounded.java` landed on main that way and triggered a full image rebuild (2026-11-20).

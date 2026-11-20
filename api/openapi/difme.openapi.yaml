@@ -80,6 +80,15 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { $ref: "#/components/responses/ExchangeError" }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/{pack}/partners/{nodeRef}:
+    get:
+      operationId: getPartnerReputation
+      summary: The exchange's FR-16 reputation for a buying partner in a vertical (null until its first outcome)
+      security: [{ oauth2: [exchange:read] }]
+      parameters: [{ $ref: "#/components/parameters/Pack" }, { name: nodeRef, in: path, required: true, schema: { type: integer } }]
+      responses:
+        "200": { description: Reputation, content: { application/json: { schema: { type: object, properties: { pack: { type: string }, nodeRef: { type: integer }, reputation: { type: [number, "null"], minimum: 0, maximum: 100 }, tracked: { type: boolean } } } } } }
+        "404": { description: Unknown pack }
   /v1/exchange/auctions/{auctionId}/bids:
     post:
       operationId: placeBid

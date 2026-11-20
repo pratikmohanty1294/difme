@@ -8,6 +8,7 @@ import dev.difme.exchange.rails.sim.SimRails;
 import dev.difme.exchange.kernel.BidBook;
 import dev.difme.exchange.kernel.CommerceSplit;
 import dev.difme.exchange.kernel.EvidenceChain;
+import dev.difme.exchange.kernel.Reputation;
 import dev.difme.exchange.kernel.Risk;
 import dev.difme.exchange.matching.MatchingEngine;
 import dev.difme.exchange.matching.MatchingIntake;
@@ -80,6 +81,8 @@ public class Exchange {
 
     /** Merchant and carrier signing keys ("merchant:<id>", "carrier:<name>"), registered at /v1/exchange/parties. */
     private final Map<String, PublicKey> partyKeys = new ConcurrentHashMap<>();
+    /** FR-16 reputation the exchange has learned per partner ("pack:nodeRef"), from execution and fulfilment outcomes. */
+    private final Map<String, Double> reputation = new ConcurrentHashMap<>();
     private Map<Long, Fulfilment> fulfilments;
     /** Overrides every pack's return window when >= 0 (tests can't wait days). */
     @ConfigProperty(name = "difme.exchange.return-window-override-ms", defaultValue = "-1") long returnWindowOverrideMs;
@@ -274,6 +277,11 @@ public class Exchange {
                         return rails.checkout.authorize(new MerchantCheckoutPort.Authorization(field11, token.token(),
                                 merchantId, s.a(), "INR"), now).responseCode();
                     });
+            for (Failover.Attempt at : f.attempts()) {
+                if (at.slashMinor() > 0) {        // a decline the partner answers for (FR-15) is a failed task (FR-16)
+                    learn(r.pack(), at.partnerId(), 0, s.a(), Reputation.PRIOR_UNVERIFIED);
+                }
+            }
             EscrowPort.Hold hold = f.fulfilled()
                     ? rails.escrow.release(holdId, "principal", "partner-" + f.winner(), s.a())
                     : rails.escrow.refund(holdId);
@@ -292,6 +300,25 @@ public class Exchange {
             executions.put(auctionId, e);
             return e;
         }
+    }
+
+    /**
+     * The reputation used to rank a bid: the exchange's own number once the partner has an outcome on record; until
+     * then (cold start) the bidder's self-reported value. Open owner question: a fixed prior instead.
+     */
+    public double reputationOf(String pack, int nodeRef, double selfReported) {
+        return reputation.getOrDefault(pack + ":" + nodeRef, selfReported);
+    }
+
+    /** The tracked value, or null when the partner has no outcome on record yet. */
+    public Double trackedReputation(String pack, int nodeRef) {
+        return reputation.get(pack + ":" + nodeRef);
+    }
+
+    private void learn(String pack, long nodeRef, double taskScore, long valueMinor, double coldStart) {
+        VerticalPack p = packs.get(pack);
+        reputation.compute(pack + ":" + nodeRef, (k, prev) -> Reputation.update(prev == null ? coldStart : prev, taskScore,
+                valueMinor, p.reputationReferenceMinor(), p.reputationAlphaBase()));
     }
 
     public void registerPartyKey(String name, PublicKey key) {
@@ -330,6 +357,7 @@ public class Exchange {
                 f.put("yieldReleaseAtMs", yieldAt);
                 chain.append(EvidenceChain.Type.fulfillment, EvidenceChain.Signal.Attested, f);
             }
+            learn(r.pack(), e.boughtBy(), 100, s.a(), Reputation.PRIOR_UNVERIFIED);   // delivered: a successful task
             Fulfilment ok = new Fulfilment(auctionId, true, List.of(), hold, yieldAt);
             fulfilments.put(auctionId, ok);
             metrics.counter("difme_exchange_fulfilments_total", "pack", r.pack()).increment();

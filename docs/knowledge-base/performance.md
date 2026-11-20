@@ -61,3 +61,7 @@ The temporal chart 0.62.0 defaults to `numHistoryShards: 512`; each shard keeps 
 `services/notary`: 1.1 MiB binary, single-threaded tokio runtime. Pod 16/64 Mi like the attestation verifier until measured in-cluster.
 ### Marquez instead of DataHub (2026-11-20)
 Marquez 0.50 API (`-Xmx256m`, SerialGC) 187 MiB PSS + web UI 51 MiB, on the shared Postgres, search off. DataHub would have needed OpenSearch, GMS, frontend and setup jobs (est. 3–5 GB).
+### Disk/network pass, first A/B (2026-11-20)
+- File refaults per container are ~0 (0.2–0.4 pages/s): idle disk reads are not page-cache thrash from tight memory limits.
+- YugabyteDB tserver heartbeat 1 s → 3 s did not change the ~270 KB/s each way between yb-tserver and yb-master (542.9 vs 542.4 KB/s): heartbeats are not the source. Reverted.
+- One 15 s window is too noisy for disk I/O of bursty processes (Flink): use the since-start average.

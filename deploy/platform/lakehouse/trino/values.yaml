@@ -39,3 +39,12 @@ catalogs:
     connection-url=jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme
     connection-user=${ENV:YB_TRINO_USER}
     connection-password=${ENV:YB_TRINO_PASSWORD}
+# Lineage (owner decision 2026-11-20: OpenLineage + Marquez). Trino's built-in listener posts one event per query
+# (inputs/outputs, column lineage) to Marquez (lakehouse-extra). When Marquez isn't installed the posts fail and are
+# logged; queries are unaffected.
+eventListenerProperties:
+  - event-listener.name=openlineage
+  - openlineage-event-listener.transport.type=HTTP
+  - openlineage-event-listener.transport.url=http://marquez.governance.svc:5000
+  - openlineage-event-listener.trino.uri=http://trino.lakehouse.svc:8080
+  - openlineage-event-listener.namespace=difme

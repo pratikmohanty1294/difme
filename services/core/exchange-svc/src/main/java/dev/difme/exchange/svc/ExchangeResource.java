@@ -152,6 +152,7 @@ public class ExchangeResource {
     @GET
     @Path("/auctions/{id}/evidence")
     public Response evidence(@PathParam("id") long auctionId) {
+        exchange.awaitSeal(auctionId, 2_000);
         EvidenceChain chain = exchange.evidence(auctionId);
         if (chain == null) return Response.status(404).build();
         Map<String, java.security.PublicKey> keys = exchange.publicKeys();

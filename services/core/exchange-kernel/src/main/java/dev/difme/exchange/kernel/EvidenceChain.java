@@ -49,10 +49,35 @@ public final class EvidenceChain {
     @FunctionalInterface
     public interface KeyResolver { PublicKey keyOf(String signer); }
 
+    /**
+     * Produces an Ed25519 signature for a named party. The key may live anywhere: in process (dev), in OpenBao
+     * transit (operator, non-exportable) or in an independent notary service (witness).
+     */
+    public interface Signer {
+        String name();
+
+        byte[] sign(byte[] message) throws Exception;
+    }
+
+    /** An in-process Ed25519 key (dev, tests). */
+    public static Signer local(String name, PrivateKey key) {
+        return new Signer() {
+            public String name() { return name; }
+
+            public byte[] sign(byte[] message) throws GeneralSecurityException {
+                Signature s = Signature.getInstance("Ed25519");
+                s.initSign(key);
+                s.update(message);
+                return s.sign();
+            }
+        };
+    }
+
     private final String id;
     private final Kind kind;
     private final List<Artifact> artifacts = new ArrayList<>();
     private Seal seal;
+    private boolean sealing;
 
     public EvidenceChain(String id, Kind kind) {
         this.id = Objects.requireNonNull(id);
@@ -63,11 +88,11 @@ public final class EvidenceChain {
 
     public Kind kind() { return kind; }
 
-    public List<Artifact> artifacts() { return Collections.unmodifiableList(artifacts); }
+    public synchronized List<Artifact> artifacts() { return List.copyOf(artifacts); }
 
-    public Seal seal() { return seal; }
+    public synchronized Seal seal() { return seal; }
 
-    public Artifact append(Type type, Signal signal, Map<String, Object> payload) {
+    public synchronized Artifact append(Type type, Signal signal, Map<String, Object> payload) {
         int seq = artifacts.size();
         String prev = seq == 0 ? null : artifacts.get(seq - 1).hash();
         Map<String, Object> copy = Collections.unmodifiableMap(new LinkedHashMap<>(payload));
@@ -77,16 +102,35 @@ public final class EvidenceChain {
     }
 
     public Seal seal(String operator, PrivateKey operatorKey, Map<String, PrivateKey> witnesses) {
-        if (artifacts.isEmpty()) throw new IllegalStateException("nothing to seal");
-        if (seal != null) throw new IllegalStateException("already sealed");
-        Artifact last = artifacts.getLast();
-        List<Attestation> ws = new ArrayList<>();
-        witnesses.forEach((name, key) -> ws.add(attest(name, "witness", key, last.hash())));
-        seal = new Seal(last.seq(), last.hash(), attest(operator, "operator", operatorKey, last.hash()), List.copyOf(ws));
-        return seal;
+        List<Signer> ws = new ArrayList<>();
+        witnesses.forEach((name, key) -> ws.add(local(name, key)));
+        return seal(local(operator, operatorKey), ws);
     }
 
-    public Verdict verify(KeyResolver keys) {
+    /**
+     * Seals the chain at its current last artifact. The hash is fixed under the lock; the signatures are made outside
+     * it, because a remote signer can take milliseconds and appends (fulfilment, refunds) must not wait on it.
+     */
+    public Seal seal(Signer operator, List<Signer> witnesses) {
+        Artifact last;
+        synchronized (this) {
+            if (artifacts.isEmpty()) throw new IllegalStateException("nothing to seal");
+            if (seal != null || sealing) throw new IllegalStateException("already sealed");
+            sealing = true;
+            last = artifacts.getLast();
+        }
+        try {
+            List<Attestation> ws = new ArrayList<>();
+            for (Signer w : witnesses) ws.add(attest(w, "witness", last.hash()));
+            Seal s = new Seal(last.seq(), last.hash(), attest(operator, "operator", last.hash()), List.copyOf(ws));
+            synchronized (this) { seal = s; }
+            return s;
+        } finally {
+            synchronized (this) { sealing = false; }
+        }
+    }
+
+    public synchronized Verdict verify(KeyResolver keys) {
         List<String> notes = new ArrayList<>();
         boolean hashes = true, links = true;
         for (int i = 0; i < artifacts.size(); i++) {
@@ -132,14 +176,11 @@ public final class EvidenceChain {
         return Canonical.sha256Hex(Canonical.json(m));
     }
 
-    private static Attestation attest(String by, String role, PrivateKey key, String overHex) {
+    private static Attestation attest(Signer signer, String role, String overHex) {
         try {
-            Signature s = Signature.getInstance("Ed25519");
-            s.initSign(key);
-            s.update(HexFormat.of().parseHex(overHex));
-            return new Attestation(by, role, "Ed25519", overHex, s.sign());
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("signing failed for " + by, e);
+            return new Attestation(signer.name(), role, "Ed25519", overHex, signer.sign(HexFormat.of().parseHex(overHex)));
+        } catch (Exception e) {
+            throw new IllegalStateException("signing failed for " + signer.name(), e);
         }
     }
 

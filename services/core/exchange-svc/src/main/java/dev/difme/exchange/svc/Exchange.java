@@ -107,11 +107,22 @@ public class Exchange {
     private final Map<Long, Context> contexts = new ConcurrentHashMap<>();
     private Map<Long, EvidenceChain> chains;
 
-    // Evidence signing (B-chain per auction, ADR-020). Dev: both keys are generated at start and published at
-    // GET /v1/exchange/keys. Open owner question: who witnesses in production (an independent notary service or an
-    // HSM-held key) and where the operator key lives (OpenBao transit).
+    // Evidence signing (B-chain per auction, ADR-020), decided 2026-11-20: the operator key lives in OpenBao transit
+    // (non-exportable) and the witness is an independent notary service. Dev and tests: generated in-process keys.
+    // Public keys are published at GET /v1/exchange/keys.
+    private static final org.jboss.logging.Logger LOG = org.jboss.logging.Logger.getLogger(Exchange.class);
     static final String OPERATOR = "exchange-svc", WITNESS = "exchange-witness";
-    private final KeyPair operatorKey = ed25519(), witnessKey = ed25519();
+    @ConfigProperty(name = "difme.evidence.operator", defaultValue = "local") String operatorMode;
+    @ConfigProperty(name = "difme.evidence.openbao-addr", defaultValue = "http://openbao.security:8200") String openbaoAddr;
+    @ConfigProperty(name = "difme.evidence.openbao-token-file", defaultValue = "/var/run/secrets/openbao/token") String openbaoTokenFile;
+    @ConfigProperty(name = "difme.evidence.transit-mount", defaultValue = "transit") String transitMount;
+    @ConfigProperty(name = "difme.evidence.transit-key", defaultValue = "evidence-operator") String transitKey;
+    @ConfigProperty(name = "difme.evidence.notary-url") java.util.Optional<String> notaryUrl;
+    private EvidenceSigners.Published operator, witness;
+    /** Remote signers take milliseconds, so seals are made off the matching thread; local keys seal inline. */
+    private boolean sealAsync;
+    private final java.util.concurrent.ExecutorService sealer = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+    private final Map<Long, java.util.concurrent.Future<?>> pendingSeals = new ConcurrentHashMap<>();
     // Ids stay below 2^53 so JSON clients (JavaScript, the PWAs) read them exactly; millis x 1000 also keeps them
     // increasing across restarts. (millis << 16 exceeded 2^53 and the bids went to a rounded id; found by the test.)
     private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1000L);
@@ -119,6 +130,19 @@ public class Exchange {
 
     @PostConstruct
     void start() {
+        try {
+            operator = "transit".equals(operatorMode)
+                    ? EvidenceSigners.transit(OPERATOR, openbaoAddr, java.nio.file.Path.of(openbaoTokenFile), transitMount, transitKey)
+                    : localSigner(OPERATOR);
+            witness = notaryUrl.filter(u -> !u.isBlank()).isPresent()
+                    ? EvidenceSigners.notary(notaryUrl.get()) : localSigner(WITNESS);
+        } catch (IOException | GeneralSecurityException e) {
+            // Fail the start: sealing evidence with a stand-in key would make chains that verify against the wrong party.
+            throw new IllegalStateException("evidence signers unavailable (" + operatorMode + ", notary "
+                    + notaryUrl.orElse("local") + "): " + e.getMessage(), e);
+        }
+        if (operator.name().equals(witness.name())) throw new IllegalStateException("the witness must not be the operator");
+        sealAsync = "transit".equals(operatorMode) || notaryUrl.filter(u -> !u.isBlank()).isPresent();
         int keep = resultsKept;
         results = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
             @Override
@@ -271,14 +295,40 @@ public class Exchange {
     }
 
     public Map<String, PublicKey> publicKeys() {
-        return Map.of(OPERATOR, operatorKey.getPublic(), WITNESS, witnessKey.getPublic());
+        return Map.of(operator.name(), operator.publicKey(), witness.name(), witness.publicKey());
     }
 
-    private static KeyPair ed25519() {
+    /** Waits briefly for a seal still being made by a remote signer, so a reader right after the award sees it. */
+    public void awaitSeal(long auctionId, long timeoutMs) {
+        java.util.concurrent.Future<?> f = pendingSeals.get(auctionId);
+        if (f == null) return;
         try {
-            return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
+            f.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+            // unsealed: the verdict reports it
+        }
+    }
+
+    private static EvidenceSigners.Published localSigner(String name) throws GeneralSecurityException {
+        KeyPair kp = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        EvidenceChain.Signer s = EvidenceChain.local(name, kp.getPrivate());
+        return new EvidenceSigners.Published() {
+            public String name() { return name; }
+
+            public PublicKey publicKey() { return kp.getPublic(); }
+
+            public byte[] sign(byte[] message) throws Exception { return s.sign(message); }
+        };
+    }
+
+    private void seal(String pack, long auctionId, EvidenceChain chain) {
+        try {
+            chain.seal(operator, List.of(witness));
+        } catch (RuntimeException e) {
+            metrics.counter("difme_exchange_seal_failures_total", "pack", pack).increment();
+            LOG.warnf("evidence chain %s left unsealed: %s", chain.id(), e.getMessage());
         }
     }
 
@@ -466,7 +516,13 @@ public class Exchange {
                 auth.put("winnerTier", award.tier().name());
             }
             chain.append(EvidenceChain.Type.authorization, EvidenceChain.Signal.Deterministic, auth);
-            chain.seal(OPERATOR, operatorKey.getPrivate(), Map.of(WITNESS, witnessKey.getPrivate()));
+            if (sealAsync) {
+                var f = java.util.concurrent.CompletableFuture.runAsync(() -> seal(pack, auctionId, chain), sealer);
+                pendingSeals.put(auctionId, f);
+                f.whenComplete((v, e) -> pendingSeals.remove(auctionId));      // runs at once if already done
+            } else {
+                seal(pack, auctionId, chain);
+            }
         }
         results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award));
         openAuctions.remove(auctionId);

@@ -156,6 +156,26 @@ Details are in docs/knowledge-base/.
     - dev keys are generated at start. Open owner question: who witnesses in production, and where the operator key lives (OpenBao transit?).
   - Next: investor/mandate rules at bid time; an Aeron transport onto the same ring; rail simulators; PWAs.
 
+## HANDOFF 2026-11-20 ~07:00 UTC (session limit reached) — START HERE
+Everything is on GitHub: `main` plus the `wip-*` branches below. Rules and decisions: `docs/knowledge-base/owner-decisions.md`.
+Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/difme`), reading the per-profile
+`CONVERGED / TIMEOUT / SYNC FAILURE` lines in its log (the run's own status can mislead), then doing the "next action".
+
+| Branch | What it fixes | Run to check | Next action |
+|---|---|---|---|
+| `wip-formio-auth` | formio → FerretDB 2 with SCRAM credentials (process profile) | 44689378187 `core,process` | process converged → merge; else read the formio log for the next error |
+| `wip-security-dev` | OpenBao 1 replica + static seal + self-init; SPIRE hooks off; Istio ambient on Cilium (probe CCNP 169.254.7.127, cni.exclusive=false, istio-cni k3d paths); Veraison stores; verifier kept | 44691132238 `core,security` | needs the `difme-attestation-verifier` image from the main image build; converged → merge |
+| `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`) | 44689754881 `core,streaming,lakehouse,ml` (first run lost its runner) | converged → rebase on main (keep-both doc conflicts) → merge; then extras |
+| `wip-mem-batch2` | Go defaults GOMAXPROCS=2/GOGC=50 (Kyverno, where unset); JVM ActiveProcessorCount=2 | A/B 44690021537 vs main 44690017534 (`core` + `measure 200 60s`) | merge only if PSS/CPU drop and accepted/p50/p99 don't regress |
+| `wip-malloc-arena` | Kyverno MALLOC_ARENA_MAX=2 default | A/B 44687672715 (compare with main 44687637776 or 44690017534) | same rule |
+| `wip-hub` (merged) | QUIC hub | main image build (latest images run on main) | verify `core,hub` profile once `difme-quinn-hub:0.1.0` exists |
+
+**Next memory candidates (from the per-process report):** Temporal SQL pool sizes (shared-Postgres backends), Cilium's
+embedded Envoy workers (4), Argo CD controller GOMEMLIMIT. Then CPU → disk I/O (cmd-svc reads ~100 KB/s at idle) → network.
+**Waiting on the owner:** PC memory notes + session logs upload; DiscountAI prototype source (for the PWA screens);
+open decisions in owner-decisions.md (canary SLO thresholds, saga vs DIRECT, collateral floors, return window 7 d
+placeholder, reputation cold start and V_ref). Revoke the GitHub token pasted in chat on 11-18/11-20.
+
 ## PROGRESS LOG (cloud session, 2026-11-20) — read this first; updated after every step
 How to resume after any stoppage (runner loss, network, session end): every change lives on a pushed `wip-*` branch;
 results are in each run's log (streamed live, kept even if the run dies). Re-dispatch a run with

@@ -11,9 +11,11 @@ data:
   DIFME_EVIDENCE_NOTARY_URL: http://notary.security.svc:8080
 ---
 # exchange-svc reads its environment at start: restart it once, after the ConfigMap exists, so it picks up the switch.
+# The restart Job runs in "security" (platform tooling, where the kubectl image is allowed); DIFME service namespaces
+# admit only images signed by the DIFME pipeline (Kyverno restrict-registries, cluster-verify 44784624271).
 apiVersion: v1
 kind: ServiceAccount
-metadata: { name: exchange-evidence-restart }
+metadata: { name: exchange-evidence-restart, namespace: security }
 automountServiceAccountToken: true
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -26,18 +28,20 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata: { name: exchange-evidence-restart }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: exchange-evidence-restart }
-subjects: [{ kind: ServiceAccount, name: exchange-evidence-restart }]
+subjects: [{ kind: ServiceAccount, name: exchange-evidence-restart, namespace: security }]
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: exchange-evidence-restart
+  namespace: security
   # A plain Job in a later sync wave than the ConfigMap (a PostSync hook never ran: cluster-verify 44779382760 found no
   # Job and an unrestarted exchange). Argo CD applies it once; the completed Job stays as the record.
   annotations: { argocd.argoproj.io/sync-wave: "1" }
 spec:
   backoffLimit: 3
   template:
+    metadata: { labels: { difme/team: security, business.metric: evidence-custody } }   # cost attribution (Kyverno)
     spec:
       serviceAccountName: exchange-evidence-restart
       restartPolicy: Never

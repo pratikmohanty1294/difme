@@ -108,6 +108,27 @@ class EvidenceSignersTest {
     }
 
     @Test
+    void kubernetesLoginIsReusedUntilItsLeaseIsMostlyUsed() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger logins = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicReference<String> jwt = new AtomicReference<>();
+        String url = start();
+        server.createContext("/v1/auth/kubernetes/login", ex -> {
+            var in = JSON.readTree(ex.getRequestBody());
+            jwt.set(in.path("jwt").asText());
+            assertEquals("exchange-evidence", in.path("role").asText());
+            reply(ex, 200, Map.of("auth", Map.of("client_token", "s.login-" + logins.incrementAndGet(), "lease_duration", 3600)));
+        });
+        server.start();
+        Path sa = Files.createTempFile("sa", ".jwt");
+        Files.writeString(sa, "eyJ.sa.token\n");
+        var token = EvidenceSigners.kubernetesLogin(url, "kubernetes", "exchange-evidence", sa);
+        assertEquals("s.login-1", token.get());
+        assertEquals("s.login-1", token.get());
+        assertEquals(1, logins.get());
+        assertEquals("eyJ.sa.token", jwt.get());
+    }
+
+    @Test
     void aNonEd25519TransitKeyIsRefused() throws Exception {
         String url = start();
         server.createContext("/v1/transit/keys/evidence-operator", ex -> reply(ex, 200, Map.of("data", Map.of(

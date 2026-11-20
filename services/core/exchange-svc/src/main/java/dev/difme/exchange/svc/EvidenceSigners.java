@@ -50,8 +50,41 @@ final class EvidenceSigners {
      * public key comes from GET /v1/transit/keys/{key} (latest version). The key must be type ed25519.
      */
     static Published transit(String name, String addr, Path tokenFile, String mount, String key) throws IOException, GeneralSecurityException {
+        return transit(name, addr, () -> Files.readString(tokenFile).strip(), mount, key);
+    }
+
+    /** Supplies the OpenBao token for each call (a fixed file, or a Kubernetes-auth login that renews itself). */
+    interface Token {
+        String get() throws IOException;
+    }
+
+    /**
+     * Kubernetes auth: logs in at auth/{authMount}/login with the pod's service-account JWT (read fresh each login, as
+     * kubelet rotates projected tokens) and reuses the client token until 80 % of its lease has passed.
+     */
+    static Token kubernetesLogin(String addr, String authMount, String role, Path jwtFile) {
+        String url = addr.replaceAll("/+$", "") + "/v1/auth/" + authMount + "/login";
+        return new Token() {
+            private String token;
+            private long renewAtMs;
+
+            public synchronized String get() throws IOException {
+                long now = System.currentTimeMillis();
+                if (token != null && now < renewAtMs) return token;
+                String body = JSON.writeValueAsString(Map.of("role", role, "jwt", Files.readString(jwtFile).strip()));
+                JsonNode auth = call(HttpRequest.newBuilder(URI.create(url)).POST(HttpRequest.BodyPublishers.ofString(body)), null).path("auth");
+                String t = auth.path("client_token").asText();
+                if (t.isBlank()) throw new IOException("OpenBao login returned no token");
+                token = t;
+                renewAtMs = now + Math.max(5_000L, auth.path("lease_duration").asLong(60) * 800L);
+                return token;
+            }
+        };
+    }
+
+    static Published transit(String name, String addr, Token token, String mount, String key) throws IOException, GeneralSecurityException {
         String base = addr.replaceAll("/+$", "") + "/v1/" + mount + "/";
-        JsonNode meta = call(HttpRequest.newBuilder(URI.create(base + "keys/" + key)).GET(), tokenFile).path("data");
+        JsonNode meta = call(HttpRequest.newBuilder(URI.create(base + "keys/" + key)).GET(), token).path("data");
         if (!"ed25519".equals(meta.path("type").asText())) throw new GeneralSecurityException("transit key " + key + " is not ed25519");
         String latest = meta.path("latest_version").asText();
         PublicKey pk = ed25519FromRaw(Base64.getDecoder().decode(meta.path("keys").path(latest).path("public_key").asText()));
@@ -63,7 +96,7 @@ final class EvidenceSigners {
             public byte[] sign(byte[] message) throws IOException {
                 String body = JSON.writeValueAsString(Map.of("input", Base64.getEncoder().encodeToString(message)));
                 String sig = call(HttpRequest.newBuilder(URI.create(base + "sign/" + key))
-                        .POST(HttpRequest.BodyPublishers.ofString(body)), tokenFile).path("data").path("signature").asText();
+                        .POST(HttpRequest.BodyPublishers.ofString(body)), token).path("data").path("signature").asText();
                 int at = sig.lastIndexOf(':');
                 if (!sig.startsWith("vault:") || at < 0) throw new IOException("unexpected transit signature format");
                 return Base64.getDecoder().decode(sig.substring(at + 1));
@@ -94,10 +127,10 @@ final class EvidenceSigners {
         };
     }
 
-    private static JsonNode call(HttpRequest.Builder req, Path tokenFile) throws IOException {
+    private static JsonNode call(HttpRequest.Builder req, Token token) throws IOException {
         req.timeout(Duration.ofSeconds(3)).header("Content-Type", "application/json");
-        // The token is read per call so a rotated file takes effect without a restart; it is never logged.
-        if (tokenFile != null) req.header("X-Vault-Token", Files.readString(tokenFile).strip());
+        // The token is fetched per call so a rotated file or a renewed login takes effect at once; it is never logged.
+        if (token != null) req.header("X-Vault-Token", token.get());
         try {
             HttpResponse<String> r = HTTP.send(req.build(), HttpResponse.BodyHandlers.ofString());
             if (r.statusCode() / 100 != 2) throw new IOException("HTTP " + r.statusCode() + " from " + r.uri().getPath());

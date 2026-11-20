@@ -114,7 +114,10 @@ public class Exchange {
     static final String OPERATOR = "exchange-svc", WITNESS = "exchange-witness";
     @ConfigProperty(name = "difme.evidence.operator", defaultValue = "local") String operatorMode;
     @ConfigProperty(name = "difme.evidence.openbao-addr", defaultValue = "http://openbao.security:8200") String openbaoAddr;
+    /** A static token file (tests, break-glass); when it doesn't exist the exchange logs in with Kubernetes auth. */
     @ConfigProperty(name = "difme.evidence.openbao-token-file", defaultValue = "/var/run/secrets/openbao/token") String openbaoTokenFile;
+    @ConfigProperty(name = "difme.evidence.openbao-role", defaultValue = "exchange-evidence") String openbaoRole;
+    @ConfigProperty(name = "difme.evidence.openbao-jwt-file", defaultValue = "/var/run/secrets/openbao-sa/token") String openbaoJwtFile;
     @ConfigProperty(name = "difme.evidence.transit-mount", defaultValue = "transit") String transitMount;
     @ConfigProperty(name = "difme.evidence.transit-key", defaultValue = "evidence-operator") String transitKey;
     @ConfigProperty(name = "difme.evidence.notary-url") java.util.Optional<String> notaryUrl;
@@ -132,7 +135,10 @@ public class Exchange {
     void start() {
         try {
             operator = "transit".equals(operatorMode)
-                    ? EvidenceSigners.transit(OPERATOR, openbaoAddr, java.nio.file.Path.of(openbaoTokenFile), transitMount, transitKey)
+                    ? EvidenceSigners.transit(OPERATOR, openbaoAddr, java.nio.file.Files.exists(java.nio.file.Path.of(openbaoTokenFile))
+                            ? () -> java.nio.file.Files.readString(java.nio.file.Path.of(openbaoTokenFile)).strip()
+                            : EvidenceSigners.kubernetesLogin(openbaoAddr, "kubernetes", openbaoRole, java.nio.file.Path.of(openbaoJwtFile)),
+                            transitMount, transitKey)
                     : localSigner(OPERATOR);
             witness = notaryUrl.filter(u -> !u.isBlank()).isPresent()
                     ? EvidenceSigners.notary(notaryUrl.get()) : localSigner(WITNESS);

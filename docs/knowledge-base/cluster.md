@@ -245,3 +245,9 @@
 - There is no host earlyoom (that was a Codespaces host feature), so the full 24 GB is usable; zswap and swap still apply.
 - Every image must be multi-arch: check new third-party pins with `python3 ci/archcheck.py <file of image refs>` before adding them.
 
+
+### Back-office nginx pods crash-looped on the read-only root filesystem (cluster-verify 2026-11-20)
+- **Symptom:** all six back-office pods (shell + 5 remotes) in CrashLoopBackOff: `mkdir() "/tmp/proxy_temp" failed (30: Read-only file system)`.
+- **Root cause:** Kyverno `mutate-defaults` sets `readOnlyRootFilesystem: true` on every container; nginx-unprivileged keeps its pid and temp paths in `/tmp`.
+- **Fix:** one kustomize patch in `back-office-ui/backoffice-web/kustomization.yaml` gives every Deployment a 16 Mi disk-backed `/tmp`.
+- **Rule:** any new image (nginx, JVM, Node) needs its writable paths mounted before it ships; check the image's temp, cache and pid directories.

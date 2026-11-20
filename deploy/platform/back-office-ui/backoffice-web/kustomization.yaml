@@ -1,1 +1,13 @@
 resources: [web.yaml, remotes.yaml]
+# The root filesystem is read-only (Kyverno mutate-defaults); nginx-unprivileged needs a writable /tmp for its pid and
+# proxy/client temp paths, else "mkdir() /tmp/proxy_temp failed (30: Read-only file system)" and every pod crash-loops
+# (cluster-verify 2026-11-20). Disk-backed so it doesn't count against the 64 Mi memory limit.
+patches:
+  - target: { kind: Deployment }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/volumes
+        value: [{ name: tmp, emptyDir: { sizeLimit: 16Mi } }]
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts
+        value: [{ name: tmp, mountPath: /tmp }]

@@ -6,6 +6,9 @@ on:
     paths: ["services/**", "vendor/**", "backoffice/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml", ".github/workflows/_manifest.yml"]
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write, attestations: write }
+# A newer push supersedes an older image build of the same ref: every run rebuilds every image, so three merges in a
+# row queued three full builds (~25 jobs each) and starved the 20-job runner limit (2026-11-20).
+concurrency: { group: "images-${{ github.ref }}", cancel-in-progress: true }
 
 jobs:
   core:

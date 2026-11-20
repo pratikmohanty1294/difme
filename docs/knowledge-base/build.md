@@ -83,3 +83,7 @@
 - **What:** `core-services` now starts exchange-svc and runs Schemathesis 4.32.7 against the OpenAPI contract (`api/openapi/schemathesis.toml` pins the live pack so requests reach the real logic). With random pack names everything stopped at 404; with `fr01-buy` it found a JSON `null` body crashing intents and mandates (NullPointerException → HTTP 500).
 - **Fix:** null bodies are 400 in intents, mandates and bids; regression test `nullBodiesAreBadRequestsNotServerErrors`. 1,220 generated cases then passed with no server errors.
 - **Local run:** start the jar with `--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED` (Agrona), as the Dockerfile does.
+
+### formio vs FerretDB 2: "listCollections requires authentication" (cluster-verify 2026-11-20)
+- **Root cause:** FerretDB 2 enables authentication by default and validates client credentials against PostgreSQL roles (SCRAM-SHA-256 only); formio's `mongo-url` had none.
+- **Fix:** `dev-secrets.sh` gives formio `mongodb://difme:<pw>@ferretdb…/formio?authMechanism=SCRAM-SHA-256` (the shared Postgres role that already backs FerretDB).

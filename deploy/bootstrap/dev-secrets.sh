@@ -18,8 +18,10 @@ PG_DOCDB=$(rand); FLUX_ADMIN=$(rand); FORMIO_KEY=$(rand 32); S3_KEY=$(rand 20); 
 secret database-tier postgres-docdb password="$PG_DOCDB"
 secret process       postgres-docdb password="$PG_DOCDB"
 secret forms         ferretdb postgresql-url="postgres://difme:${PG_DOCDB}@postgres-docdb.database-tier.svc:5432/postgres"
+# FerretDB 2 requires authentication and checks the credentials against PostgreSQL (SCRAM-SHA-256 only), so formio
+# connects as the shared Postgres role (cluster-verify 2026-11-20: "listCollections requires authentication").
 secret forms         formio api-key="$FORMIO_KEY" api-keys="$FORMIO_KEY" jwt-secret="$(rand 48)" \
-                     mongo-url="mongodb://ferretdb.forms.svc:27017/formio" root-email="admin@difme.local" root-password="$(rand)"
+                     mongo-url="mongodb://difme:${PG_DOCDB}@ferretdb.forms.svc:27017/formio?authMechanism=SCRAM-SHA-256" root-email="admin@difme.local" root-password="$(rand)"
 secret process       formio api-key="$FORMIO_KEY"
 secret process       fluxnova admin-password="$FLUX_ADMIN" admin-basic="admin:${FLUX_ADMIN}"
 

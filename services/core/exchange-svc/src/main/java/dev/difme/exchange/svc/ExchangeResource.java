@@ -87,12 +87,13 @@ public class ExchangeResource {
             return Response.status(400).entity(Map.of("error", "listMinor > 0, 0 < discountBps < 10000, feeMinor >= 0")).build();
         }
         // §11.1 FAIL path: raw features instead of an attested edge score → the exchange scores them server-side and
-        // that score replaces the client's. No score (scorer down, slow, erroring) fails closed.
+        // that score replaces the client's. No score (scorer down, slow, erroring) fails closed: RISK_UNSCORED blocks.
         double riskScore = in.riskScore();
         FraudScorer.Score server = null;
         if (in.fraudFeatures() != null) {
             server = fraudScorer.score(in.fraudFeatures()).orElse(null);
-            if (server == null) return Response.status(503).entity(Map.of("error", "server-side risk scoring is unavailable; retry")).build();
+            if (server == null) return Response.status(422).entity(Map.of("findings", List.of(new Finding("RISK_UNSCORED",
+                    Finding.Severity.BLOCK, "The device could not be verified and the server-side risk check is unavailable; try again shortly.")))).build();
             riskScore = server.riskScore();
         }
         long discount = Math.round(in.listMinor() * (in.discountBps() / 10_000.0));

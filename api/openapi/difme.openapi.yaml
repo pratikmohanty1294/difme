@@ -287,7 +287,7 @@ components:
         feeMinor: { type: integer, format: int64, minimum: 0 }
         maxPriceMinor: { type: integer, format: int64, minimum: 1 }
         fraudFeatures:
-          description: "PDF §11.1 FAIL path: edge attestation failed, so the exchange scores these server-side (services/fraud-scorer) and that score replaces riskScore. 503 when the scorer can't answer (fails closed)."
+          description: "PDF §11.1 FAIL path: edge attestation failed, so the exchange scores these server-side (services/fraud-scorer) and that score replaces riskScore. When the scorer can't answer, 422 with finding RISK_UNSCORED (fails closed)."
           type: object
           required: [amountZscore, txnCount1h, distinctCounterparties24h, geoJumpKm1h, newDeviceFlag, edgeScoreMean24h]
           properties:

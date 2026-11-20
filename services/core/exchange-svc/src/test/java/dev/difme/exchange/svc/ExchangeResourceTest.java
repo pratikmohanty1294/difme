@@ -252,7 +252,7 @@ class ExchangeResourceTest {
                 .body("artifacts.type", hasItem("fulfillment"));
     }
 
-    /** §11.1 FAIL path: raw features → server-side score replaces the client's; no scorer → 503 (fails closed). */
+    /** §11.1 FAIL path: raw features → server-side score replaces the client's; no scorer → RISK_UNSCORED (fails closed). */
     @Test
     void serverSideRiskScoring() throws Exception {
         var stub = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 18091), 0);
@@ -281,7 +281,7 @@ class ExchangeResourceTest {
             stub.stop(0);
         }
         given().contentType(ContentType.JSON).body(base.formatted(safe))
-                .post("/v1/exchange/fr01-buy/intents").then().statusCode(503);
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(422).body("findings[0].code", equalTo("RISK_UNSCORED"));
         given().contentType(ContentType.JSON).body(intent(900, 9_500_000))                  // no features: edge score as before
                 .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).body("riskSource", equalTo("edge"));
     }

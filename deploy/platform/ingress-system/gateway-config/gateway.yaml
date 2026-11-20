@@ -2,6 +2,10 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata: { name: difme-proxy, namespace: ingress-system }
 spec:
+  # One worker thread (dev sizing, owner memory rule): Envoy defaults to one per CPU, and every worker carries its own
+  # Coraza WAF Wasm VM with the OWASP CRS loaded, so 4 workers held the rule set 4 times. One worker serves the 200
+  # req/s baseline comfortably; production overlays raise it.
+  concurrency: 1
   provider:
     type: Kubernetes
     kubernetes:

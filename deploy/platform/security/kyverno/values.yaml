@@ -6,8 +6,10 @@ backgroundController:
   enabled: true
   rbac: { clusterRole: { extraResources: [{ apiGroups: [cilium.io], resources: [ciliumnetworkpolicies], verbs: [get, list, watch, create, update, patch, delete] }] } }
 cleanupController: { enabled: true }
-# 128Mi default was OOM-killed generating reports for a whole profile (found live); refine from measurements.
-reportsController: { enabled: true, resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 320Mi } } }
+# Off in dev/verification (owner memory rule): it only writes PolicyReport objects, which nothing reads here (no
+# policy-reporter UI), and it was the largest steady CPU user at idle (≈170 MiB, ≈240m CPU measured 2026-11-20).
+# Enforcement is the admission controller's job and is unaffected. Production overlays turn it back on.
+reportsController: { enabled: false }
 # Hook jobs: official Kubernetes kubectl image (the chart default was withdrawn from Docker Hub; found live).
 webhooksCleanup: { image: { registry: registry.k8s.io, repository: kubectl, tag: v1.32.3 } }
 # Disabled: a migration helper for upgrades from old Kyverno releases that runs /bin/bash, which the official

@@ -53,7 +53,14 @@ jobs:
         run: ${{ inputs.prebuild }}
       - if: contains(inputs.platforms, ',')
         uses: docker/setup-qemu-action@v3
+      # Docker Hub base images (rust, node, golang, debian, eclipse-temurin) come through Google's pull-through cache
+      # first: anonymous Docker Hub pulls hit HTTP 429 when ~25 image jobs start together (2026-11-20, flink-jobs).
+      # BuildKit falls back to docker.io itself when the mirror lacks an image.
       - uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
       - uses: docker/login-action@v3
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
       - name: Build (local) for scanning

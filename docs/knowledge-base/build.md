@@ -61,3 +61,9 @@
 - **What happened:** `difme.flagd.port=8015   # flagd sync port` made the whole remainder the value. cmd-svc crash-looped with `Failed to load config value of type int for: difme.flagd.port`. Unit tests passed because they never start Quarkus.
 - **Rule:** comments go on their own `#` line.
 - **Guard:** `ci/check.sh core` now fails on `key=value   # …` in any `application.properties`.
+
+### formio server crash-looped on `matchMedia is not defined` (cluster-verify 2026-11-20)
+- **Symptom:** `ReferenceError: matchMedia is not defined` in `node_modules/inputmask/dist/inputmask.js` at startup; the formio pod never became ready.
+- **Root cause:** the new lockfile resolved the server's `inputmask ^5.0.8` to 5.0.10, which calls the browser-only `matchMedia` while the module loads. 5.0.9 (what `@formio/core` pins) has no such call.
+- **Fix:** `vendor/formio/server/package.json` pins `inputmask` to 5.0.9 and overrides it as `$inputmask` everywhere; lockfile regenerated.
+- **Rule:** a lockfile refresh can pull a browser library's new patch release into a Node server. Verify the server starts (cluster-verify process profile) whenever its lockfile changes.

@@ -40,6 +40,8 @@ public class ExchangeResource {
                           long budgetTotalMinor, int merchantCount, int goodsCount, int validityDays, String cardJurisdiction) {}
 
     @Inject Exchange exchange;
+    /** Dev and verification clusters: a simulated merchant and carrier sign the proof of delivery (SimParties). */
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name = "difme.exchange.sim-parties", defaultValue = "true") boolean simParties;
 
     /**
      * Registers a mandate after the pack's mandate_validation rules. The required security deposit is computed by the
@@ -260,6 +262,22 @@ public class ExchangeResource {
         Exchange.Fulfilment f = exchange.fulfil(auctionId, proof);
         if (f == null) return Response.status(409).entity(Map.of("error", "auction has no successful execution")).build();
         return f.verified() ? Response.ok(f).build() : Response.status(422).entity(f).build();
+    }
+
+    /**
+     * Dev only: the simulated merchant and carrier deliver an executed order and submit their signed proof, which is
+     * checked exactly like a real one. 404 when simulated parties are off.
+     */
+    @POST
+    @Path("/auctions/{id}/sim/delivery")
+    public Response simDelivery(@PathParam("id") long auctionId) {
+        if (!simParties) return Response.status(404).build();
+        Exchange.Execution e = exchange.execution(auctionId);
+        Exchange.Result r = exchange.result(auctionId);
+        if (e == null || !e.fulfilled() || r == null || r.award() == null) {
+            return Response.status(409).entity(Map.of("error", "auction has no successful execution")).build();
+        }
+        return fulfilment(auctionId, exchange.simParties().deliver(auctionId, e.merchantId(), r.award().split().a(), System.currentTimeMillis()));
     }
 
     /** Releases the yield Y after the return window. */

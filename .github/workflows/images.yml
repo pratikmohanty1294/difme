@@ -3,7 +3,7 @@ name: images
 on:
   push:
     branches: [main]
-    paths: ["services/**", "vendor/**", "backoffice/**", "pwa/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml", ".github/workflows/_manifest.yml"]
+    paths: ["services/**", "ml/fraud/**", "vendor/**", "backoffice/**", "pwa/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml", ".github/workflows/_manifest.yml"]
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write, attestations: write }
 # A newer push supersedes an older image build of the same ref: every run rebuilds every image, so three merges in a
@@ -141,6 +141,15 @@ jobs:
     with:
       name: difme-notary
       dockerfile: deploy/images/notary/Dockerfile
+  fraud-scorer:
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-fraud-scorer
+      dockerfile: deploy/images/fraud-scorer/Dockerfile
+      # The model and ONNX Runtime must load: start the image and score one order.
+      smoke: |
+        docker run -d --name fs -p 18090:8090 "$IMAGE:scan" && sleep 3
+        curl -fsS -X POST -H 'content-type: application/json' -d '{"amountZscore":0.2,"txnCount1h":1,"distinctCounterparties24h":2,"geoJumpKm1h":3,"newDeviceFlag":0,"edgeScoreMean24h":860}' localhost:18090/v1/score || { docker logs fs; exit 1; }
 
   debezium-connect:
     uses: ./.github/workflows/_image.yml

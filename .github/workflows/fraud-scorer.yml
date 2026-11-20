@@ -1,0 +1,22 @@
+# Server-side fraud scorer: train the model, then the locked build and its tests against the real model and ONNX Runtime.
+name: fraud-scorer
+on:
+  push: { branches: [main, "wip-*"], paths: ["services/fraud-scorer/**", "ml/fraud/**", ".github/workflows/fraud-scorer.yml"] }
+  pull_request: { paths: ["services/fraud-scorer/**", "ml/fraud/**"] }
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: train
+        run: |
+          pip install -q -r ml/fraud/requirements.txt onnxruntime==1.31.1
+          python -I ml/fraud/train.py --out /tmp/model/model.onnx
+          echo "FRAUD_MODEL=/tmp/model/model.onnx" >> "$GITHUB_ENV"
+          echo "ORT_DYLIB_PATH=$(python -c 'import onnxruntime,glob,os; print(glob.glob(os.path.join(os.path.dirname(onnxruntime.__file__),"capi","libonnxruntime.so.*"))[0])')" >> "$GITHUB_ENV"
+      - name: cargo test (locked)
+        working-directory: services/fraud-scorer
+        run: cargo test --locked

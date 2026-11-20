@@ -37,7 +37,13 @@ export interface SplitMinor { a: number; b: number; yield: number; fee: number; 
 export interface Award { winner: { nodeRef: number; askMinor: number; score: number }; split: SplitMinor; collateralMinor: number; tier?: string }
 export interface AuctionResult { auctionId: number; pack: string; ranked: number; top: { nodeRef: number; askMinor: number; score: number }[]; award: Award | null }
 export interface Execution { auctionId: number; fulfilled: boolean; boughtBy: number; slashedMinor: number; attempts: { partnerId: number; responseCode: string }[] }
-export interface EvidenceView { chain: string; sealed: boolean; verdict: { hashes: boolean; links: boolean; seal: boolean; witnesses: boolean; notes: string[] } }
+export interface EvidenceArtifact { seq: number; type: string; signal: string; payload: Record<string, unknown>; prevHash: string; hash: string; postSeal: boolean }
+export interface EvidenceView {
+  chain: string; sealed: boolean; artifacts?: EvidenceArtifact[];
+  verdict: { hashes: boolean; links: boolean; seal: boolean; witnesses: boolean; notes: string[] };
+}
+export interface Hold { holdId: string; heldMinor: number; releasedMinor: number; state: string }
+export interface Fulfilment { auctionId: number; verified: boolean; problems: string[]; escrow: Hold; yieldReleaseAtMs: number }
 export interface MandateIn {
   partnerRef: string; limitMinor: number; maxPerOrderMinor: number; minYieldPct: number; depositMinor: number;
   budgetTotalMinor: number; merchantCount: number; goodsCount: number; validityDays: number; cardJurisdiction: string;
@@ -54,6 +60,8 @@ export const exchange = {
   auction: (id: number) => call<AuctionResult>('GET', `/auctions/${id}`),
   execute: (id: number, merchantId: string) => call<Execution>('POST', `/auctions/${id}/execute`, { merchantId }),
   evidence: (id: number) => call<EvidenceView>('GET', `/auctions/${id}/evidence`),
+  /** Dev clusters: the simulated merchant and carrier deliver and submit their signed proof of delivery. */
+  simDelivery: (id: number) => call<Fulfilment>('POST', `/auctions/${id}/sim/delivery`),
   registerMandate: (m: MandateIn) => call<MandateRegistered>('POST', `/${PACK}/mandates`, m),
   mandate: (id: number) => call<MandateState>('GET', `/${PACK}/mandates/${id}`),
   /** Cheap reachability probe (the public verification keys). */

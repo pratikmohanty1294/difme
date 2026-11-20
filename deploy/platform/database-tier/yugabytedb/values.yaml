@@ -17,6 +17,11 @@ gflags:
     # uses a lock table instead, stops at Flyway 10 and Quarkus uses Flyway 12.
     ysql_yb_enable_advisory_locks: true
     allowed_preview_flags_csv: ysql_yb_enable_advisory_locks
+    # Logical replication (Debezium outbox + settlements CDC): with no changes the walsender polls every 10 ms (2.25
+    # default, pg_wrapper.cc), and each poll reads catalog state from the master: ~165-230 master reads/s at idle for
+    # the two streams (A/B 2026-11-20, 44812883402: 165/s running, 0/s with the connectors stopped). 500 ms ≈ 4/s; the
+    # first event after a quiet spell waits up to 0.5 s, busy streams still poll every 1 ms (..._nonempty_ms).
+    ysql_yb_walsender_poll_sleep_duration_empty_ms: 500
   master:
     enable_automatic_tablet_splitting: true
     ysql_yb_enable_advisory_locks: true

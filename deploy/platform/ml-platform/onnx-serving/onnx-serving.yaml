@@ -1,4 +1,12 @@
 # PDF §5.7 — server-side ONNX Runtime fraud scoring (fallback when edge attestation fails, §11.1 FAIL path).
+# services/fraud-scorer: the model (ml/fraud/train.py) and libonnxruntime are baked into the image, so the pod needs no
+# object store or network at start. Measured 2026-11-20 (release build, local): 36 MiB RSS, 1 thread.
+# Next: features from the Feast online store by account/device id instead of in the request; promoted models from MLflow.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: onnx-serving }
+automountServiceAccountToken: false
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: onnx-serving, labels: { app: onnx-serving } }
@@ -8,16 +16,15 @@ spec:
   template:
     metadata: { labels: { app: onnx-serving, difme/team: ml, business.metric: fraud-check } }
     spec:
+      serviceAccountName: onnx-serving
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: scorer
           image: ghcr.io/pratikmohanty1294/difme-fraud-scorer:0.1.0
-          env:
-            - { name: MODEL_URI, value: "s3://mlflow/models/fraud/production/model.onnx" }
-            - { name: FEAST_URL, value: "http://feast-server:6566" }
-            - { name: VECTOR_DB_URL, value: "postgresql://ml@postgres-docdb.database-tier.svc:5432/ml" }   # pgvector
-            - { name: FLAGD_HOST, value: "flagd.core-platform.svc" }
           ports: [{ containerPort: 8090 }]
-          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 512Mi } }
+          readinessProbe: { httpGet: { path: /healthz, port: 8090 }, periodSeconds: 10 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 10m, memory: 48Mi }, limits: { memory: 128Mi } }
 ---
 apiVersion: v1
 kind: Service

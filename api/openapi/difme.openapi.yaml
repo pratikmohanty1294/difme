@@ -155,6 +155,17 @@ paths:
         "200": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
         "409": { $ref: "#/components/responses/ExchangeError" }
         "422": { description: Proof rejected (problems listed), content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
+  /v1/exchange/auctions/{auctionId}/sim/delivery:
+    post:
+      operationId: simulateDelivery
+      summary: Dev and verification clusters only (difme.exchange.sim-parties) - the simulated merchant and carrier sign and submit the proof of delivery, checked like a real one
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/AuctionId" }]
+      responses:
+        "200": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
+        "404": { description: Simulated parties are off }
+        "409": { $ref: "#/components/responses/ExchangeError" }
+        "422": { description: Proof rejected (problems listed), content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
   /v1/exchange/auctions/{auctionId}/settle:
     post:
       operationId: settleYield

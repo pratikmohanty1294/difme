@@ -106,6 +106,24 @@ if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1; then
       | sed -E 's/handler_latency_//; s/\{[^}]*\}//' | sort -nr | head -6 | sed "s|^|  ${t%%:*}: |"
   done
 fi
+# A/B for the catalog reads (2026-11-20: ~230 master Read/s from the streaming profile on): stop the Debezium
+# connectors (YugabyteDB logical replication) for 45 s and sample the master's Read rate again, then resume them.
+yb_reads() {
+  u=/api/v1/namespaces/database-tier/pods/yb-master-0:7000/proxy/prometheus-metrics
+  a=$(kubectl get --raw "$u" 2>/dev/null | awk '/^handler_latency_yb_tserver_TabletServerService_Read_count/ {s+=$2} END {print s+0}'); sleep 15
+  b=$(kubectl get --raw "$u" 2>/dev/null | awk '/^handler_latency_yb_tserver_TabletServerService_Read_count/ {s+=$2} END {print s+0}')
+  awk -v a="$a" -v b="$b" 'BEGIN {printf "%.1f", (b - a) / 15}'
+}
+if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1 && kubectl -n streaming get kafkaconnector core-outbox >/dev/null 2>&1; then
+  echo "== catalog reads A/B (Debezium connectors running vs stopped)"
+  kubectl get --raw "/api/v1/namespaces/database-tier/pods/yb-tserver-0:9000/proxy/varz?raw=1" 2>/dev/null | grep -iE 'walsender|cdcsdk_.*(interval|poll)' | head -8 | sed 's/^/  flag: /'
+  echo "  running: $(yb_reads) Read/s"
+  conns=$(kubectl -n streaming get kafkaconnector -o name 2>/dev/null)
+  for c in $conns; do kubectl -n streaming patch "$c" --type merge -p '{"spec":{"state":"stopped"}}' >/dev/null 2>&1; done
+  sleep 45
+  echo "  stopped: $(yb_reads) Read/s"
+  for c in $conns; do kubectl -n streaming patch "$c" --type merge -p '{"spec":{"state":"running"}}' >/dev/null 2>&1; done
+fi
 # Evidence custody smoke: with the security switch present, the published keys must be the transit operator key and the
 # notary's own key (local dev keys are named exchange-svc / exchange-witness).
 if [ "$rc" -eq 0 ] && kubectl -n core-platform get configmap exchange-evidence >/dev/null 2>&1; then
@@ -123,6 +141,11 @@ if [ "$rc" -eq 0 ] && kubectl -n core-platform get configmap exchange-evidence >
     kubectl -n argocd get application exchange-evidence -o jsonpath='  app: {.status.sync.status} {.status.health.status} {.status.operationState.phase} {.status.operationState.message}{"\n"}' 2>&1 | cut -c1-300
     kubectl -n core-platform get events --sort-by=.lastTimestamp 2>/dev/null | grep -iE 'exchange-evidence|exchange-svc' | tail -6 | cut -c1-220
   fi
+fi
+# Live buy smoke (informational): the full FR-01 path through the shopbot PWA's /api proxy.
+if [ "$rc" -eq 0 ] && kubectl -n core-platform get svc pwa-shopbot >/dev/null 2>&1; then
+  echo "== live buy through the PWA"
+  python3 ci/live-buy.py || true
 fi
 # Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
 if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then

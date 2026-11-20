@@ -104,6 +104,15 @@ printf '  %7s %6s %4s %6s %8s %8s  %-8s %-44s %-15s %s\n' PSS_MiB anon thr CPU% 
 sort -t$'\t' -k1,1nr "$rows" | head -"$N" | awk -F'\t' '{printf "  %7d %6d %4d %6.1f %8.1f %8.1f  %-8s %-44s %-15s %s\n", $1/1024, $4/1024, $5, $7, $8, $9, $6, substr($2,1,44), substr($3,1,15), substr($10,1,90)}'
 echo "== top 10 by CPU over the window"
 sort -t$'\t' -k7,7nr "$rows" | head -10 | awk -F'\t' '{printf "  %6.1f%%  %-44s %-15s %s\n", $7, substr($2,1,44), substr($3,1,15), substr($10,1,80)}'
+# A 15 s window catches bursts (job start, savepoint upload); the average since process start shows the steady cost
+# (fraud-cep read 4.2 MB/s in one window and 0.2 MB/s in another, 2026-11-20).
+echo "== top 10 by disk I/O averaged since process start (read+write KB/s, process age)"
+up=$(awk '{print int($1)}' /proc/uptime)
+for p in "${!PODS[@]}"; do
+  st=$(awk '{print $22}' "/proc/$p/stat" 2>/dev/null) || continue; [ -n "$st" ] || continue
+  age=$(( up - st / HZ )); [ "$age" -gt 30 ] || continue
+  awk -v age="$age" -v pod="${PODS[$p]}" -v c="$(cat /proc/$p/comm 2>/dev/null)" '/^read_bytes/{r=$2} /^write_bytes/{w=$2} END{printf "%.1f\t%.1f\t%.1f\t%d\t%s\t%s\n", (r+w)/1024/age, r/1024/age, w/1024/age, age, pod, c}' "/proc/$p/io" 2>/dev/null
+done | sort -t$'\t' -k1,1nr | head -10 | awk -F'\t' '$1>0 {printf "  %8.1f (r %.1f w %.1f, %ds)  %-44s %s\n", $1, $2, $3, $4, substr($5,1,44), $6}'
 echo "== top 10 by disk I/O (read+write KB/s)"
 awk -F'\t' '{printf "%.1f\t%s\t%s\t%s\t%s\n", $8+$9, $8, $9, $2, $3}' "$rows" | sort -t$'\t' -k1,1nr | head -10 \
   | awk -F'\t' '$1>0 {printf "  %8.1f (r %.1f w %.1f)  %-44s %s\n", $1, $2, $3, substr($4,1,44), $5}'

@@ -26,9 +26,13 @@ while :; do
 done
 if [ $rc -ne 0 ]; then
   echo "== pods not ready"; kubectl get pods -A --no-headers | grep -vE "Running|Completed" | cut -c1-120 | head -25
-  for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error/ {print $1"/"$2}' | head -6); do
-    echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=25 2>&1 | cut -c1-300
+  # Crash-looping pods, plus pods that run but never turn ready (e.g. a new revision failing its probe).
+  for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error/ || ($4 == "Running" && $3 ~ /^0\//) {print $1"/"$2}' | head -8); do
+    echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=40 2>&1 | cut -c1-300
+    kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous --tail=15 2>/dev/null | sed 's/^/  (previous) /' | cut -c1-300
+    kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8
   done
+  kubectl get rollouts -A 2>/dev/null | head; kubectl get rs -n core-platform 2>/dev/null | head -15
   echo "== recent warning events"; kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>/dev/null | tail -20 | cut -c1-250
 fi
 echo "== $P: after"; bash ci/mem-report.sh 12

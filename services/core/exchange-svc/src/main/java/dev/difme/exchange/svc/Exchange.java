@@ -232,10 +232,31 @@ public class Exchange {
 
     /** Registered mandates (in memory for now; persistence and budget draw-down come with settlement). */
     /** A registered mandate and what the exchange tracks for it (the partner cannot misstate these). */
-    public record MandateState(String pack, ExchangeResource.Mandate terms, long registeredAtMillis, AtomicLong budgetLeftMinor) {
+    public record MandateState(String pack, ExchangeResource.Mandate terms, long registeredAtMillis, AtomicLong budgetLeftMinor,
+                               int nodeRef, java.util.concurrent.atomic.AtomicInteger awards, AtomicLong yieldEarnedMinor) {
         public int ageDays() {
             return (int) ((System.currentTimeMillis() - registeredAtMillis) / 86_400_000L);
         }
+
+        /** Still a standing order: within its validity and with budget left. */
+        public boolean standing() {
+            return ageDays() < terms.validityDays() && budgetLeftMinor.get() > 0;
+        }
+    }
+
+    /** Stable bidder node per partner (standing mandates bid as their partner's node; above the range agents use). */
+    private final Map<String, Integer> partnerNodes = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicInteger nextPartnerNode = new java.util.concurrent.atomic.AtomicInteger(1_000_000);
+
+    public int nodeRefOf(String partnerRef) {
+        return partnerNodes.computeIfAbsent(partnerRef, k -> nextPartnerNode.incrementAndGet());
+    }
+
+    /** Ids of the pack's mandates that are standing orders right now. */
+    public List<Long> standingMandates(String pack) {
+        List<Long> out = new ArrayList<>();
+        mandates.forEach((id, m) -> { if (m.pack().equals(pack) && m.standing()) out.add(id); });
+        return out;
     }
 
     private final Map<Long, MandateState> mandates = new ConcurrentHashMap<>();
@@ -245,7 +266,8 @@ public class Exchange {
 
     public long registerMandate(String pack, ExchangeResource.Mandate m) {
         long id = mandateIds.incrementAndGet();
-        mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor())));
+        mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor()),
+                nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong()));
         return id;
     }
 
@@ -500,7 +522,11 @@ public class Exchange {
             // a concurrent award on the same mandate can still race, so never let it go negative).
             Long mandateId = bound == null ? null : bound.get(w.nodeRef());
             MandateState ms = mandateId == null ? null : mandates.get(mandateId);
-            if (ms != null) ms.budgetLeftMinor().updateAndGet(left -> Math.max(0, left - split.a()));
+            if (ms != null) {
+                ms.budgetLeftMinor().updateAndGet(left -> Math.max(0, left - split.a()));
+                ms.awards().incrementAndGet();
+                ms.yieldEarnedMinor().addAndGet(split.yield());
+            }
         }
         EvidenceChain chain = chains.get(auctionId);
         if (chain != null) {

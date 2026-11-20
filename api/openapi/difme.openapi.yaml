@@ -80,6 +80,17 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { $ref: "#/components/responses/ExchangeError" }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/{pack}/mandates/{mandateId}:
+    get:
+      operationId: getMandate
+      summary: A standing mandate as the exchange tracks it (budget left, awards, yield earned, tier)
+      security: [{ oauth2: [exchange:read] }]
+      parameters:
+        - { $ref: "#/components/parameters/Pack" }
+        - { name: mandateId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "200": { description: Mandate state, content: { application/json: { schema: { $ref: "#/components/schemas/MandateState" } } } }
+        "404": { description: Unknown mandate (or another vertical's) }
   /v1/exchange/{pack}/partners/{nodeRef}:
     get:
       operationId: getPartnerReputation
@@ -270,6 +281,22 @@ components:
         auctionId: { type: integer, format: int64 }
         maxYieldMinor: { type: integer, format: int64, description: "Y_max = d·P − F − 1" }
         findings: { type: array, items: { $ref: "#/components/schemas/Finding" } }
+        standingBids: { type: integer, minimum: 0, description: "Bids the exchange placed for standing mandates when the intent opened" }
+    MandateState:
+      type: object
+      properties:
+        mandateId: { type: integer, format: int64 }
+        partnerRef: { type: string }
+        nodeRef: { type: integer }
+        standing: { type: boolean, description: "Within validity and with budget left: bids automatically" }
+        budgetTotalMinor: { type: integer, format: int64 }
+        budgetLeftMinor: { type: integer, format: int64 }
+        awards: { type: integer, minimum: 0 }
+        yieldEarnedMinor: { type: integer, format: int64 }
+        minYieldPct: { type: number }
+        ageDays: { type: integer, minimum: 0 }
+        validityDays: { type: integer }
+        tier: { type: string, enum: [COLD_START, ESTABLISHED, ENTERPRISE] }
     Finding:
       type: object
       properties: { code: { type: string }, severity: { type: string, enum: [BLOCK, WARN, INFO] }, message: { type: string } }

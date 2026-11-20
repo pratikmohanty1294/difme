@@ -124,6 +124,11 @@ if [ "$rc" -eq 0 ] && kubectl -n core-platform get configmap exchange-evidence >
     kubectl -n core-platform get events --sort-by=.lastTimestamp 2>/dev/null | grep -iE 'exchange-evidence|exchange-svc' | tail -6 | cut -c1-220
   fi
 fi
+# Live buy smoke (informational): the full FR-01 path through the shopbot PWA's /api proxy.
+if [ "$rc" -eq 0 ] && kubectl -n core-platform get svc pwa-shopbot >/dev/null 2>&1; then
+  echo "== live buy through the PWA"
+  python3 ci/live-buy.py || true
+fi
 # Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
 if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then
   echo "== lineage in Marquez"

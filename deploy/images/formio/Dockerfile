@@ -9,10 +9,14 @@ FROM node:22-bookworm AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shims/ ./shims/
-RUN npm ci --omit=dev --no-audit --no-fund
+# Full install first: 4.11 needs `npm run build` (webpack, a dev dependency) to generate src/vm/bundles/*.js, the
+# sandbox bundles the server reads at startup. Without them it died with ENOENT on core-lodash-moment-inputmask.js
+# (cluster-verify 2026-11-20). Dev dependencies are pruned before the runtime stage.
+RUN npm ci --no-audit --no-fund
 COPY src/ ./src/
 COPY config/ ./config/
 COPY *.js *.txt default-template.json ./
+RUN npm run build && test -s src/vm/bundles/core-lodash-moment-inputmask.js && npm prune --omit=dev --no-audit --no-fund
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production PORT=3001

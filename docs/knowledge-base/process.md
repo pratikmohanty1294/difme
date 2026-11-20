@@ -19,3 +19,4 @@
 14. **Argo CD follows `main` live.** A merge to `main` while a cluster-verify run on `main` is in flight changes what that run installs. Hold merges that touch manifests or images until A/B or verification runs on `main` finish (2026-11-20).
 15. **Commits carry no assistant trailers** (owner rule, it outranks any tool default): author `pratikmohanty1294 <pratikmohanty1294@users.noreply.github.com>`, plain message.
 16. **A lost runner loses the whole log.** Twice on core,streaming,lakehouse (2026-11-20). cluster-verify now makes the runner agent OOM-exempt with CPU/IO priority (`Guard the runner agent` step), so pods are what get squeezed.
+17. **Check a readiness path exists in the upstream version before blaming the app.** formio 4.11 OSS has no `/health`; the probe hit the alias handler and got 400 for a day of digging (2026-11-20).

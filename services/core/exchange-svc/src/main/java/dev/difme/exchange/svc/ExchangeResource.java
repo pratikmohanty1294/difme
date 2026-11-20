@@ -24,7 +24,7 @@ public class ExchangeResource {
      * Y_max = d·P − F − 1, so the buyer always pays less than list (vertical.yaml price_basis).
      */
     public record Intent(double riskScore, boolean offerSanctioned, long listMinor, int discountBps, long feeMinor,
-                         long maxPriceMinor, Risk.Tier partnerTier) {}
+                         long maxPriceMinor) {}
 
     /**
      * The buying partner's facts for bid-time eligibility (FR-01 investor_eligibility). Minor units; the rule tables
@@ -94,7 +94,6 @@ public class ExchangeResource {
         if (!PackRules.allowed(findings)) return Response.status(422).entity(Map.of("findings", findings)).build();
         long maxYield = discount - in.feeMinor() - 1;
         if (maxYield <= 0) return Response.status(422).entity(Map.of("error", "the fee leaves no yield inside the discount")).build();
-        Risk.Tier tier = in.partnerTier() == null ? Risk.Tier.ESTABLISHED : in.partnerTier();
         Map<String, Object> evidence = new LinkedHashMap<>();       // canonical JSON: integers, strings, booleans
         evidence.put("riskScore", Math.round(in.riskScore()));
         evidence.put("offerSanctioned", in.offerSanctioned());
@@ -102,9 +101,8 @@ public class ExchangeResource {
         evidence.put("discountBps", in.discountBps());
         evidence.put("feeMinor", in.feeMinor());
         evidence.put("maxPriceMinor", in.maxPriceMinor());
-        evidence.put("partnerTier", tier.name());
         evidence.put("findings", findings.stream().map(Finding::code).toList());
-        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor(), tier), evidence);
+        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor()), evidence);
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings)).build();
     }
@@ -130,7 +128,8 @@ public class ExchangeResource {
             in.put("intentAgeDays", ms != null ? ms.ageDays() : pt.intentAgeDays());
             in.put("validityDays", ms != null ? ms.terms().validityDays() : pt.validityDays());
             in.put("deposit", (ms != null ? ms.terms().depositMinor() : pt.depositMinor()) / 100.0);
-            in.put("maxDepositNeeded", ctx.depositNeededMinor() / 100.0);   // the exchange's own number, not the bidder's
+            // The exchange's own number at this partner's own tier (from its delivery history), not the bidder's claim.
+            in.put("maxDepositNeeded", exchange.depositNeeded(auctionId, b.nodeRef()) / 100.0);
             in.put("amountA", ctx.cardPriceMinor() / 100.0);
             in.put("maxPerOrder", (ms != null ? ms.terms().maxPerOrderMinor() : pt.maxPerOrderMinor()) / 100.0);
             in.put("budgetLeft", (ms != null ? ms.budgetLeftMinor().get() : pt.budgetLeftMinor()) / 100.0);
@@ -153,6 +152,7 @@ public class ExchangeResource {
     @GET
     @Path("/auctions/{id}/evidence")
     public Response evidence(@PathParam("id") long auctionId) {
+        exchange.awaitSeal(auctionId, 2_000);
         EvidenceChain chain = exchange.evidence(auctionId);
         if (chain == null) return Response.status(404).build();
         Map<String, java.security.PublicKey> keys = exchange.publicKeys();
@@ -180,6 +180,8 @@ public class ExchangeResource {
         out.put("nodeRef", nodeRef);
         out.put("reputation", tracked);
         out.put("tracked", tracked != null);
+        out.put("verifiedDeliveries", exchange.verifiedDeliveries(packId, nodeRef));
+        out.put("tier", exchange.tierOf(packId, nodeRef).name());
         return Response.ok(out).build();
     }
 

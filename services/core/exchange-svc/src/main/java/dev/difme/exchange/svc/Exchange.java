@@ -49,17 +49,18 @@ public class Exchange {
     public record Ranked(int nodeRef, long askMinor, double score) {}
 
     /** Commercial terms of the intent, needed to settle the award (all minor units). */
-    public record Terms(long listMinor, int discountBps, long feeMinor, Risk.Tier partnerTier) {}
+    public record Terms(long listMinor, int discountBps, long feeMinor) {}
 
     /**
      * The award: the winner's split under the conservation identity (A, Y, F, B, buyer saving; FR-01 v4.1) and the
-     * collateral the winner must lock before execution (FR-14, D_req = max(D_min, V·α·γ·φ)). Open owner questions:
-     * V is taken as A (what the partner pays the merchant) and the partner tier defaults to ESTABLISHED.
+     * collateral the winner must lock before execution (FR-14, D_req = max(D_min, V·α·γ·φ)). V is A (what the partner
+     * pays the merchant); φ comes from the winner's tier, which the exchange derives from its own history (decided
+     * 2026-11-20): COLD_START until enough verified deliveries, then ESTABLISHED.
      */
-    public record Award(Ranked winner, CommerceSplit split, long collateralMinor) {}
+    public record Award(Ranked winner, CommerceSplit split, long collateralMinor, Risk.Tier tier) {}
 
     /** What the exchange (not the bidder) knows about an open auction; the facts bid-time rules are checked against. */
-    public record Context(long cardPriceMinor, long yieldRoomMinor, long depositNeededMinor) {}
+    public record Context(long cardPriceMinor, long yieldRoomMinor) {}
 
     public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
 
@@ -83,6 +84,8 @@ public class Exchange {
     private final Map<String, PublicKey> partyKeys = new ConcurrentHashMap<>();
     /** FR-16 reputation the exchange has learned per partner ("pack:nodeRef"), from execution and fulfilment outcomes. */
     private final Map<String, Double> reputation = new ConcurrentHashMap<>();
+    /** Verified deliveries per partner ("pack:nodeRef"): accepted proofs of delivery, the basis of the tier. */
+    private final Map<String, Integer> deliveries = new ConcurrentHashMap<>();
     private Map<Long, Fulfilment> fulfilments;
     /** Overrides every pack's return window when >= 0 (tests can't wait days). */
     @ConfigProperty(name = "difme.exchange.return-window-override-ms", defaultValue = "-1") long returnWindowOverrideMs;
@@ -104,11 +107,25 @@ public class Exchange {
     private final Map<Long, Context> contexts = new ConcurrentHashMap<>();
     private Map<Long, EvidenceChain> chains;
 
-    // Evidence signing (B-chain per auction, ADR-020). Dev: both keys are generated at start and published at
-    // GET /v1/exchange/keys. Open owner question: who witnesses in production (an independent notary service or an
-    // HSM-held key) and where the operator key lives (OpenBao transit).
+    // Evidence signing (B-chain per auction, ADR-020), decided 2026-11-20: the operator key lives in OpenBao transit
+    // (non-exportable) and the witness is an independent notary service. Dev and tests: generated in-process keys.
+    // Public keys are published at GET /v1/exchange/keys.
+    private static final org.jboss.logging.Logger LOG = org.jboss.logging.Logger.getLogger(Exchange.class);
     static final String OPERATOR = "exchange-svc", WITNESS = "exchange-witness";
-    private final KeyPair operatorKey = ed25519(), witnessKey = ed25519();
+    @ConfigProperty(name = "difme.evidence.operator", defaultValue = "local") String operatorMode;
+    @ConfigProperty(name = "difme.evidence.openbao-addr", defaultValue = "http://openbao.security:8200") String openbaoAddr;
+    /** A static token file (tests, break-glass); when it doesn't exist the exchange logs in with Kubernetes auth. */
+    @ConfigProperty(name = "difme.evidence.openbao-token-file", defaultValue = "/var/run/secrets/openbao/token") String openbaoTokenFile;
+    @ConfigProperty(name = "difme.evidence.openbao-role", defaultValue = "exchange-evidence") String openbaoRole;
+    @ConfigProperty(name = "difme.evidence.openbao-jwt-file", defaultValue = "/var/run/secrets/openbao-sa/token") String openbaoJwtFile;
+    @ConfigProperty(name = "difme.evidence.transit-mount", defaultValue = "transit") String transitMount;
+    @ConfigProperty(name = "difme.evidence.transit-key", defaultValue = "evidence-operator") String transitKey;
+    @ConfigProperty(name = "difme.evidence.notary-url") java.util.Optional<String> notaryUrl;
+    private EvidenceSigners.Published operator, witness;
+    /** Remote signers take milliseconds, so seals are made off the matching thread; local keys seal inline. */
+    private boolean sealAsync;
+    private final java.util.concurrent.ExecutorService sealer = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+    private final Map<Long, java.util.concurrent.Future<?>> pendingSeals = new ConcurrentHashMap<>();
     // Ids stay below 2^53 so JSON clients (JavaScript, the PWAs) read them exactly; millis x 1000 also keeps them
     // increasing across restarts. (millis << 16 exceeded 2^53 and the bids went to a rounded id; found by the test.)
     private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1000L);
@@ -116,6 +133,22 @@ public class Exchange {
 
     @PostConstruct
     void start() {
+        try {
+            operator = "transit".equals(operatorMode)
+                    ? EvidenceSigners.transit(OPERATOR, openbaoAddr, java.nio.file.Files.exists(java.nio.file.Path.of(openbaoTokenFile))
+                            ? () -> java.nio.file.Files.readString(java.nio.file.Path.of(openbaoTokenFile)).strip()
+                            : EvidenceSigners.kubernetesLogin(openbaoAddr, "kubernetes", openbaoRole, java.nio.file.Path.of(openbaoJwtFile)),
+                            transitMount, transitKey)
+                    : localSigner(OPERATOR);
+            witness = notaryUrl.filter(u -> !u.isBlank()).isPresent()
+                    ? EvidenceSigners.notary(notaryUrl.get()) : localSigner(WITNESS);
+        } catch (IOException | GeneralSecurityException e) {
+            // Fail the start: sealing evidence with a stand-in key would make chains that verify against the wrong party.
+            throw new IllegalStateException("evidence signers unavailable (" + operatorMode + ", notary "
+                    + notaryUrl.orElse("local") + "): " + e.getMessage(), e);
+        }
+        if (operator.name().equals(witness.name())) throw new IllegalStateException("the witness must not be the operator");
+        sealAsync = "transit".equals(operatorMode) || notaryUrl.filter(u -> !u.isBlank()).isPresent();
         int keep = resultsKept;
         results = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
             @Override
@@ -178,8 +211,7 @@ public class Exchange {
         chain.append(EvidenceChain.Type.intent, EvidenceChain.Signal.Deterministic, intent);
         chains.put(id, chain);
         long cardPrice = t.listMinor() - Math.round(t.listMinor() * (t.discountBps() / 10_000.0));
-        contexts.put(id, new Context(cardPrice, maxAcceptableMinor, Risk.requiredCollateral(cardPrice,
-                p.collateral().alpha(), p.collateral().gammaRev(), t.partnerTier(), p.collateral().minMinor())));
+        contexts.put(id, new Context(cardPrice, maxAcceptableMinor));
         openAuctions.put(id, pack);
         terms.put(id, t);
         long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
@@ -229,6 +261,37 @@ public class Exchange {
         return contexts.get(auctionId);
     }
 
+    /** FR-14 collateral this partner would have to lock for this auction, at the partner's own tier; -1 if not open. */
+    public long depositNeeded(long auctionId, int nodeRef) {
+        Context c = contexts.get(auctionId);
+        String pack = openAuctions.get(auctionId);
+        if (c == null || pack == null) return -1;
+        VerticalPack p = packs.get(pack);
+        return Risk.requiredCollateral(c.cardPriceMinor(), p.collateral().alpha(), p.collateral().gammaRev(),
+                tierOf(pack, nodeRef), p.collateral().minMinor());
+    }
+
+    /** The partner's tier from the exchange's own records, never from the intent or the bid. */
+    public Risk.Tier tierOf(String pack, long nodeRef) {
+        VerticalPack p = packs.get(pack);
+        String k = pack + ":" + nodeRef;
+        return tierFor(deliveries.getOrDefault(k, 0), reputation.get(k), p == null ? Integer.MAX_VALUE : p.establishedAfterDeliveries());
+    }
+
+    /**
+     * COLD_START (φ 2.0) until the partner has {@code threshold} verified deliveries and a tracked reputation no lower
+     * than the cold-start prior; then ESTABLISHED (φ 1.0). ENTERPRISE (φ 0.6) needs a signed enterprise agreement and is
+     * never reached from history alone.
+     */
+    static Risk.Tier tierFor(int verifiedDeliveries, Double trackedReputation, int threshold) {
+        return verifiedDeliveries >= threshold && trackedReputation != null && trackedReputation >= Reputation.PRIOR_UNVERIFIED
+                ? Risk.Tier.ESTABLISHED : Risk.Tier.COLD_START;
+    }
+
+    public int verifiedDeliveries(String pack, int nodeRef) {
+        return deliveries.getOrDefault(pack + ":" + nodeRef, 0);
+    }
+
     public String packOf(long auctionId) {
         return openAuctions.get(auctionId);
     }
@@ -238,14 +301,40 @@ public class Exchange {
     }
 
     public Map<String, PublicKey> publicKeys() {
-        return Map.of(OPERATOR, operatorKey.getPublic(), WITNESS, witnessKey.getPublic());
+        return Map.of(operator.name(), operator.publicKey(), witness.name(), witness.publicKey());
     }
 
-    private static KeyPair ed25519() {
+    /** Waits briefly for a seal still being made by a remote signer, so a reader right after the award sees it. */
+    public void awaitSeal(long auctionId, long timeoutMs) {
+        java.util.concurrent.Future<?> f = pendingSeals.get(auctionId);
+        if (f == null) return;
         try {
-            return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
+            f.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+            // unsealed: the verdict reports it
+        }
+    }
+
+    private static EvidenceSigners.Published localSigner(String name) throws GeneralSecurityException {
+        KeyPair kp = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        EvidenceChain.Signer s = EvidenceChain.local(name, kp.getPrivate());
+        return new EvidenceSigners.Published() {
+            public String name() { return name; }
+
+            public PublicKey publicKey() { return kp.getPublic(); }
+
+            public byte[] sign(byte[] message) throws Exception { return s.sign(message); }
+        };
+    }
+
+    private void seal(String pack, long auctionId, EvidenceChain chain) {
+        try {
+            chain.seal(operator, List.of(witness));
+        } catch (RuntimeException e) {
+            metrics.counter("difme_exchange_seal_failures_total", "pack", pack).increment();
+            LOG.warnf("evidence chain %s left unsealed: %s", chain.id(), e.getMessage());
         }
     }
 
@@ -359,6 +448,7 @@ public class Exchange {
                 chain.append(EvidenceChain.Type.fulfillment, EvidenceChain.Signal.Attested, f);
             }
             learn(r.pack(), e.boughtBy(), 100, s.a(), Reputation.PRIOR_UNVERIFIED);   // delivered: a successful task
+            deliveries.merge(r.pack() + ":" + e.boughtBy(), 1, Integer::sum);
             Fulfilment ok = new Fulfilment(auctionId, true, List.of(), hold, yieldAt);
             fulfilments.put(auctionId, ok);
             metrics.counter("difme_exchange_fulfilments_total", "pack", r.pack()).increment();
@@ -402,9 +492,10 @@ public class Exchange {
             VerticalPack p = packs.get(pack);
             Ranked w = top.get(0);
             CommerceSplit split = CommerceSplit.of(t.listMinor(), t.discountBps(), w.askMinor(), t.feeMinor(), p.guaranteeFundBps());
+            Risk.Tier tier = tierOf(pack, w.nodeRef());
             long collateral = Risk.requiredCollateral(split.a(), p.collateral().alpha(), p.collateral().gammaRev(),
-                    t.partnerTier(), p.collateral().minMinor());
-            award = new Award(w, split, collateral);
+                    tier, p.collateral().minMinor());
+            award = new Award(w, split, collateral, tier);
             // Draw the card price A from the winner's mandate budget (it was checked against the budget at bid time;
             // a concurrent award on the same mandate can still race, so never let it go negative).
             Long mandateId = bound == null ? null : bound.get(w.nodeRef());
@@ -428,9 +519,16 @@ public class Exchange {
                 auth.put("currency", "INR");
                 auth.put("buyerSaves", award.split().buyerSaves());
                 auth.put("collateralMinor", award.collateralMinor());
+                auth.put("winnerTier", award.tier().name());
             }
             chain.append(EvidenceChain.Type.authorization, EvidenceChain.Signal.Deterministic, auth);
-            chain.seal(OPERATOR, operatorKey.getPrivate(), Map.of(WITNESS, witnessKey.getPrivate()));
+            if (sealAsync) {
+                var f = java.util.concurrent.CompletableFuture.runAsync(() -> seal(pack, auctionId, chain), sealer);
+                pendingSeals.put(auctionId, f);
+                f.whenComplete((v, e) -> pendingSeals.remove(auctionId));      // runs at once if already done
+            } else {
+                seal(pack, auctionId, chain);
+            }
         }
         results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award));
         openAuctions.remove(auctionId);

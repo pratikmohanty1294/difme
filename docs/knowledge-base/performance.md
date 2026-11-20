@@ -55,3 +55,7 @@ Same-time `core` runs with the per-process report (main 44687637776 vs branch 44
 The reports controller was the single largest idle CPU consumer in the cluster, writing PolicyReports nobody reads. Next candidates seen in the same report: Cilium's embedded Envoy also runs 4 workers (`wrk:worker_×4`).
 ### Attestation verifier footprint (measured 2026-11-20, release build)
 1.8 MiB binary, 3.7 MiB RSS and 2 threads at idle (one tokio worker via `VERIFIER_WORKER_THREADS`). Pod request/limit 16/64 Mi (was 32/128 Mi, written before the code existed).
+### Temporal history shards (2026-11-20, A/B on wip-mem-batch3)
+The temporal chart 0.62.0 defaults to `numHistoryShards: 512`; each shard keeps its own caches, task queues and timers inside `temporal-history` (151 MiB PSS, 12 threads at idle in the core profile). Dev runs one history pod with a handful of workflows, so 4 shards. The count is fixed when the persistence schema is first set up; production must choose its own (512+) before its first install.
+### Notary footprint (2026-11-20, release build)
+`services/notary`: 1.1 MiB binary, single-threaded tokio runtime. Pod 16/64 Mi like the attestation verifier until measured in-cluster.

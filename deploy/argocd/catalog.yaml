@@ -31,6 +31,7 @@ components:
   - { name: ztunnel,           ns: istio-system,    kind: helm, profile: security, wave: -3, pdf: "4.4", repo: https://blob.istio.io/istio-release/charts, chart: ztunnel, version: 1.32.0 }
   - { name: istio-config,      ns: istio-system,    kind: path, profile: security, wave: -2, pdf: "4.4" }
   - { name: attestation,       ns: security,        kind: path, profile: security, wave: 2,  pdf: "11.1" }
+  - { name: notary,            ns: security,        kind: path, profile: security, wave: 1,  pdf: "ADR-020" }
   - { name: keycloak,          ns: security,        kind: path, profile: security, wave: 0,  pdf: "4.1/ADR-010" }
 
   # ── Layers 3–5 · Core, workflow, OLTP data (profile: core) ─────────────────

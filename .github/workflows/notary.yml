@@ -1,0 +1,14 @@
+# The evidence notary (independent witness): locked build and its tests.
+name: notary
+on:
+  push: { branches: [main, "wip-*"], paths: ["services/notary/**", ".github/workflows/notary.yml"] }
+  pull_request: { paths: ["services/notary/**"] }
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo test (locked)
+        working-directory: services/notary
+        run: cargo test --locked

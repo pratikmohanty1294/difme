@@ -29,6 +29,7 @@ price_basis:                       # what "ask" and "max acceptable" mean for th
 reputation:                        # FR-16 value-weighted asymmetric EWMA, tracked by the exchange per partner
   alpha_base: 0.10                 # learning rate before value weighting (kernel default)
   reference_minor: 5000000         # V_ref ₹50,000: a task this size moves the score by α·ln 2 (owner to confirm)
+  established_after_deliveries: 3  # FR-14 tier: COLD_START (φ 2.0) until 3 verified deliveries with reputation ≥ 80, then ESTABLISHED
 slashing:                          # FR-15 β_fault overrides (v4.1)
   iso_51_bps: 200                  # insufficient funds / over-commitment: 2 % of A
   other_decline_bps: 50            # other declines: 0.5 % of A

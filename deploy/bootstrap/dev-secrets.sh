@@ -97,4 +97,5 @@ for n in streaming lakehouse; do
   secret $n flink-s3 access-key="$S3_KEY" secret-key="$S3_SECRET"
 done
 secret streaming     bulk-db password="$YB"
+secret security      notary-key seed="$(head -c 32 /dev/urandom | base64)"   # the notary's own Ed25519 seed, never shared with the exchange
 echo "Dev secrets ready. Read one with: kubectl -n <ns> get secret <name> -o jsonpath='{.data.<key>}' | base64 -d"

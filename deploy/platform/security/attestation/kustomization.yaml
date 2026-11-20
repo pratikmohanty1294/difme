@@ -1,1 +1,3 @@
-resources: [veraison.yaml, verifier.yaml]
+# verifier.yaml (DIFME attestation-verifier) is left out until its code exists: there is no source or image yet
+# (owner decision 2026-11-20). Veraison runs alone.
+resources: [veraison.yaml]

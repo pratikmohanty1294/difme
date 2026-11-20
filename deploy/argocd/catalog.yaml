@@ -21,7 +21,7 @@ components:
   - { name: fleet-bundles,     ns: kube-system,     kind: path, profile: base, wave: -5, pdf: "4.1" }
 
   # ── Security / zero trust (profile: security) ──────────────────────────────
-  - { name: openbao,           ns: security,        kind: helm, profile: security, wave: -4, pdf: "5.8", repo: https://openbao.github.io/openbao-helm, chart: openbao, version: 0.8.1 }
+  - { name: openbao,           ns: security,        kind: helm, profile: security, wave: -4, pdf: "5.8", repo: https://openbao.github.io/openbao-helm, chart: openbao, version: 0.30.7 }   # OpenBao 2.7.2: static seal + self-init (2.4+)
   - { name: spire-crds,        ns: security,        kind: helm, profile: security, wave: -5, pdf: "5.8", repo: https://spiffe.github.io/helm-charts-hardened, chart: spire-crds, version: 0.5.0 }
   - { name: spire,             ns: security,        kind: helm, profile: security, wave: -4, pdf: "5.8", repo: https://spiffe.github.io/helm-charts-hardened, chart: spire, version: 0.24.1 }
   - { name: warpgate,          ns: security,        kind: path, profile: security, wave: -3, pdf: "5.8" }

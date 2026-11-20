@@ -494,6 +494,17 @@ public class Exchange {
         return results.get(auctionId);
     }
 
+    public Execution execution(long auctionId) {
+        return executions.get(auctionId);
+    }
+
+    private final SimParties simParties = new SimParties(this);
+
+    /** The simulated merchant and carrier (dev and verification clusters only; see ExchangeResource.simDelivery). */
+    SimParties simParties() {
+        return simParties;
+    }
+
     public boolean isOpen(long auctionId) {
         return openAuctions.containsKey(auctionId);
     }

@@ -229,6 +229,29 @@ class ExchangeResourceTest {
                 .body("verdict.hashes", equalTo(true));
     }
 
+    /** Dev clusters: the simulated merchant and carrier sign a proof the exchange checks like a real one. */
+    @Test
+    void simulatedPartiesDeliverAnExecutedOrder() throws Exception {
+        given().post("/v1/exchange/auctions/987654322/sim/delivery").then().statusCode(409);
+        long id = given().contentType(ContentType.JSON).body(intent(900, 9_500_000))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body(bid(51, 400_000, 95, 5_000, 6_000_000))
+                .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) {
+            Thread.sleep(20);
+        }
+        given().post("/v1/exchange/auctions/" + id + "/sim/delivery").then().statusCode(409);     // not executed yet
+        given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-7\"}")
+                .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(200).body("fulfilled", equalTo(true));
+        given().post("/v1/exchange/auctions/" + id + "/sim/delivery").then().statusCode(200)
+                .body("verified", equalTo(true))
+                .body("escrow.releasedMinor", equalTo(8_100_000));                               // A + fee F
+        given().post("/v1/exchange/auctions/" + id + "/sim/delivery").then().statusCode(200).body("verified", equalTo(true));
+        given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200)
+                .body("artifacts.type", hasItem("fulfillment"));
+    }
+
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
                                               long amount, long deliveredAt) throws Exception {
         var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",

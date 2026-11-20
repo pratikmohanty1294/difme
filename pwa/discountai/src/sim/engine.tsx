@@ -314,6 +314,16 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         const ok = ev.verdict.hashes && ev.verdict.links && ev.verdict.seal && ev.verdict.witnesses;
         dispatch({ type: 'patchRequest', id, patch: { chainValid: ok } });
         step('Compliance', ok ? 'Evidence chain verified (hashes, links, operator seal, witness)' : `Evidence chain did not verify: ${ev.verdict.notes.join('; ')}`, 'POC');
+        // Delivery: merchant invoice + carrier event, each signed by its own registered key and checked by the exchange.
+        // Fee F is released now; yield Y only after the pack's return window.
+        const f = await exchange.simDelivery(opened.auctionId);
+        if (!f.verified) return step('Compliance', `Proof of delivery refused: ${f.problems.join('; ')}`, 'POC');
+        const releaseAt = new Date(f.yieldReleaseAtMs).toISOString();
+        dispatch({ type: 'patchRequest', id, patch: { trackingId: `TRK-${opened.auctionId}`, payoutPlan: {
+          tier: r.award.tier === 'COLD_START' ? 0 : 1, principal: split.A, yield: split.Y, principalTo: `node-${e.boughtBy}`,
+          principalPaidAt: new Date().toISOString(), releaseAt } } });
+        step('Merchant', `Delivered · signed invoice and carrier event verified`, 'POC',
+          `fee ${inr(split.F)} released · yield ${inr(split.Y)} releases ${new Date(f.yieldReleaseAtMs).toLocaleDateString('en-IN')} after the return window`);
       } catch (err) {
         fail(err instanceof ExchangeError ? (err.status === 0 ? 'The exchange is unreachable; nothing was charged' : `Refused by the exchange: ${err.message}`) : String(err));
       }

@@ -6,7 +6,6 @@ metadata:
   labels:
     app: quarkus-cmd-svc
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: quarkus-cmd-svc

@@ -61,6 +61,12 @@
 - Fix: the Rollouts moved into a `canary-gates` component in the observability profile.
 - Also: `kubectl rollout restart` on an Argo-managed Deployment adds an annotation that self-heal reverts, which leaves another ReplicaSet behind. Delete the pods instead.
 
+### Argo Rollouts and Argo CD fought over the Deployment's `replicas` (found 2026-11-20)
+- **Symptom:** with core + observability, a `quarkus-cmd-svc` pod from the Deployment's own ReplicaSet was started and killed about once a minute. It never got as far as listening on 8080 (readiness: connection refused). `canary-gates` and `core-services` stayed `Progressing`, and the profile timed out.
+- **Root cause:** the Rollout uses `workloadRef` with `scaleDown: progressively`, so Argo Rollouts scales the referenced Deployment to 0. The generated Deployment declared `replicas: 1`, and Argo CD self-heal set it back each time.
+- **Fix:** services with `rollout: true` in `core-services/services.yaml` leave `replicas` out of the Deployment, as KEDA-scaled services already do. The API default of 1 still applies when no Rollout exists (core alone).
+- **Rule:** a field that another controller writes (HPA/KEDA, Argo Rollouts) must not be declared in the Git manifest of a self-healing app.
+
 ### First real streaming install: seven defects, about 50 min lost (found 2026-11-18)
 - **Kyverno cost labels:** `require-labels-and-limits` rejected every third-party operator in `streaming` (Strimzi, KEDA, Apicurio, Flink, RisingWave). Fix: a mutate rule in `mutate-defaults.yaml` adds `difme/team: platform`, `business.metric: shared-infra` only where missing.
 - **`$(VAR)` env references:** `no-plaintext-secrets` treated `RW_SQL_PASSWORD: $(RW_POSTGRES_PASSWORD)` (a reference to a Secret-backed variable) as a literal. The pattern now allows `'\$(*)'`. The `\$` escapes Kyverno's own `$(...)` syntax.

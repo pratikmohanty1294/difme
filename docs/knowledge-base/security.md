@@ -39,3 +39,8 @@
 - **Symptom:** after the security profile installed, every pod in core-platform and temporal failed its probes ("context deadline exceeded") and was restarted by its liveness probe; istio-cni stayed Progressing.
 - **Root causes (Istio's Cilium prerequisites, none applied):** kubelet probes into ambient pods are SNAT-ed to 169.254.7.127, which our default-deny Cilium policies dropped; Cilium's exclusive CNI mode removes istio-cni's chained plugin; istio-cni looked for the CNI config in /etc/cni/net.d, but k3s keeps it under /var/lib/rancher/k3s/agent/etc/cni/net.d.
 - **Fix (owner decision: keep Istio ambient):** `istio-config/allow-ambient-probes.yaml` (CiliumClusterwideNetworkPolicy from 169.254.7.127/32, `enableDefaultDeny` off so it only adds an allow); Cilium `cni.exclusive: false`; istio-cni `global.platform: k3d`.
+
+### Helper Jobs in DIFME service namespaces (2026-11-20)
+- **Symptom:** a PostSync hook Job (kubectl rollout restart) never ran; as a plain Job it failed the whole security sync.
+- **Cause:** Kyverno: pod templates need `difme/team` + `business.metric`; in core-platform, quinn-hub and back-office-ui only DIFME-pipeline images are admitted (registry.k8s.io/kubectl is not).
+- **Fix:** run platform helper Jobs in `security` with the labels, and grant a narrow Role in the target namespace. Check `kubectl -n argocd get application <app> -o jsonpath='{.status.operationState.message}'` when a hook silently doesn't run.

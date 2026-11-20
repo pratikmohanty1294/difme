@@ -164,19 +164,20 @@ results are in each run's log (streamed live, kept even if the run dies). Re-dis
 **Merged to main today:** formio open-source shim; cmd-svc replicas left to the canary Rollout (observability ✅);
 Actions parity (gates on `wip-*` pushes, properties gate, `measure` input); owner rules/decisions log
 (`docs/knowledge-base/owner-decisions.md`); Fluxnova TCP probe; formio inputmask 5.0.9 pin; formio VM bundle build;
-backoffice writable /tmp (backoffice ✅).
+backoffice writable /tmp (backoffice ✅); platform-ops fixes incl. Harbor on the shared Postgres (platform-ops ✅);
+cluster-verify Summary-step fix (runs had been marked failed when no baseline ran: read the per-profile CONVERGED lines).
 
-**Verified converged:** base, core, observability, backoffice.
+**Verified converged:** base, core, observability, backoffice, platform-ops.
 
 **In flight — branch → what it fixes → verify run → next action**
 | Branch | Fix | Run | When green |
 |---|---|---|---|
 | main (formio VM bundles) | process profile | `core,process` queued after the main image build | process ✅ |
 | `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`); verify-profile diagnostics | 44682308371 `core,streaming,lakehouse,ml` | merge; then extras (`streaming-extra`, `lakehouse-extra`) |
-| `wip-platform-ops` | Harbor stable secrets + DB on shared Postgres; Velero no CRD job; k6 labels | 44682469612 `core,platform-ops` | merge |
 | `wip-security-dev` | OpenBao 1 replica, static seal, self-init; SPIRE hooks off + insecureSkipVerify; istio-system privileged; Veraison stores; verifier out | 44682927471 `core,security` | merge; then `hub` stays blocked (no code) |
 | `wip-tb-memory` | TigerBeetle 2151 → 1356 MiB (measured) | A/B 44683333718 (main) vs 44683336388 (branch), both `core` + `measure 200 60s` | merge only if throughput/latency don't regress |
 | `wip-proc-report` | `ci/proc-report.sh`: per-process/thread memory after each profile | 44683717857 `core,observability,backoffice`, 44683720991 `core,streaming` | rank savings; propose JVM ActiveProcessorCount, GOMAXPROCS/GOMEMLIMIT, MALLOC_ARENA_MAX, UV_THREADPOOL_SIZE batches; A/B each |
+| `wip-rails` | exchange-rails: 5 FR-01 rail ports + simulators, failover with FR-15 slashing; next: wire into exchange-svc (`/execute`) | core-services gate on push | merge when green |
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |
 
 **Waiting on the owner:** PC memory notes + session logs upload (to complete `owner-decisions.md`); canary SLO

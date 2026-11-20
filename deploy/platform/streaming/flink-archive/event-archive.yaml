@@ -23,5 +23,4 @@ spec:
             - { name: AWS_REGION, value: local }
   jobManager: { resource: { memory: 768m, cpu: 0.2 } }
   taskManager: { resource: { memory: 1024m, cpu: 0.3 } }
-  job: { jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar, entryClass: dev.difme.flink.archive.EventArchiveJob, parallelism: 1, upgradeMode: savepoint,
-         state: suspended }   # needs the lakehouse Iceberg catalog (Polaris); resume when lakehouse is installed
+  job: { jarURI: local:///opt/flink/usrlib/difme-flink-jobs.jar, entryClass: dev.difme.flink.archive.EventArchiveJob, parallelism: 1, upgradeMode: savepoint }   # runs with the lakehouse profile, which provides the Polaris Iceberg catalog

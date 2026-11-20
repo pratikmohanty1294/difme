@@ -4,3 +4,4 @@ trino
 starrocks
 superset
 analytics-jobs
+flink-archive

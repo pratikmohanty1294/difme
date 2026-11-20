@@ -121,3 +121,9 @@
 - **Velero `upgrade-crds` Job never started:** it runs `/bin/sh` inside the kubectl image, and our replacement (`registry.k8s.io/kubectl`) is distroless (same trap as the Kyverno cleanup jobs above). **Fix:** `upgradeCRDs: false`; the chart's `crds/` are applied by Argo CD on every sync.
 - **k6-operator blocked by `require-labels-and-limits`:** the `k6` namespace is validated for cost labels (for our load-test Jobs) but was missing from the default-labels mutate rule. **Fix:** `k6` added to `default-cost-attribution-labels`.
 - **Follow-up, same day:** with stable secrets there was one ReplicaSet, yet the migration was still dirty at version 1: Harbor's first migration fails on YugabyteDB itself. **Fix (owner decision):** Harbor's database is on the shared Postgres (ADR-019 amendment). Note: `postgres-docdb` init scripts run on first boot only; an existing cluster needs the `harbor` role and database created by hand once (and `dev-secrets.sh` re-run for the `database-tier/harbor-db` Secret).
+
+### A suspended FlinkDeployment never reports Healthy, so its app never converges (cluster-verify 2026-11-20)
+- **Symptom:** streaming timed out with every pod Ready; only `flink-jobs` stayed Progressing. The new verify diagnostics showed `FlinkDeployment streaming/event-archive Progressing: Waiting for Flink operator`.
+- **Root cause:** event-archive was parked with `job.state: suspended` until the lakehouse existed. A suspended FlinkDeployment is never deployed, so Argo CD's health check keeps it Progressing.
+- **Fix:** event-archive moved to its own component `flink-archive` in the **lakehouse** profile (after Polaris) and runs there; `flink-jobs` keeps fraud-cep only.
+- **Rule:** don't park workloads in a suspended state inside a profile that must converge; put them in the profile that provides their dependencies.

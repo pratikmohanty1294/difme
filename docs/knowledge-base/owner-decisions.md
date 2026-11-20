@@ -67,5 +67,6 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Carried-over pending items
 - Measure the memory saving of running payments + tools on the shared Postgres instead of YugabyteDB (owner asked for numbers before any move).
 - Resume `event-archive` once the lakehouse profile (Polaris) is up.
+- ~~Resume `event-archive` once the lakehouse profile (Polaris) is up.~~ Done 2026-11-20: it moved to the lakehouse profile (`flink-archive`).
 - A startup smoke test for config parsing (the `.properties` inline-comment crash only showed at runtime).
 - The Makefile `build` and `test` targets still name `services/hub`, `services/attestation` and `edge/core`, which don't exist yet.

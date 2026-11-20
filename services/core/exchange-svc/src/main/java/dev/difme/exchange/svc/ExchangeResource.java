@@ -50,6 +50,7 @@ public class ExchangeResource {
     public Response mandate(@PathParam("pack") String packId, Mandate m) {
         VerticalPack pack = exchange.pack(packId);
         if (pack == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        if (m == null) return Response.status(400).entity(Map.of("error", "a mandate body is required")).build();
         if (!pack.rules().decisionIds().contains("mandate_validation")) {
             return Response.status(400).entity(Map.of("error", "this vertical takes no mandates")).build();
         }
@@ -78,6 +79,7 @@ public class ExchangeResource {
     public Response intent(@PathParam("pack") String packId, Intent in) {
         VerticalPack pack = exchange.pack(packId);
         if (pack == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        if (in == null) return Response.status(400).entity(Map.of("error", "an intent body is required")).build();
         if (in.listMinor() <= 0 || in.discountBps() <= 0 || in.discountBps() >= 10_000 || in.feeMinor() < 0) {
             return Response.status(400).entity(Map.of("error", "listMinor > 0, 0 < discountBps < 10000, feeMinor >= 0")).build();
         }
@@ -110,6 +112,7 @@ public class ExchangeResource {
     @POST
     @Path("/auctions/{id}/bids")
     public Response bid(@PathParam("id") long auctionId, Bid b) {
+        if (b == null) return Response.status(400).entity(Map.of("error", "a bid body is required")).build();
         if (!exchange.isOpen(auctionId)) return Response.status(409).entity(Map.of("error", "auction not open")).build();
         VerticalPack pack = exchange.pack(exchange.packOf(auctionId));
         Exchange.Context ctx = exchange.context(auctionId);

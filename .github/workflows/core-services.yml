@@ -1,8 +1,8 @@
 # Builds and tests the Quarkus core (Java 25) and enforces the Semgrep purity gate (PDF §4.5, §9).
 name: core-services
 on:
-  push: { branches: [main, "wip-*"], paths: ["services/core/**", "api/proto/**", "policies/semgrep/**", ".github/workflows/core-services.yml"] }
-  pull_request: { paths: ["services/core/**", "api/proto/**", "policies/semgrep/**"] }
+  push: { branches: [main, "wip-*"], paths: ["services/core/**", "api/proto/**", "api/openapi/**", "policies/semgrep/**", ".github/workflows/core-services.yml"] }
+  pull_request: { paths: ["services/core/**", "api/proto/**", "api/openapi/**", "policies/semgrep/**"] }
 permissions: { contents: read }
 jobs:
   semgrep:
@@ -27,6 +27,18 @@ jobs:
             echo "::error::inline comment in an application.properties value (put the comment on its own line)"; exit 1
           fi
       - run: mvn -B -ntp -f services/core/pom.xml verify
+      # ADR-014 contract tests: Schemathesis generates requests from the OpenAPI contract and runs them against the
+      # real exchange-svc (in-memory, no cluster needed). Any 5xx fails the build; it found null-body 500s on day one.
+      - name: Contract tests (Schemathesis) against a live exchange-svc
+        run: |
+          java --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED -jar services/core/exchange-svc/target/quarkus-app/quarkus-run.jar > /tmp/exchange-svc.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf localhost:8089/q/health/ready >/dev/null && break; sleep 1; done
+          pip install -q --break-system-packages schemathesis==4.32.7
+          st --config-file api/openapi/schemathesis.toml run api/openapi/difme.openapi.yaml --url http://localhost:8089 \
+            --include-path-regex '^/v1/exchange' --checks not_a_server_error --max-examples 30
+      - name: exchange-svc log on failure
+        if: failure()
+        run: grep -E 'ERROR|Caused by' /tmp/exchange-svc.log | tail -40 || true
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: surefire-reports, path: "services/core/*/target/surefire-reports/", if-no-files-found: ignore }

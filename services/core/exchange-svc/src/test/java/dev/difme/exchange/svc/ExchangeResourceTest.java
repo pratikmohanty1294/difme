@@ -93,6 +93,14 @@ class ExchangeResourceTest {
         org.junit.jupiter.api.Assertions.assertEquals(422, auctionWithMandate(mandateId));   // 8,000 < A: BUDGET_EXHAUSTED
     }
 
+    /** Found by Schemathesis (ADR-014): a JSON null body was a NullPointerException, i.e. HTTP 500. */
+    @Test
+    void nullBodiesAreBadRequestsNotServerErrors() {
+        given().contentType(ContentType.JSON).body("null").post("/v1/exchange/fr01-buy/intents").then().statusCode(400);
+        given().contentType(ContentType.JSON).body("null").post("/v1/exchange/fr01-buy/mandates").then().statusCode(400);
+        given().contentType(ContentType.JSON).body("null").post("/v1/exchange/auctions/1/bids").then().statusCode(400);
+    }
+
     @Test
     void unknownPackIs404() {
         given().contentType(ContentType.JSON).body(intent(900, 9_500_000))

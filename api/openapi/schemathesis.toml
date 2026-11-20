@@ -1,0 +1,4 @@
+# ADR-014 contract tests (Schemathesis): generated from difme.openapi.yaml, run against a live exchange-svc in CI.
+# The live pack, so generated requests reach the real logic instead of 404 on random pack names.
+[parameters]
+pack = "fr01-buy"

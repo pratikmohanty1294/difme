@@ -67,3 +67,4 @@ Marquez 0.50 API (`-Xmx256m`, SerialGC) 187 MiB PSS + web UI 51 MiB, on the shar
 - One 15 s window is too noisy for disk I/O of bursty processes (Flink): use the since-start average.
 - Second A/B: fraud-cep incremental RocksDB checkpoints gave no benefit and the JobManager looked restarted (8.7 vs 2.0 MB/s); dropped. The process report runs right after convergence, so measure idle disk I/O only after a settle period.
 - YugabyteDB single-node idle chatter (~270–350 KB/s each way, tserver↔master): not heartbeats (1→3 s no change) and not tablet count (1 tablet/table: traffic slightly up, CPU within noise). Both reverted. Next step: read YB's per-RPC metrics before changing flags.
+- Temporal SQL pools 20+10 → 5+3 per service: −44 MiB Postgres PSS but accepted throughput −45 % and p99 +46 % (connection starvation under load). Dropped. Lineage: Flink job-status events reach Marquez (`fraud-cep` in namespace difme); the dbt check run did not complete (open).

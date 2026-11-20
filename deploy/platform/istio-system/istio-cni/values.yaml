@@ -1,4 +1,5 @@
 profile: ambient
-# k3s keeps the CNI config in /var/lib/rancher/k3s/agent/etc/cni/net.d (Istio's k3d platform profile); with the default
-# /etc/cni/net.d istio-cni never found the primary (Cilium) config and stayed not ready (cluster-verify 2026-11-20).
-global: { platform: k3d }
+# CNI paths: the chart defaults (/etc/cni/net.d, /opt/cni/bin) are where Cilium writes on our k3d node; the node listing
+# in cluster-verify 44708558896 showed /etc/cni/net.d/05-cilium.conflist and an empty k3s dir, so the `platform: k3d`
+# profile (k3s dirs) pointed istio-cni at nothing. Readiness also needs Cilium's cni.exclusive=false, or Cilium keeps
+# removing istio-cni's chained entry from its conflist (deploy/platform/kube-system/cilium/values.yaml).

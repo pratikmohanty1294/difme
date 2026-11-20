@@ -70,5 +70,35 @@ server:
             }
           }
         }
+        initialize "evidence-transit" {
+          # Evidence custody (decided 2026-11-20): the exchange's operator seal key lives here, non-exportable;
+          # exchange-svc may sign and read the public key, nothing else.
+          request "mount-transit" {
+            operation = "update"
+            path = "sys/mounts/transit"
+            data = { type = "transit" }
+          }
+          request "evidence-key" {
+            operation = "update"
+            path = "transit/keys/evidence-operator"
+            data = { type = "ed25519", exportable = false, allow_plaintext_backup = false }
+          }
+          request "evidence-policy" {
+            operation = "update"
+            path = "sys/policies/acl/exchange-evidence"
+            data = { policy = "path \"transit/sign/evidence-operator\" { capabilities = [\"update\"] }\npath \"transit/keys/evidence-operator\" { capabilities = [\"read\"] }" }
+          }
+          request "evidence-role" {
+            operation = "update"
+            path = "auth/kubernetes/role/exchange-evidence"
+            data = {
+              bound_service_account_names = ["exchange-svc"]
+              bound_service_account_namespaces = ["core-platform"]
+              audience = "vault"
+              token_policies = ["exchange-evidence"]
+              token_ttl = "1h"
+            }
+          }
+        }
 injector: { enabled: true }
 csi: { enabled: true }

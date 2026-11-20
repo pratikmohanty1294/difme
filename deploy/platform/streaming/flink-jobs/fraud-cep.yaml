@@ -14,6 +14,11 @@ spec:
     execution.checkpointing.savepoint-dir: s3://flink/savepoints/fraud-cep   # required by upgradeMode: savepoint
     s3.endpoint: http://seaweedfs-s3.lakehouse.svc:8333
     s3.path.style.access: "true"
+    # Lineage to Marquez (lakehouse-extra); when it isn't installed the posts fail and are logged.
+    execution.job-status-changed-listeners: io.openlineage.flink.listener.OpenLineageJobStatusChangedListenerFactory
+    openlineage.transport.type: http
+    openlineage.transport.url: http://marquez.governance.svc:5000
+    openlineage.job.namespace: difme
   serviceAccount: flink
   podTemplate:
     spec:

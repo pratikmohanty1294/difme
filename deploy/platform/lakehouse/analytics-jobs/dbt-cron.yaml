@@ -13,5 +13,9 @@ spec:
           containers:
             - name: dbt
               image: ghcr.io/pratikmohanty1294/difme-dbt:0.1.0
+              command: [dbt-ol]     # lineage wrapper; runs dbt and posts OpenLineage events (failures are logged, the run continues)
               args: [build, --profiles-dir, /dbt, --project-dir, /dbt]
+              env:
+                - { name: OPENLINEAGE_URL, value: "http://marquez.governance.svc:5000" }
+                - { name: OPENLINEAGE_NAMESPACE, value: difme }
               resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 512Mi } }

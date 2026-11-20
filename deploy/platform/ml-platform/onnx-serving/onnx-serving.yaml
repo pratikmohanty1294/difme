@@ -14,7 +14,7 @@ spec:
           env:
             - { name: MODEL_URI, value: "s3://mlflow/models/fraud/production/model.onnx" }
             - { name: FEAST_URL, value: "http://feast-server:6566" }
-            - { name: WEAVIATE_URL, value: "http://weaviate:80" }
+            - { name: VECTOR_DB_URL, value: "postgresql://ml@postgres-docdb.database-tier.svc:5432/ml" }   # pgvector
             - { name: FLAGD_HOST, value: "flagd.core-platform.svc" }
           ports: [{ containerPort: 8090 }]
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 512Mi } }

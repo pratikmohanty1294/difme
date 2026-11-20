@@ -53,6 +53,9 @@ secret database-tier temporal-db password="$TEMPORAL_PG"
 HARBOR_PG=$(kubectl -n harbor get secret harbor-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true); HARBOR_PG=${HARBOR_PG:-$(rand)}
 secret harbor        harbor-db password="$HARBOR_PG"
 secret database-tier harbor-db password="$HARBOR_PG"
+ML_PG=$(rand)
+secret database-tier ml-db password="$ML_PG"
+secret ml-platform   ml-db password="$ML_PG"
 # Harbor's own secrets, fixed once per cluster: the chart would otherwise re-randomise them on every Argo CD render
 # (its lookup() sees nothing), rolling harbor-core mid-migration (cluster-verify 2026-11-20). See harbor/values.yaml.
 secret harbor        harbor-dev-secretkey secretKey="$(rand 16)"

@@ -41,8 +41,6 @@ flink-archive
 datahub
 feast
 mlflow
-weaviate
-onnx-serving
 victoria-metrics
 loki
 tempo

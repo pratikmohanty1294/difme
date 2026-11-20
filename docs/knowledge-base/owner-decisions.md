@@ -25,6 +25,9 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Decided
 | Date | Question | Owner's answer |
 |---|---|---|
+| 2026-11-20 | Argo CD → Flux? | Keep Argo CD. |
+| 2026-11-20 | Istio → Cilium mesh? | Keep Istio ambient (fixed for Cilium the same day). |
+| 2026-11-20 | Kafka: replace Strimzi brokers with `apache/kafka-native`? | Allowed only if no functionality is lost. Before any switch: list everything Strimzi provides today (KRaft node pools, entity/topic operator and KafkaTopic resources, listeners/TLS, metrics, Debezium/Apicurio/Flink/RisingWave/KEDA integrations, rolling upgrades), show each one covered by the replacement, then A/B the footprint. |
 | 2026-11-20 | Harbor fails its first migration on YugabyteDB (it supports PostgreSQL only). Where should its database live? | Shared platform Postgres (ADR-019). |
 | 2026-11-20 | OpenBao is 3-replica HA (unschedulable on one node) and never initialized. How should it run in dev/verification? | 1 Raft replica plus a bootstrap Job (init, unseal with a dev key in a Secret, PKI mount and Kubernetes auth for SPIRE); HA stays for production overlays. |
 | 2026-11-20 | attestation-verifier has no source and no image yet. What until the code exists? | Take it out of the security profile for now (Veraison stays); it returns with its code. |
@@ -53,8 +56,6 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-20 | FR-01 return window before the yield Y is released | `return_window_days: 7` placeholder in `verticals/fr01-buy/vertical.yaml`. |
 | 2026-11-20 | FR-16 reputation: cold start and V_ref | The exchange now learns reputation from outcomes (fault-driven decline = failed task, verified delivery = success) and ranks known partners on it. Open: should a partner with no history use a fixed prior (80) instead of its self-reported value, and is V_ref ₹50,000 right for FR-01? |
 | 2026-11-19 | v4.1 money letters | A charged at the merchant, B = A + Y + F paid by the buyer; the PRD has them swapped. |
-| 2026-11-19 | Istio → Cilium mesh; Argo CD → Flux | Footprint candidates (status.md, next step 2). |
-| 2026-11-19 | Kafka: `apache/kafka-native` vs Strimzi brokers | kafka-native can't run under Strimzi; adopting it means a plain StatefulSet broker. |
 
 ## Product requirement context (owner's questions, 2026-11-17)
 `docs/GOALS.md` still says "product goals: to be defined by the owner". The owner's research questions show the direction of DIFME/DiscountAI (ADR-020):

@@ -54,11 +54,87 @@ paths:
       parameters: [{ name: accountId, in: path, required: true, schema: { $ref: "#/components/schemas/Uuid7" } }]
       responses:
         "200": { description: "Ledger balance (strict, from TigerBeetle)", content: { application/json: { schema: { $ref: "#/components/schemas/Balance" } } } }
+  # ---- DiscountAI exchange (ADR-020; FR-01 pack first). Idempotency-Key is enforced at the gateway (PDF §9). ----
+  /v1/exchange/{pack}/intents:
+    post:
+      operationId: openIntent
+      summary: Open a sealed-bid auction for a buyer intent after the pack's eligibility rules (embedded DMN)
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/Pack" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExchangeIntent" } } } }
+      responses:
+        "202": { description: Auction open, content: { application/json: { schema: { $ref: "#/components/schemas/IntentOpened" } } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { $ref: "#/components/responses/ExchangeError" }
+        "422": { $ref: "#/components/responses/ExchangeError" }
+        "503": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/{pack}/mandates:
+    post:
+      operationId: registerMandate
+      summary: Register a buying partner's standing mandate (deposit requirement computed by the exchange)
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/Pack" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Mandate" } } } }
+      responses:
+        "201": { description: Registered, content: { application/json: { schema: { $ref: "#/components/schemas/MandateRegistered" } } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { $ref: "#/components/responses/ExchangeError" }
+        "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/auctions/{auctionId}/bids:
+    post:
+      operationId: placeBid
+      summary: Place a sealed bid (bid-time eligibility against exchange-supplied facts)
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AuctionId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Bid" } } } }
+      responses:
+        "202": { description: Bid accepted into the window }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { $ref: "#/components/responses/ExchangeError" }
+        "409": { $ref: "#/components/responses/ExchangeError" }
+        "422": { $ref: "#/components/responses/ExchangeError" }
+        "503": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/auctions/{auctionId}:
+    get:
+      operationId: getAuction
+      security: [{ oauth2: [exchange:read] }]
+      parameters: [{ $ref: "#/components/parameters/AuctionId" }]
+      responses:
+        "200": { description: "The result (ranking, award) or {auctionId, status: OPEN}", content: { application/json: { schema: { $ref: "#/components/schemas/AuctionResult" } } } }
+        "404": { description: Unknown auction }
+  /v1/exchange/auctions/{auctionId}/execute:
+    post:
+      operationId: executeAward
+      summary: Carry out the award over the rails (ADR-018) — escrow hold of B, silent failover with FR-15 slashing, principal release; once per auction
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AuctionId" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [merchantId], properties: { merchantId: { type: string, minLength: 1 } } } } } }
+      responses:
+        "200": { description: Execution outcome (repeat calls return the first outcome), content: { application/json: { schema: { $ref: "#/components/schemas/Execution" } } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { description: Unknown auction }
+        "409": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/auctions/{auctionId}/evidence:
+    get:
+      operationId: getEvidence
+      summary: The auction's hash-linked, Ed25519-sealed evidence chain and a fresh verification verdict
+      security: [{ oauth2: [exchange:read] }]
+      parameters: [{ $ref: "#/components/parameters/AuctionId" }]
+      responses:
+        "200": { description: Evidence chain, content: { application/json: { schema: { type: object, properties: { chain: { type: string }, sealed: { type: boolean }, artifacts: { type: array, items: { type: object } }, verdict: { type: object } } } } } }
+        "404": { description: Unknown auction }
+  /v1/exchange/keys:
+    get:
+      operationId: getEvidenceKeys
+      summary: Public keys for independent verification of evidence seals (X.509 SubjectPublicKeyInfo, base64)
+      security: [{ oauth2: [exchange:read] }]
+      responses:
+        "200": { description: Key name to key, content: { application/json: { schema: { type: object, additionalProperties: { type: string } } } } }
 components:
   securitySchemes:
     oauth2:
       type: oauth2
-      flows: { clientCredentials: { tokenUrl: https://idp.difme.local/oauth2/token, scopes: { payments:write: create payments, payments:read: read payments, accounts:read: read accounts } } }
+      flows: { clientCredentials: { tokenUrl: https://idp.difme.local/oauth2/token, scopes: { payments:write: create payments, payments:read: read payments, accounts:read: read accounts, exchange:write: open intents and mandates and bid and execute awards, exchange:read: read auctions and evidence } } }
   parameters:
     IdempotencyKey:
       name: Idempotency-Key
@@ -70,6 +146,16 @@ components:
       in: header
       required: false
       schema: { type: string, pattern: "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$" }
+    Pack:
+      name: pack
+      in: path
+      required: true
+      schema: { type: string, pattern: "^fr0[1-9]-[a-z]+$" }
+    AuctionId:
+      name: auctionId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, maximum: 9007199254740991 }
   schemas:
     Uuid7:
       type: string
@@ -129,10 +215,109 @@ components:
         postedMinor: { type: integer, format: int64 }
         pendingMinor: { type: integer, format: int64 }
         currency: { type: string }
+    ExchangeIntent:
+      type: object
+      required: [riskScore, listMinor, discountBps, feeMinor, maxPriceMinor]
+      properties:
+        riskScore: { type: number, minimum: 0, maximum: 1000 }
+        offerSanctioned: { type: boolean }
+        listMinor: { type: integer, format: int64, minimum: 1 }
+        discountBps: { type: integer, minimum: 1, maximum: 9999 }
+        feeMinor: { type: integer, format: int64, minimum: 0 }
+        maxPriceMinor: { type: integer, format: int64, minimum: 1 }
+        partnerTier: { type: string, enum: [COLD_START, ESTABLISHED, ENTERPRISE] }
+    IntentOpened:
+      type: object
+      properties:
+        auctionId: { type: integer, format: int64 }
+        maxYieldMinor: { type: integer, format: int64, description: "Y_max = d·P − F − 1" }
+        findings: { type: array, items: { $ref: "#/components/schemas/Finding" } }
+    Finding:
+      type: object
+      properties: { code: { type: string }, severity: { type: string, enum: [BLOCK, WARN, INFO] }, message: { type: string } }
+    Mandate:
+      type: object
+      required: [partnerRef, limitMinor, maxPerOrderMinor, budgetTotalMinor, validityDays]
+      properties:
+        partnerRef: { type: string }
+        limitMinor: { type: integer, format: int64 }
+        maxPerOrderMinor: { type: integer, format: int64 }
+        minYieldPct: { type: number, minimum: 0 }
+        depositMinor: { type: integer, format: int64 }
+        budgetTotalMinor: { type: integer, format: int64 }
+        merchantCount: { type: integer }
+        goodsCount: { type: integer }
+        validityDays: { type: integer }
+        cardJurisdiction: { type: string }
+    MandateRegistered:
+      type: object
+      properties:
+        mandateId: { type: integer, format: int64 }
+        depositRequiredMinor: { type: integer, format: int64 }
+        findings: { type: array, items: { $ref: "#/components/schemas/Finding" } }
+    Bid:
+      type: object
+      required: [nodeRef, askMinor, reputation, latencyMicros]
+      properties:
+        nodeRef: { type: integer }
+        askMinor: { type: integer, format: int64, description: Yield Y asked by the buying partner }
+        reputation: { type: number, minimum: 0, maximum: 100 }
+        latencyMicros: { type: integer, format: int64 }
+        partner:
+          type: object
+          properties:
+            flow: { type: string, enum: [A, B, C] }
+            intentAgeDays: { type: integer }
+            depositMinor: { type: integer, format: int64 }
+            budgetLeftMinor: { type: integer, format: int64 }
+            merchantApproved: { type: boolean }
+            goodsInScope: { type: boolean }
+            maxPerOrderMinor: { type: integer, format: int64 }
+            validityDays: { type: integer }
+            mandateId: { type: integer, format: int64 }
+    AuctionResult:
+      type: object
+      properties:
+        auctionId: { type: integer, format: int64 }
+        status: { type: string, enum: [OPEN] }
+        pack: { type: string }
+        ranked: { type: integer }
+        top: { type: array, items: { type: object, properties: { nodeRef: { type: integer }, askMinor: { type: integer, format: int64 }, score: { type: number } } } }
+        award:
+          type: object
+          properties:
+            collateralMinor: { type: integer, format: int64 }
+            split: { type: object, description: "Conservation identity: A = P − d·P; B = A + Y + F; buyer saves P − B", additionalProperties: { type: integer, format: int64 } }
+    Execution:
+      type: object
+      properties:
+        auctionId: { type: integer, format: int64 }
+        merchantId: { type: string }
+        boughtBy: { type: integer, format: int64, description: "-1 when no partner could buy" }
+        fulfilled: { type: boolean }
+        slashedMinor: { type: integer, format: int64 }
+        attempts:
+          type: array
+          items:
+            type: object
+            properties:
+              partnerId: { type: integer, format: int64 }
+              responseCode: { type: string, description: ISO 8583 field 39 }
+              outcome: { type: string, enum: [APPROVED, DECLINE_FUNDS, DECLINE_OTHER, RETRYABLE] }
+              slashMinor: { type: integer, format: int64 }
+        escrow:
+          type: object
+          properties:
+            holdId: { type: string }
+            heldMinor: { type: integer, format: int64 }
+            releasedMinor: { type: integer, format: int64 }
+            refundedMinor: { type: integer, format: int64 }
+            state: { type: string, enum: [HELD, PARTLY_RELEASED, SETTLED, REFUNDED] }
     Problem:
       type: object
       description: RFC 9457 problem details
       properties: { type: { type: string }, title: { type: string }, status: { type: integer }, detail: { type: string }, traceId: { type: string } }
   responses:
+    ExchangeError: { description: "Error ({error}) or rule findings ({findings})", content: { application/json: { schema: { type: object, properties: { error: { type: string }, findings: { type: array, items: { $ref: "#/components/schemas/Finding" } } } } } } }
     Problem: { description: Error, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
     IdempotencyConflict: { description: Same Idempotency-Key reused with a different body, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }

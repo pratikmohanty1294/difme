@@ -201,5 +201,12 @@ Details are in docs/knowledge-base/.
 5. **Remaining:** profiles live, ADR-014 test suites, CI gates, ADR-017 resilience leftovers.
 
 ## Open questions for the owner
-- `min_minor` collateral floors per vertical (₹500 placeholders).
-- Confirm the v4.1 money letters (A charged at the merchant, B = A + Y + F paid by the buyer); the PRD has them swapped.
+The full list, with context and every decision already made, is in [knowledge-base/owner-decisions.md](knowledge-base/owner-decisions.md):
+- canary SLO thresholds (p99 ≤ 5 ms vs measured 250–330 ms);
+- payment routing, saga vs DIRECT;
+- evidence witness and operator-key custody;
+- collateral V = A and the default partner tier;
+- `min_minor` collateral floors per vertical (₹500 placeholders);
+- the v4.1 money letters (A charged at the merchant, B = A + Y + F paid by the buyer; the PRD has them swapped);
+- Istio → Cilium mesh, Argo CD → Flux;
+- Kafka native image vs Strimzi.

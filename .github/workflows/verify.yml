@@ -1,7 +1,7 @@
 # Fast gates on every push and PR: formal verification, API governance, GitOps manifests.
 name: verify
 on:
-  push: { branches: [main] }
+  push: { branches: [main, "wip-*"] }
   pull_request:
 permissions: { contents: read }
 concurrency: { group: "verify-${{ github.ref }}", cancel-in-progress: true }

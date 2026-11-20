@@ -1,6 +1,6 @@
 name: dbt
 on:
-  push: { branches: [main], paths: ["analytics/dbt/**", ".github/workflows/dbt.yml"] }
+  push: { branches: [main, "wip-*"], paths: ["analytics/dbt/**", ".github/workflows/dbt.yml"] }
   pull_request: { paths: ["analytics/dbt/**"] }
 permissions: { contents: read }
 jobs:

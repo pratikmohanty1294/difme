@@ -1,6 +1,6 @@
 name: flink-jobs
 on:
-  push: { branches: [main], paths: ["analytics/flink-jobs/**", "processes/dmn/**", ".github/workflows/flink-jobs.yml"] }
+  push: { branches: [main, "wip-*"], paths: ["analytics/flink-jobs/**", "processes/dmn/**", ".github/workflows/flink-jobs.yml"] }
   pull_request: { paths: ["analytics/flink-jobs/**", "processes/dmn/**"] }
 permissions: { contents: read }
 jobs:

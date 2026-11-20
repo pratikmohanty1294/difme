@@ -9,7 +9,7 @@
 - Contract-first: change a spec in api/ before changing the code that implements it.
 - Runtime: `make cluster`, then `make up PROFILE=<core|hub|streaming|data|lakehouse|ml|observability|security|backoffice|edge|all>`.
 - Footprint (hard): lowest RAM/CPU/disk/network I/O for the highest throughput and lowest latency. Measure, don't assume: `bash ci/measure.sh RATE DURATION` gives the k6 baseline and per-pod CPU/RAM. A footprint change is kept only if it beats the recorded baseline.
-- Commits and PRs: plain messages, no tool or vendor attribution trailers. No assistant-instruction files (e.g. CLAUDE.md) in the repo.
+- Commits and PRs: plain messages, no tool or vendor attribution trailers, and no company or vendor references anywhere in the repo. No assistant-instruction files (e.g. CLAUDE.md) in the repo.
 - Privacy: never put personal data (names, emails) in code, commits, URLs or requests to outside services.
-- Dev loop: verify in the Codespace before pushing (`make check AREA=…` on a `wip-*` branch, then fast-forward main). Look up APIs and artifact versions before using them. Infra fixes are time-boxed to two attempts, then step back. No sleep-polling: long jobs go through `ci/bg.sh`.
+- Dev loop: verify before merging: `make check AREA=…` in the Codespace, or the GitHub Actions gates that run on every `wip-*` push (plus `cluster-verify` for runtime changes); then fast-forward main. Look up APIs and artifact versions before using them. Infra fixes are time-boxed to two attempts, then step back. No sleep-polling: long jobs go through `ci/bg.sh`.
 - Knowledge: every non-obvious lesson goes into docs/knowledge-base/ (cluster, gitops, build) in the same change.

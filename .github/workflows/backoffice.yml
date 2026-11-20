@@ -1,7 +1,7 @@
 # Builds every micro-frontend and enforces the PDF §5.9 performance budget (≤200 KB gz initial JS per remote).
 name: backoffice
 on:
-  push: { branches: [main], paths: ["backoffice/**", "vendor/formio/js/**", ".github/workflows/backoffice.yml"] }
+  push: { branches: [main, "wip-*"], paths: ["backoffice/**", "vendor/formio/js/**", ".github/workflows/backoffice.yml"] }
   pull_request: { paths: ["backoffice/**", "vendor/formio/js/**"] }
 permissions: { contents: read }
 jobs:

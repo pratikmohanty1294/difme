@@ -10,3 +10,4 @@ Lessons learned while building and running DIFME. Each entry gives the **symptom
 | Build, CI, toolchain gotchas | [build.md](build.md) |
 | Performance and efficiency measurements | [performance.md](performance.md) |
 | How we work (fast feedback loop) | [process.md](process.md) |
+| Owner rules, decisions and open questions | [owner-decisions.md](owner-decisions.md) |

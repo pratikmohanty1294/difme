@@ -9,3 +9,7 @@
 4. **Wait on conditions, not timers:** `kubectl wait`, `rollout status`, or `until …; do sleep; done` inside one remote call.
 5. **Batch fixes into one push.** Never push one-line fixes one by one.
 6. **Record every multi-attempt problem here** (symptom → cause → fix → prevention).
+7. **Never sit idle.** While a run or sync is in progress, work on the next item.
+8. **Know the expected duration** of every step and report an overrun before being asked; give watchers deadlines.
+9. **Commit before switching branches;** an uncommitted edit once travelled into an unrelated branch.
+10. **Owner answers go into [owner-decisions.md](owner-decisions.md)** the same day, never only into a chat.

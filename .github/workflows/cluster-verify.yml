@@ -10,6 +10,7 @@ on:
       profiles: { description: "Profiles after base, in order (comma-separated)", default: "core", type: string }
       runner:   { description: "Runner", default: "ubuntu-24.04", type: choice, options: ["ubuntu-24.04", "ubuntu-24.04-arm"] }
       deadline: { description: "Per-profile convergence deadline (s)", default: "1800", type: string }
+      measure:  { description: "Payment baseline after the profiles: ci/measure.sh args, e.g. '200 60s' (empty = skip)", default: "", type: string }
 permissions: { contents: read }
 concurrency: { group: "cluster-verify-${{ github.ref }}-${{ inputs.profiles }}-${{ inputs.runner }}", cancel-in-progress: false }
 
@@ -59,6 +60,12 @@ jobs:
             [ $r -ne 0 ] && { rc=$r; break; }    # later profiles would run on a broken base
           done
           exit $rc
+      - name: Payment baseline (ci/measure.sh)
+        if: success() && inputs.measure != ''
+        run: |
+          # k6 runs as an in-cluster Job in "k6"; that namespace otherwise comes only with platform-ops (k6-operator).
+          kubectl create namespace k6 --dry-run=client -o yaml | kubectl apply -f -
+          bash ci/measure.sh ${{ inputs.measure }} 2>&1 | tee /tmp/measure.txt
       - name: Summary
         if: always()
         run: |
@@ -67,8 +74,9 @@ jobs:
             echo '```'; cat /tmp/verdicts.txt 2>/dev/null; echo '```'
             echo '```'; bash ci/mem-report.sh 15 2>/dev/null; echo '```'
             echo '```'; kubectl -n argocd get applications --no-headers 2>/dev/null; echo '```'
+            [ -s /tmp/measure.txt ] && { echo '### payment baseline'; echo '```'; cat /tmp/measure.txt; echo '```'; }
           } >> "$GITHUB_STEP_SUMMARY"
-          mkdir -p /tmp/out && cp /tmp/report.txt /tmp/verdicts.txt /tmp/up-*.log /tmp/out/ 2>/dev/null || true
+          mkdir -p /tmp/out && cp /tmp/report.txt /tmp/verdicts.txt /tmp/measure.txt /tmp/up-*.log /tmp/out/ 2>/dev/null || true
           kubectl get pods -A -o wide > /tmp/out/pods.txt 2>&1 || true
       - uses: actions/upload-artifact@v4
         if: always()

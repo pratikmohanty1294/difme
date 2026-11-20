@@ -1,7 +1,7 @@
 # Builds and tests the Quarkus core (Java 25) and enforces the Semgrep purity gate (PDF §4.5, §9).
 name: core-services
 on:
-  push: { branches: [main], paths: ["services/core/**", "api/proto/**", "policies/semgrep/**", ".github/workflows/core-services.yml"] }
+  push: { branches: [main, "wip-*"], paths: ["services/core/**", "api/proto/**", "policies/semgrep/**", ".github/workflows/core-services.yml"] }
   pull_request: { paths: ["services/core/**", "api/proto/**", "policies/semgrep/**"] }
 permissions: { contents: read }
 jobs:
@@ -19,6 +19,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "25", cache: maven }
+      # Same gate as ci/check.sh core: "key=value   # note" keeps the note in the value and the service fails at
+      # startup, which unit tests never reach (cmd-svc crash-looped on difme.flagd.port, 2026-11-19).
+      - name: No inline comments in application.properties values
+        run: |
+          if grep -nE '^[^#!][^=]*=.*[^\\]\s+#' services/*/*/src/main/resources/application.properties; then
+            echo "::error::inline comment in an application.properties value (put the comment on its own line)"; exit 1
+          fi
       - run: mvn -B -ntp -f services/core/pom.xml verify
       - uses: actions/upload-artifact@v4
         if: always()

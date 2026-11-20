@@ -10,3 +10,7 @@ credentials: { existingSecret: velero-s3 }
 deployNodeAgent: true
 # bitnami/kubectl was withdrawn; CRD upgrade/cleanup jobs use the upstream kubectl image.
 kubectl: { image: { repository: registry.k8s.io/kubectl, tag: v1.32.3 } }
+# The chart's upgrade-crds Job runs `/bin/sh -c "cp `which sh` ..."` inside that image, which is distroless, so the
+# Job never started and the app stayed OutOfSync (cluster-verify 2026-11-20). The chart ships its CRDs in crds/, and
+# Argo CD applies those on every sync (upgrades included), so the Job isn't needed: one less pod per sync.
+upgradeCRDs: false

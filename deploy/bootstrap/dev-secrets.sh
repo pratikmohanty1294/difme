@@ -48,6 +48,26 @@ TEMPORAL_PG=${TEMPORAL_PG:-$(rand)}
 secret temporal      temporal-db password="$TEMPORAL_PG"
 secret database-tier temporal-db password="$TEMPORAL_PG"
 secret harbor        harbor-db password="$YB"
+# Harbor's own secrets, fixed once per cluster: the chart would otherwise re-randomise them on every Argo CD render
+# (its lookup() sees nothing), rolling harbor-core mid-migration (cluster-verify 2026-11-20). See harbor/values.yaml.
+secret harbor        harbor-dev-secretkey secretKey="$(rand 16)"
+secret harbor        harbor-dev-admin HARBOR_ADMIN_PASSWORD="$(rand)"
+secret harbor        harbor-dev-core secret="$(rand 16)" CSRF_KEY="$(rand 32)"
+secret harbor        harbor-dev-jobservice JOBSERVICE_SECRET="$(rand 16)"
+secret harbor        harbor-dev-registry REGISTRY_HTTP_SECRET="$(rand 16)"
+if ! kubectl -n harbor get secret harbor-dev-registry-credentials >/dev/null 2>&1; then
+  # The registry reads a bcrypt htpasswd line; Python's bcrypt (Apache-2.0) makes it. Prefix 2a for the Go parser.
+  python3 -c 'import bcrypt' 2>/dev/null || pip install -q --user --break-system-packages bcrypt==4.2.1 2>/dev/null || pip install -q --user bcrypt==4.2.1
+  REG_PW=$(rand)
+  REG_HT=$(python3 -c 'import bcrypt,sys; print("harbor_registry_user:" + bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt(10, b"2a")).decode())' "$REG_PW")
+  secret harbor      harbor-dev-registry-credentials REGISTRY_PASSWD="$REG_PW" REGISTRY_HTPASSWD="$REG_HT"
+fi
+if ! kubectl -n harbor get secret harbor-dev-token >/dev/null 2>&1; then
+  t=$(mktemp -d)
+  openssl req -x509 -newkey rsa:4096 -nodes -days 3650 -subj "/CN=harbor-token-ca" -keyout "$t/tls.key" -out "$t/tls.crt" 2>/dev/null
+  kubectl -n harbor create secret tls harbor-dev-token --cert="$t/tls.crt" --key="$t/tls.key" >/dev/null && echo "+ harbor/harbor-dev-token"
+  rm -rf "$t"
+fi
 secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"
 secret security      keycloak admin-password="$(rand)"

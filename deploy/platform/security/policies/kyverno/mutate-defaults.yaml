@@ -16,7 +16,7 @@ spec:
     # cost-attribution labels, so require-labels-and-limits rejected them and the streaming profile never came up.
     # Fill in shared-infrastructure defaults only where a label is missing; our own services keep theirs.
     - name: default-cost-attribution-labels
-      match: { any: [{ resources: { kinds: [Deployment, StatefulSet, Job], namespaces: [streaming, ml-platform] } }] }
+      match: { any: [{ resources: { kinds: [Deployment, StatefulSet, Job], namespaces: [streaming, ml-platform, k6] } }] }   # k6: the k6-operator chart (cluster-verify 2026-11-20)
       mutate:
         patchStrategicMerge:
           spec:

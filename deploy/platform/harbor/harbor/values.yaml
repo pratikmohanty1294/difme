@@ -5,4 +5,19 @@ persistence:
 trivy: { enabled: true }
 database: { type: external, external: { host: yb-tservers.database-tier.svc, port: "5433", username: harbor, coreDatabase: harbor, existingSecret: harbor-db } }
 redis: { type: external, external: { addr: valkey.cache-tier.svc:6379 } }
-core: { resources: { requests: { cpu: 50m, memory: 128Mi } } }
+# Stable secrets (created by deploy/bootstrap/dev-secrets.sh; OpenBao in production). Without them the chart generates
+# new random values on every render: its `lookup` of the previous Secret returns nothing under Argo CD's helm template.
+# Each sync then changed the pods' checksum annotations, harbor-core rolled during its first schema migration, and the
+# database was left "dirty" (cluster-verify 2026-11-20). Names differ from the chart's own Secrets on purpose.
+existingSecretSecretKey: harbor-dev-secretkey          # key: secretKey (16 chars)
+existingSecretAdminPassword: harbor-dev-admin          # key: HARBOR_ADMIN_PASSWORD (else the public default)
+core:
+  resources: { requests: { cpu: 50m, memory: 128Mi } }
+  existingSecret: harbor-dev-core                      # key: secret (16 chars)
+  secretName: harbor-dev-token                         # tls.key / tls.crt for token signing (else a new CA per render)
+  existingXsrfSecret: harbor-dev-core                  # key: CSRF_KEY (32 chars)
+jobservice: { existingSecret: harbor-dev-jobservice }  # key: JOBSERVICE_SECRET (16 chars)
+registry:
+  existingSecret: harbor-dev-registry                  # key: REGISTRY_HTTP_SECRET (16 chars)
+  credentials: { existingSecret: harbor-dev-registry-credentials }   # keys: REGISTRY_PASSWD, REGISTRY_HTPASSWD (bcrypt)
+

@@ -35,3 +35,4 @@ Method: a throwaway replica in a cloud container, formatted fresh per variant, R
 | object caches 0 (floor) | 1334 MiB |
 
 `--memory-lsm-compaction` can't go below 10.5 MiB and changes nothing under `--development`; `--limit-request=64KiB` *raises* memory there. Kept only if the payment baseline (A/B on identical runners) doesn't regress.
+**A/B result (2026-11-20, `core` + `measure 200 60s`, same-time runs 44684890534 vs 44684975198):** TigerBeetle 2170 → 1373 MiB, node peak RAM 9130 → 8343 MiB; accepted 58.5 → 84.3 req/s, p50 38 → 32 ms, p99 346 → 338 ms. Runner variance is large (an earlier main run reached 91 req/s), so throughput is read as "no regression". **Kept.**

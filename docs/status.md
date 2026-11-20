@@ -168,6 +168,7 @@ backoffice writable /tmp (backoffice ✅); platform-ops fixes incl. Harbor on th
 cluster-verify Summary-step fix (runs had been marked failed when no baseline ran: read the per-profile CONVERGED lines).
 
 **Verified converged:** base, core, observability, backoffice, platform-ops.
+**Memory wins kept:** TigerBeetle 2170 → 1373 MiB (A/B, no throughput/latency regression).
 
 **In flight — branch → what it fixes → verify run → next action**
 | Branch | Fix | Run | When green |
@@ -175,7 +176,6 @@ cluster-verify Summary-step fix (runs had been marked failed when no baseline ra
 | main (formio VM bundles) | process profile | `core,process` queued after the main image build | process ✅ |
 | `wip-streaming-archive` | event-archive moved to lakehouse (`flink-archive`); verify-profile diagnostics | 44682308371 `core,streaming,lakehouse,ml` | merge; then extras (`streaming-extra`, `lakehouse-extra`) |
 | `wip-security-dev` | OpenBao 1 replica, static seal, self-init; SPIRE hooks off + insecureSkipVerify; istio-system privileged; Veraison stores; verifier out | 44682927471 `core,security` | merge; then `hub` stays blocked (no code) |
-| `wip-tb-memory` | TigerBeetle 2151 → 1356 MiB (measured) | A/B re-run: 44684890534 (main) vs 44684975198 (branch), `core` + `measure 200 60s` (first try: dev batch size crashed the load-test seeding; fixed on main: batches of 100 + pipefail) | merge only if throughput/latency don't regress |
 | `wip-proc-report` | `ci/proc-report.sh`: per-process/thread memory after each profile | 44683717857 `core,observability,backoffice`, 44683720991 `core,streaming` | rank savings; propose JVM ActiveProcessorCount, GOMAXPROCS/GOMEMLIMIT, MALLOC_ARENA_MAX, UV_THREADPOOL_SIZE batches; A/B each |
 | `wip-rails` | FR-01 money loop end to end: exchange-rails (5 rail ports + simulators, failover, FR-15 slashing) → `POST /execute` (escrow B, failover, principal A) → `POST /fulfilment` (Ed25519 invoice + carrier POD; fee F) → `POST /settle` (yield Y after the return window) → FR-16 reputation learned from outcomes; OpenAPI contract for the whole exchange | core-services ✅ on Java 25 (latest commit running) | merge when green |
 | `wip-verify-diag` | diagnostics only (also cherry-picked into the two branches above) | — | lands with either |

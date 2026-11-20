@@ -60,6 +60,7 @@ def main():
     metrics = {"roc_auc": round(float(roc_auc_score(yte, p)), 4), "pr_auc": round(float(average_precision_score(yte, p)), 4),
                "fraud_rate": round(float(y.mean()), 4), "rows": a.rows}
     onx = to_onnx(clf, Xtr[:1], options={id(clf): {"zipmap": False}}, target_opset={"": 17, "ai.onnx.ml": 3})
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "wb") as f:
         f.write(onx.SerializeToString())
     meta = {"version": VERSION, "features": FEATURES, "metrics": metrics, "outputs": [o.name for o in onx.graph.output]}

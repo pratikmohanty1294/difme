@@ -106,6 +106,14 @@ if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1; then
       | sed -E 's/handler_latency_//; s/\{[^}]*\}//' | sort -nr | head -6 | sed "s|^|  ${t%%:*}: |"
   done
 fi
+# Evidence custody smoke: with the security switch present, the published keys must be the transit operator key and the
+# notary's own key (local dev keys are named exchange-svc / exchange-witness).
+if [ "$rc" -eq 0 ] && kubectl -n core-platform get configmap exchange-evidence >/dev/null 2>&1; then
+  echo "== evidence signers"
+  kubectl get --raw /api/v1/namespaces/core-platform/services/exchange-svc:8089/proxy/v1/exchange/keys 2>/dev/null \
+    | python3 -c "import json,sys; k=json.load(sys.stdin); print('  published keys:', sorted(k)); print('  notary witness:', 'yes' if 'notary-1' in k else 'NO (local witness)')" 2>/dev/null \
+    || echo "  (exchange-svc keys endpoint not reachable)"
+fi
 # Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
 if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then
   echo "== lineage in Marquez"

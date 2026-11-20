@@ -32,6 +32,7 @@ components:
   - { name: istio-config,      ns: istio-system,    kind: path, profile: security, wave: -2, pdf: "4.4" }
   - { name: attestation,       ns: security,        kind: path, profile: security, wave: 2,  pdf: "11.1" }
   - { name: notary,            ns: security,        kind: path, profile: security, wave: 1,  pdf: "ADR-020" }
+  - { name: exchange-evidence, ns: core-platform,   kind: path, profile: security, wave: 3,  pdf: "ADR-020" }   # switches exchange-svc to OpenBao transit + notary
   - { name: keycloak,          ns: security,        kind: path, profile: security, wave: 0,  pdf: "4.1/ADR-010" }
 
   # ── Layers 3–5 · Core, workflow, OLTP data (profile: core) ─────────────────

@@ -10,4 +10,5 @@ ztunnel
 istio-config
 attestation
 notary
+exchange-evidence
 keycloak

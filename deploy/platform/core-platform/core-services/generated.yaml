@@ -462,13 +462,27 @@ spec:
             memory: 256Mi
           limits:
             memory: 256Mi
+        envFrom:
+        - configMapRef:
+            name: exchange-evidence
+            optional: true
         volumeMounts:
         - name: tmp
           mountPath: /tmp
+        - name: openbao-sa
+          mountPath: /var/run/secrets/openbao-sa
+          readOnly: true
       volumes:
       - name: tmp
         emptyDir:
           sizeLimit: 64Mi
+      - name: openbao-sa
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: vault
+              expirationSeconds: 3600
+              path: token
 ---
 apiVersion: v1
 kind: Service

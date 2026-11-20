@@ -70,7 +70,7 @@ components:
   - { name: superset,          ns: lakehouse,       kind: helm, profile: lakehouse, wave: 1,  pdf: "5.6", repo: https://apache.github.io/superset, chart: superset, version: 0.14.2 }
   - { name: analytics-jobs,    ns: lakehouse,       kind: path, profile: lakehouse, wave: 2,  pdf: "5.6" }
   - { name: flink-archive,     ns: streaming,       kind: path, profile: lakehouse, wave: 2,  pdf: "5.6" }   # event-archive Flink job; needs Polaris
-  - { name: datahub,           ns: governance,      kind: helm, profile: lakehouse-extra, wave: 1, pdf: "5.8", repo: https://helm.datahubproject.io, chart: datahub, version: 0.5.10 }
+  - { name: marquez,           ns: governance,      kind: path, profile: lakehouse-extra, wave: 1, pdf: "5.8" }   # lineage; replaces DataHub (owner 2026-11-20)
 
   # ── AI / ML plane (profile: ml) ────────────────────────────────────────────
   - { name: feast,             ns: ml-platform,     kind: path, profile: ml, wave: 0, pdf: "5.7" }

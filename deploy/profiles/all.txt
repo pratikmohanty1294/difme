@@ -38,7 +38,7 @@ starrocks
 superset
 analytics-jobs
 flink-archive
-datahub
+marquez
 feast
 mlflow
 weaviate

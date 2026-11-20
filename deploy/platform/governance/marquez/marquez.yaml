@@ -1,0 +1,60 @@
+# Lineage (owner decision 2026-11-20, instead of DataHub): Marquez receives OpenLineage events from Trino, dbt and
+# Flink and serves the cross-system lineage graph and impact analysis. Metadata lives on the shared Postgres
+# (role/database "marquez", created at first boot). No OpenSearch: search is off, the graph and API need only Postgres.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: marquez-config }
+data:
+  marquez.yml: |
+    server:
+      applicationConnectors: [{ type: http, port: 5000, httpCompliance: RFC7230_LEGACY }]
+      adminConnectors: [{ type: http, port: 5001 }]
+    db:
+      driverClass: org.postgresql.Driver
+      url: jdbc:postgresql://postgres-docdb.database-tier.svc:5432/marquez
+      user: marquez
+      password: ${POSTGRES_PASSWORD}
+      maxSize: 8
+    migrateOnStartup: true
+    graphql: { enabled: true }
+    search: { enabled: false }
+    logging: { level: INFO, appenders: [{ type: console }] }
+    tags:
+      - { name: PII, description: Personally identifiable information }
+      - { name: SENSITIVE, description: Contains sensitive information }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: marquez, labels: { app: marquez } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: marquez } }
+  template:
+    metadata: { labels: { app: marquez, difme/team: platform, business.metric: data-lineage } }
+    spec:
+      containers:
+        - name: api
+          image: marquezproject/marquez:0.50.0
+          env:
+            - { name: MARQUEZ_CONFIG, value: /etc/marquez/marquez.yml }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: marquez-db, key: password } } }
+            # Small heap: lineage writes are a few events per job run in dev. Production raises it.
+            - { name: JAVA_OPTS, value: "-Xms64m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -Xss512k" }
+          ports: [{ containerPort: 5000 }, { containerPort: 5001 }]
+          readinessProbe: { httpGet: { path: /healthcheck, port: 5001 }, periodSeconds: 10, failureThreshold: 30 }
+          volumeMounts: [{ name: config, mountPath: /etc/marquez }]
+          resources: { requests: { cpu: 50m, memory: 320Mi }, limits: { memory: 512Mi } }
+        - name: web
+          image: marquezproject/marquez-web:0.50.0
+          env:
+            - { name: MARQUEZ_HOST, value: localhost }
+            - { name: MARQUEZ_PORT, value: "5000" }
+            - { name: WEB_PORT, value: "3000" }
+          ports: [{ containerPort: 3000 }]
+          resources: { requests: { cpu: 10m, memory: 64Mi }, limits: { memory: 192Mi } }
+      volumes: [{ name: config, configMap: { name: marquez-config } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: marquez }
+spec: { selector: { app: marquez }, ports: [{ name: api, port: 5000 }, { name: web, port: 3000 }] }

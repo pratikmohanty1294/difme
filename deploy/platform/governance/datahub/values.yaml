@@ -1,9 +1,0 @@
-# PDF §5.8 — data catalog, column-level lineage (OpenLineage from Flink, Spark, dbt, Airbyte), impact analysis.
-global:
-  kafka: { bootstrap: { server: difme-kafka-bootstrap.streaming.svc:9092 }, schemaregistry: { type: INTERNAL } }
-  sql: { datasource: { host: yb-tservers.database-tier.svc:5433, hostForpostgresqlClient: yb-tservers.database-tier.svc, port: "5433", url: "jdbc:postgresql://yb-tservers.database-tier.svc:5433/datahub", driver: org.postgresql.Driver, username: datahub, password: { secretRef: datahub-db, secretKey: password } } }
-  elasticsearch: { host: opensearch-cluster-master.governance.svc, port: "9200" }
-datahub-gms: { resources: { requests: { cpu: 200m, memory: 1Gi } } }
-datahub-frontend: { resources: { requests: { cpu: 50m, memory: 512Mi } } }
-mysqlSetupJob: { enabled: false }
-postgresqlSetupJob: { enabled: true }

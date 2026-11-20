@@ -1,4 +1,4 @@
--- Backs the Analytics remote (PDF §5.9) through StarRocks' Iceberg catalog.
+-- Backs the Analytics remote (PDF §5.9) through Trino's Iceberg catalog (qry-svc /v1/analytics/fraud-daily).
 with payments as (
     select event_day as day, count(*) as initiated
     from {{ ref('stg_payment_events') }}

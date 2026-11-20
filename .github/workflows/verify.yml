@@ -70,6 +70,18 @@ jobs:
               if not need.exists(): bad.append(str(need))
           print("\n".join(bad)); sys.exit(1 if bad else 0)
           PY
+      # Helm values are not built by kustomize; a broken flow mapping in risingwave/values.yaml reached a cluster run and
+      # left the app "Unknown" (2026-11-20). Parse every YAML file under deploy/.
+      - name: Every manifest and values file parses
+        run: |
+          python - <<'PY'
+          import yaml, pathlib, sys
+          bad = []
+          for f in pathlib.Path("deploy").rglob("*.yaml"):
+              try: list(yaml.safe_load_all(f.read_text()))
+              except yaml.YAMLError as e: bad.append(f"{f}: {str(e).splitlines()[0]}")
+          print("\n".join(bad)); sys.exit(1 if bad else 0)
+          PY
       - name: Kustomize build every path component
         run: |
           curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin

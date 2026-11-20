@@ -34,7 +34,6 @@ seatunnel
 seaweedfs
 polaris
 trino
-starrocks
 superset
 analytics-jobs
 flink-archive

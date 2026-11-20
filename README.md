@@ -56,7 +56,7 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 5.5 | Event broker (Kafka API) | **Apache Kafka 4 (KRaft)** via Strimzi — OSI replacement | `deploy/platform/streaming/` |
 | 5.5 | Debezium (CloudEvents), Flink, Apicurio, Airbyte, KEDA | Same, with **Apache SeaTunnel** instead of Airbyte (ELv2, ADR-009) | `deploy/platform/streaming/` |
 | 5.5 | Streaming SQL views | **RisingWave** — OSI replacement | `deploy/platform/streaming/` |
-| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | SeaweedFS + Polaris (ADR-005); Spark covered by Flink + dbt (ADR-015) | `deploy/platform/lakehouse/`, `analytics/` |
+| 5.6 | Iceberg, MinIO, Trino, Spark, StarRocks, dbt, Superset | SeaweedFS + Polaris (ADR-005); Spark covered by Flink + dbt (ADR-015); **StarRocks dropped, Trino serves analytics** (owner 2026-11-20) | `deploy/platform/lakehouse/`, `analytics/` |
 | 5.7 | Feast, Weaviate, ONNX Runtime, PostgresML, FlinkML, MLflow | Same except PostgresML (covered by MLflow + ONNX, ADR-015) | `deploy/platform/ml-platform/`, `ml/` |
 | 5.8 | SPIFFE/SPIRE, Cilium, OPA Gatekeeper, Kyverno, Sigstore, OpenTelemetry, Alloy, DataHub + OpenLineage | Same, with **Kyverno as the single admission engine** (Gatekeeper and policy-controller removed, ADR-015) | `deploy/platform/security/`, `deploy/platform/governance/` |
 | 5.8 | Secrets management | **OpenBao** — OSI replacement | `deploy/platform/security/` |

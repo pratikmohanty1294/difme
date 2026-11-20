@@ -44,9 +44,11 @@ done
 if [ $rc -ne 0 ]; then
   echo "== pods not ready"; kubectl get pods -A --no-headers | grep -vE "Running|Completed" | cut -c1-120 | head -25
   # Crash-looping pods, plus pods that run but never turn ready (e.g. a new revision failing its probe).
-  for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error/ || ($4 == "Running" && $3 ~ /^0\//) {print $1"/"$2}' | head -8); do
+  for p in $(kubectl get pods -A --no-headers | awk '$4 ~ /CrashLoop|Error|Pending/ || ($4 == "Running" && $3 ~ /^0\//) {print $1"/"$2}' | head -8); do
     echo "--- logs $p"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --tail=40 2>&1 | cut -c1-300
     kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous --tail=15 2>/dev/null | sed 's/^/  (previous) /' | cut -c1-300
+    # Errors of the previous run: a long config dump (Trino's Bootstrap table) pushes them out of the tail.
+    kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous 2>/dev/null | grep -E 'ERROR|FATAL|Exception:|Caused by|panic' | grep -v '^\s*at ' | head -8 | sed 's/^/  (previous error) /' | cut -c1-300
     kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8
     # Startup lines: setup steps log once at start and scroll out of --tail (formio's db setup, 2026-11-20).
     echo "  (startup)"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers 2>/dev/null | grep -vE '^    at |Update found|[█▄▀]' | head -70 | cut -c1-300

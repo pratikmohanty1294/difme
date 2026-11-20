@@ -1,4 +1,4 @@
-// PDF §5.9 Analytics UI: StarRocks OLAP fraud dashboards (via qry-svc) rendered with ECharts.
+// PDF §5.9 Analytics UI: fraud dashboards over the Iceberg marts (Trino via qry-svc) rendered with ECharts.
 import { ChangeDetectionStrategy, Component, ElementRef, effect, input, signal, viewChild } from "@angular/core";
 import type { ECharts } from "echarts/core";
 

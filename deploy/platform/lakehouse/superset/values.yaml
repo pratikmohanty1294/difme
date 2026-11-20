@@ -4,10 +4,23 @@ bootstrapScript: |
   pip install --no-cache-dir trino[sqlalchemy]==0.333.0 psycopg2-binary==2.9.10
 supersetNode:
   connections: { db_host: yb-tservers.database-tier.svc, db_port: "5433", db_name: superset, db_user: superset }
-  resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }
+  resources: { requests: { cpu: 100m, memory: 384Mi }, limits: { memory: 1Gi } }
 postgresql: { enabled: false }
 redis: { enabled: false }
 extraEnv: { REDIS_HOST: valkey.cache-tier.svc, REDIS_PORT: "6379" }
+# Superset refuses to start with its default SECRET_KEY (cluster-verify 44717717115); the key comes from a Secret
+# made by dev-secrets.sh (OpenBao in production), never from values in git.
+extraEnvRaw:
+  - { name: SUPERSET_SECRET_KEY, valueFrom: { secretKeyRef: { name: superset-secret-key, key: key } } }
 configOverrides:
+  secret: |
+    SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
   roles: |
     FAB_ROLES = {"Compliance": [[".*", "can_read"]], "Settlements": [["Dashboard", "can_read"]]}
+# The chart's worker waits for its bundled Redis (superset-redis-headless), which is disabled: we use Valkey
+# (cluster-verify 44734645270: worker init crash-looped on "no such host").
+supersetWorker:
+  initContainers:
+    - name: wait-for-valkey
+      image: apache/superset:dockerize
+      command: [/bin/sh, -c, "dockerize -wait tcp://valkey.cache-tier.svc:6379 -wait tcp://yb-tservers.database-tier.svc:5433 -timeout 300s"]

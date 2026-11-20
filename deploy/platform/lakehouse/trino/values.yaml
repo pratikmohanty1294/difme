@@ -4,8 +4,15 @@
 server:
   workers: 0
   config: { query: { maxMemory: "512MB" } }   # heap-sized (default 4GB assumes big workers)
+# s3.region: SeaweedFS ignores it, but the AWS SDK refuses to start without one ("Unable to load region", 44731237973).
+# Catalog properties read ${ENV:...}; without these the coordinator exits at start ("Environment variable is not set:
+# POLARIS_CREDENTIAL", cluster-verify 44717717115). YSQL auth is off in dev, so the password is a placeholder.
+env:
+  - { name: POLARIS_CREDENTIAL, valueFrom: { secretKeyRef: { name: polaris-client, key: credential } } }
+  - { name: YB_TRINO_USER, value: trino }
+  - { name: YB_TRINO_PASSWORD, value: dev-ysql-auth-off }
 coordinator:
-  resources: { requests: { cpu: 200m, memory: 1Gi }, limits: { memory: 1280Mi } }
+  resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 1280Mi } }   # used 668 Mi at start (run 44724409966)
   jvm: { maxHeapSize: 768M }
   config: { nodeScheduler: { includeCoordinator: true }, query: { maxMemoryPerNode: "256MB" } }   # must fit the 768M heap
 catalogs:
@@ -20,6 +27,7 @@ catalogs:
     fs.native-s3.enabled=true
     s3.endpoint=http://seaweedfs-s3:8333
     s3.path-style-access=true
+    s3.region=us-east-1
   events: |
     connector.name=kafka
     kafka.nodes=difme-kafka-bootstrap.streaming.svc:9092

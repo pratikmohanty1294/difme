@@ -33,7 +33,12 @@ kubectl -n lakehouse get secret seaweedfs-s3-config >/dev/null 2>&1 || kubectl -
 rm -f /tmp/s3.json
 secret lakehouse     seaweedfs-s3-admin RCLONE_CONFIG_SW_TYPE=s3 RCLONE_CONFIG_SW_PROVIDER=SeaweedFS \
                      RCLONE_CONFIG_SW_ENDPOINT=http://seaweedfs-s3:8333 RCLONE_CONFIG_SW_ACCESS_KEY_ID="$S3_KEY" RCLONE_CONFIG_SW_SECRET_ACCESS_KEY="$S3_SECRET"
-secret lakehouse     polaris-bootstrap credentials="POLARIS,root,$(rand)"
+POLARIS_SECRET=$(rand)   # one secret for the bootstrap principal and the clients (they were generated separately and could never match)
+secret lakehouse     polaris-bootstrap credentials="POLARIS,root,$POLARIS_SECRET"
+POLARIS_PG=$(rand)
+secret lakehouse     polaris-db password="$POLARIS_PG"
+secret database-tier polaris-db password="$POLARIS_PG"
+secret lakehouse     superset-secret-key key="$(rand 48)"
 secret streaming     risingwave-s3 AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET"   # key names the chart requires
 # RisingWave meta store is on the shared Postgres (ADR-019 pattern); both copies must match, so reuse an existing one.
 RW_PG=$(kubectl -n streaming get secret risingwave-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true); RW_PG=${RW_PG:-$(rand)}
@@ -98,7 +103,7 @@ ear_jwk() {
 }
 kubectl -n security get secret veraison-ear >/dev/null 2>&1 || secret security veraison-ear skey.jwk="$(ear_jwk)"
 secret security      postgres-docdb password="$PG_DOCDB"
-POLARIS_CRED="root:$(rand)"
+POLARIS_CRED="root:$POLARIS_SECRET"
 for n in streaming lakehouse; do
   secret $n polaris-client credential="$POLARIS_CRED"
   secret $n flink-s3 access-key="$S3_KEY" secret-key="$S3_SECRET"

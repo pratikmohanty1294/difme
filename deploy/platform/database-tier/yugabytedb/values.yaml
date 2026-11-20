@@ -2,7 +2,7 @@
 # proprietary settlement DB). Also the Temporal persistence backend and the Apicurio/Polaris metadata store.
 replicas: { master: 1, tserver: 1 }
 resource:
-  master: { requests: { cpu: 200m, memory: 512Mi }, limits: { memory: 1Gi } }
+  master: { requests: { cpu: 200m, memory: 192Mi }, limits: { memory: 1Gi } }   # used 95 Mi (44731237973); YB sizes from the limit
   tserver: { requests: { cpu: 300m, memory: 1Gi }, limits: { memory: 2Gi } }
 storage: { master: { size: 4Gi }, tserver: { size: 8Gi } }
 enableLoadBalancer: false

@@ -304,10 +304,11 @@ public class Exchange {
 
     /**
      * The reputation used to rank a bid: the exchange's own number once the partner has an outcome on record; until
-     * then (cold start) the bidder's self-reported value. Open owner question: a fixed prior instead.
+     * then the fixed cold-start prior (80). A self-reported score is ignored: it would be trivially gameable
+     * (decided 2026-11-20).
      */
     public double reputationOf(String pack, int nodeRef, double selfReported) {
-        return reputation.getOrDefault(pack + ":" + nodeRef, selfReported);
+        return reputation.getOrDefault(pack + ":" + nodeRef, Reputation.PRIOR_UNVERIFIED);
     }
 
     /** The tracked value, or null when the partner has no outcome on record yet. */

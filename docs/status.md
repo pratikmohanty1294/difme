@@ -170,6 +170,7 @@ Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/di
 | `wip-malloc-arena` | Kyverno MALLOC_ARENA_MAX=2 default | A/B 44687672715 (compare with main 44687637776 or 44690017534) | same rule |
 | `wip-hub` (merged) | QUIC hub | main image build (latest images run on main) | verify `core,hub` profile once `difme-quinn-hub:0.1.0` exists |
 
+**Decided business rules to implement:** partner tier from history (COLD_START until verified deliveries); evidence operator key in OpenBao transit + independent notary witness.
 **Next memory candidates (from the per-process report):** Temporal SQL pool sizes (shared-Postgres backends), Cilium's
 embedded Envoy workers (4), Argo CD controller GOMEMLIMIT. Then CPU → disk I/O (cmd-svc reads ~100 KB/s at idle) → network.
 **Waiting on the owner:** PC memory notes + session logs upload; DiscountAI prototype source (for the PWA screens);

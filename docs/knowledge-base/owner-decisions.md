@@ -25,6 +25,12 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Decided
 | Date | Question | Owner's answer |
 |---|---|---|
+| 2026-11-20 | Business rules (owner: "do as you seem best fit for the requirements") — evidence custody | Operator key in OpenBao transit (non-exportable, signs via API); the witness is a separate notary service with its own key, never the operator. Dev keeps generated keys. *Implementation pending.* |
+| 2026-11-20 | — collateral basis and default tier | V = A (the partner's exposure at the merchant). New partners start COLD_START (φ 2.0) and become ESTABLISHED after verified deliveries. *Tier-from-history pending; intents still default to ESTABLISHED.* |
+| 2026-11-20 | — `min_minor` floors | FR-01 keeps ₹500 (minimum stake; small next to typical order values). Other verticals set theirs when they go live. |
+| 2026-11-20 | — FR-01 return window | 10 days before yield Y is released (covers 7–10-day return policies plus confirmation lag). Applied in vertical.yaml. |
+| 2026-11-20 | — reputation cold start, V_ref | Partners without history rank at the fixed prior 80; self-reported scores are ignored (gameable). V_ref stays ₹50,000. Applied in exchange-svc. |
+| 2026-11-20 | — money letters | v4.1 as implemented: A charged at the merchant, B = A + Y + F paid by the buyer; the PRD is the one to correct. |
 | 2026-11-20 | Payment routing: saga vs DIRECT | Keep saga (Temporal). |
 | 2026-11-20 | Canary SLO thresholds | "Best possible value achievable": p99 ≤ 400 ms (measured worst p99 346 ms under the 200 req/s baseline, ~15 % headroom); success rate stays ≥ 99.5 %. Tighten as the payment path speeds up. |
 | 2026-11-20 | Argo CD → Flux? | Keep Argo CD. |
@@ -50,12 +56,6 @@ Newest first within each section. When the owner answers a question, move it fro
 ## Open (owner to decide)
 | Since | Question | Context |
 |---|---|---|
-| 2026-11-19 | Evidence chain: who witnesses in production, and where the operator key lives | Dev keys are generated at start. OpenBao transit is the candidate for the operator key. |
-| 2026-11-19 | Collateral V = A, and the default partner tier | FR-14 collateral at close. |
-| 2026-11-19 | `min_minor` collateral floors per vertical | ₹500 placeholders. |
-| 2026-11-20 | FR-01 return window before the yield Y is released | `return_window_days: 7` placeholder in `verticals/fr01-buy/vertical.yaml`. |
-| 2026-11-20 | FR-16 reputation: cold start and V_ref | The exchange now learns reputation from outcomes (fault-driven decline = failed task, verified delivery = success) and ranks known partners on it. Open: should a partner with no history use a fixed prior (80) instead of its self-reported value, and is V_ref ₹50,000 right for FR-01? |
-| 2026-11-19 | v4.1 money letters | A charged at the merchant, B = A + Y + F paid by the buyer; the PRD has them swapped. |
 
 ## Product requirement context (owner's questions, 2026-11-17)
 `docs/GOALS.md` still says "product goals: to be defined by the owner". The owner's research questions show the direction of DIFME/DiscountAI (ADR-020):

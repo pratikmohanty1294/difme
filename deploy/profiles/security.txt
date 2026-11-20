@@ -9,4 +9,5 @@ istio-cni
 ztunnel
 istio-config
 attestation
+notary
 keycloak

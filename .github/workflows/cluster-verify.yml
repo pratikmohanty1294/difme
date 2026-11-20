@@ -74,7 +74,8 @@ jobs:
             echo '```'; cat /tmp/verdicts.txt 2>/dev/null; echo '```'
             echo '```'; bash ci/mem-report.sh 15 2>/dev/null; echo '```'
             echo '```'; kubectl -n argocd get applications --no-headers 2>/dev/null; echo '```'
-            [ -s /tmp/measure.txt ] && { echo '### payment baseline'; echo '```'; cat /tmp/measure.txt; echo '```'; }
+            # if/fi, not `[ ] && {}`: under bash -e a false test as the group's last command failed the step (2026-11-20).
+            if [ -s /tmp/measure.txt ]; then echo '### payment baseline'; echo '```'; cat /tmp/measure.txt; echo '```'; fi
           } >> "$GITHUB_STEP_SUMMARY"
           mkdir -p /tmp/out && cp /tmp/report.txt /tmp/verdicts.txt /tmp/measure.txt /tmp/up-*.log /tmp/out/ 2>/dev/null || true
           kubectl get pods -A -o wide > /tmp/out/pods.txt 2>&1 || true

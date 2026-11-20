@@ -116,6 +116,7 @@ yb_reads() {
 }
 if kubectl -n database-tier get pod yb-master-0 >/dev/null 2>&1 && kubectl -n streaming get kafkaconnector core-outbox >/dev/null 2>&1; then
   echo "== catalog reads A/B (Debezium connectors running vs stopped)"
+  kubectl get --raw "/api/v1/namespaces/database-tier/pods/yb-tserver-0:9000/proxy/varz?raw=1" 2>/dev/null | grep -iE 'walsender|cdcsdk_.*(interval|poll)' | head -8 | sed 's/^/  flag: /'
   echo "  running: $(yb_reads) Read/s"
   conns=$(kubectl -n streaming get kafkaconnector -o name 2>/dev/null)
   for c in $conns; do kubectl -n streaming patch "$c" --type merge -p '{"spec":{"state":"stopped"}}' >/dev/null 2>&1; done

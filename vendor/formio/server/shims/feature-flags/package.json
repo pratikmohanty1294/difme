@@ -1,0 +1,8 @@
+{
+  "name": "@formio/feature-flags",
+  "version": "0.0.0-difme",
+  "description": "Open-source stand-in for Form.io's proprietary @formio/feature-flags (DIFME, 2026-11-20). Same interface; every flag defaults to off unless its environment variable is true/1.",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true
+}

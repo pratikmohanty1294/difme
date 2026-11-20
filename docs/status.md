@@ -120,7 +120,7 @@ Details are in docs/knowledge-base/.
   - The cluster data survives the stop, and the startup heal (swap, ACL, Cilium refresh) runs automatically.
   - Staged and ready: `wip-security-prep` (istiod sizing, Keycloak JVM) and `wip-process-prep` (Fluxnova JVM).
   - Done: observability installed and healthy (~950 Mi); its fixes are on `main`.
-- **Runtime move (owner decision 2026-11-20): Oracle Cloud Always Free Ampere A1** (arm64, 4 OCPU / 24 GB RAM, up to 200 GB disk, free with no time limit) replaces the blocked Codespace.
+- **Runtime move (owner decision 2026-11-20): a free-tier arm64 cloud VM** (arm64, 4 OCPU / 24 GB RAM, up to 200 GB disk, free with no time limit) replaces the blocked Codespace.
   - Setup: `ci/vm-bootstrap.sh` (idempotent; same `/workspaces/difme` path, image store and swap under `/var/lib/difme`, `difme-heal.service` at boot).
   - Driving it: `DIFME_VM=ubuntu@<ip> DIFME_VM_KEY=~/.ssh/<key> bash ci/cs.sh '<cmd>'`.
   - Images: all first-party images are multi-arch. Core services build per arch on native runners (native binaries and the AOT cache are CPU-specific), and `_manifest.yml` joins and signs the result. All directly referenced third-party images have arm64 builds.
@@ -168,7 +168,7 @@ Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/di
 | (main) ml, streaming-extra | **streaming-extra CONVERGED** (44733260505, SeaTunnel 73 s). ml run 44733255772 still running (expected to fail on missing feast/fraud-scorer images; wip-ml fixes) | 44733255772 | merge Marquez + wip-ml when it ends |
 | `wip-marquez` (**merged**) | lakehouse-extra verified (Marquez ~240 MiB) | — | OpenLineage emitters next |
 | `wip-trino-only` | **Owner: Trino only.** StarRocks removed (chart, setup job, SQL, secret); qry-svc fraud analytics query moved to the Trino datasource; MariaDB driver dropped | 44734645270 `core,streaming,lakehouse` (+ core-services CI for qry-svc) | converged → merge (supersedes wip-lakehouse-fix) |
-| `wip-trino-only` (layer 4) | Trino crash = AWS SDK needs a region (`s3.region=us-east-1`, SeaweedFS ignores it); RisingWave request 1Gi→384Mi (used 71), yb-master 512→192Mi (used 95). Pushed during 44734645270 → re-run clean after it | next run | converged → merge |
+| `wip-trino-only` (layer 4) | Trino crash = the S3 client SDK needs a region (`s3.region=us-east-1`, SeaweedFS ignores it); RisingWave request 1Gi→384Mi (used 71), yb-master 512→192Mi (used 95). Pushed during 44734645270 → re-run clean after it | next run | converged → merge |
 | `wip-trino-only` (layer 5) | Trino starts (region fix). dbt: Polaris schema never created (relational-jdbc needs the admin-tool bootstrap) → Polaris moved to the shared Postgres + `polaris-bootstrap` Job. superset-worker waited for the disabled chart Redis → waits for Valkey | 44741294208 `core,streaming,lakehouse` | converged → merge |
 | `wip-trino-only` (layer 6) | **lakehouse CONVERGED** (44746488055: base, core, streaming, lakehouse 138 s) → **all 13 profiles verified** | background job: merge trino-only + openlineage + iceberg-maint after idle run 44748980093, then images, then `core,streaming,lakehouse,lakehouse-extra` on main | converged → lineage + maintenance verified |
 | (main) lakehouse + lineage + maintenance | **Merged and CONVERGED on main** (44758053216: base, core, streaming, lakehouse 124 s, lakehouse-extra 41 s; images 44755227155 green). Trino 755 MiB, Polaris 192, Superset 187 + worker 107, Marquez 249. Lineage flow not yet proven (convergence ≠ events in Marquez) → verify-profile now prints Marquez namespaces/jobs | next lakehouse-extra run (settle so dbt's 15-min cron fires) | jobs listed → lineage verified |
@@ -182,7 +182,7 @@ Resume by checking each run below (`gh run view <id> --repo pratikmohanty1294/di
 | docs | ADR-021 written (Marquez, Trino only, pgvector, minimal Feast; third-party migrations on the shared Postgres); README stack table updated | — | done |
 | `wip-ml` (**merged**) | **ml CONVERGED** (44745510825, 62 s): Feast 0.67.0 (CVE fix) with registry apply, MLflow on the shared Postgres, pgvector database `ml`. onnx-serving parked (no scorer code/model) | — | done; scorer is product work |
 | `wip-security-dev` (**merged**) | **security + hub CONVERGED** (44727343332: base, core, security 829 s, hub 12 s). istio-cni (Cilium dirs + exclusive=false), Istio webhook ignore rules, OpenBao 1 replica + static seal + self-init incl. evidence-transit, SPIRE, Veraison, attestation verifier, notary | — | done |
-| `wip-tier-history` (**merged** d345479) | tier from history, evidence custody (transit + notary signers), `services/notary`; merged with the Docker Hub mirror and the refault report | images 44715598131 ✅ (mirror.gcr.io works; notary image built) | images green → add the OpenBao `evidence-transit` stanza to wip-security-dev (draft in scratchpad: mount, ed25519 key, policy, role for core-platform/exchange-svc) |
+| `wip-tier-history` (**merged** d345479) | tier from history, evidence custody (transit + notary signers), `services/notary`; merged with the docker.io mirror and the refault report | images 44715598131 ✅ (mirror.gcr.io works; notary image built) | images green → add the OpenBao `evidence-transit` stanza to wip-security-dev (draft in scratchpad: mount, ed25519 key, policy, role for core-platform/exchange-svc) |
 | `wip-lakehouse-fix` | Layer 2 held (StarRocks CR accepted, Superset/Polaris OK). Layer 3: StarRocks FE and event-archive unschedulable (Insufficient memory: requests, not usage) → lakehouse requests trimmed (limits unchanged); Trino still crashes, error hidden by its config dump → diagnostics now print previous-run ERROR/Caused-by lines and a requested-vs-used memory table | 44731237973 `core,streaming,lakehouse` | read Trino error + request table → fix |
 | `wip-mem-batch2` | **Rejected.** Kyverno Go rule broke sync (same as malloc-arena); the JVM-only re-test (44701164308) gave 5,581 → 5,575 MiB PSS, −31 threads, p99 297 → 339 ms: not better than the baseline | — | Go/JVM runtime limits per component instead (e.g. GOMEMLIMIT/GOMAXPROCS in each chart's values) |
 | `wip-malloc-arena` | **Rejected** (A/B 44687672715): the Kyverno `+(value)` env injection corrupted containers that use `valueFrom` (temporal-frontend invalid; base/core sync failed). See knowledge-base/security.md. | — | redo with a foreach + precondition + JSON patch, or per component |
@@ -254,13 +254,13 @@ thresholds and the other open questions in `owner-decisions.md`.
 - **Canary SLO thresholds:** `slo-gate` requires p99 ≤ 5 ms, but measured cmd-svc p99 is about 250–330 ms, so every real rollout would abort. **Owner decision needed.**
 
 **Runtime status:**
-- **Oracle Cloud** (Free Trial, Hyderabad, single AD): VM `difme-runtime` (A1.Flex 4/24, Ubuntu 24.04, 150 GB) was refused with "Out of capacity". The in-browser retry loop stopped when the console session expired; it needs the owner to sign in again. The SSH public key lives on the owner's PC.
+- **Cloud VM** (free trial, single availability domain): VM `difme-runtime` (A1.Flex 4/24, Ubuntu 24.04, 150 GB) was refused with "Out of capacity". The in-browser retry loop stopped when the console session expired; it needs the owner to sign in again. The SSH public key lives on the owner's PC.
 - **Codespace** `difme-dev-97rgj4pqrvpjh6j9`: still HTTP 402 (billing). Retention runs to 2026-12-19; any successful start resets it. A cloud session can retry `gh codespace ssh` once the monthly hours reset.
 
 **CI lessons applied** (see `.github/workflows`):
 - Release tags (`:0.1.0`) move only on `main`; branch builds push `sha-*` tags only.
 - Kyverno trusts `_image.yml` or `_manifest.yml` signatures from `main` (`subjectRegExp`).
-- Maven resolves through Google's Central mirror (repo1 returned HTTP 429 to runners).
+- Maven resolves through a public Central mirror (repo1 returned HTTP 429 to runners).
 - The backoffice and formio builds use lockfiles with frozen installs.
 
 ## Next steps (owner decides the order)

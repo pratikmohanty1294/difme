@@ -89,6 +89,6 @@
 - **Fix:** `dev-secrets.sh` gives formio `mongodb://difme:<pw>@ferretdb…/formio?authMechanism=SCRAM-SHA-256` (the shared Postgres role that already backs FerretDB).
 - **Next layer, same day:** `schema "documentdb_api" does not exist`. Our ConfigMap was mounted over the postgres-documentdb image's `/docker-entrypoint-initdb.d`, hiding the image's own init (which creates the DocumentDB extension). Creating the extension in our own script failed and stopped the init chain, so Temporal's database was never created. **Fix:** mount each of our scripts by `subPath`, so the image's init runs too.
 - **Next layer:** `Cannot find module 'resourcejs'`. Upstream formio 4.11.0 depends on `resourcejs ^2.6.2` (MIT), but it was missing from our vendored package.json. A diff against `npm view formio@4.11.0 dependencies` showed it was the only gap. **Fix:** declared and locked (2.6.3). **Rule:** after re-vendoring, diff the dependency list against the published package.
-### Docker Hub rate limits in image builds (2026-11-20)
-- **Symptom:** a flink-jobs image leg failed with HTTP 429 from Docker Hub when ~25 image jobs started together (anonymous pulls).
-- **Fix:** `_image.yml` configures BuildKit with `[registry."docker.io"] mirrors = ["mirror.gcr.io"]`; Google's pull-through cache serves rust, node, golang, debian and eclipse-temurin, and BuildKit falls back to docker.io for anything the mirror lacks. No Dockerfile changes.
+### docker.io rate limits in image builds (2026-11-20)
+- **Symptom:** a flink-jobs image leg failed with HTTP 429 from docker.io when ~25 image jobs started together (anonymous pulls).
+- **Fix:** `_image.yml` configures BuildKit with `[registry."docker.io"] mirrors = ["mirror.gcr.io"]`; a public pull-through cache serves rust, node, golang, debian and eclipse-temurin, and BuildKit falls back to docker.io for anything the mirror lacks. No Dockerfile changes.

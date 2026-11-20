@@ -3,7 +3,7 @@ package dev.difme.exchange.rails;
 import java.util.UUID;
 
 /**
- * Card network agentic credential (Visa Intelligent Commerce / Mastercard Agent Pay class): a single-use token bound to
+ * Card network agentic credential (card-network agentic-commerce programme class): a single-use token bound to
  * one delegated purchase instruction, capped at the instructed amount and merchant.
  */
 public interface AgentCredentialPort {

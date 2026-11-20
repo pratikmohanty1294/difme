@@ -16,7 +16,7 @@
 - **Fix:** `privileged` only for `ingress-system`, `security`, `observability`, `backup`. Everything else stays `baseline`.
 
 ### Hook job `ImagePullBackOff`: `bitnami/kubectl` not found
-- **Root cause:** the Bitnami catalog was withdrawn from Docker Hub (it is also vendor-named).
+- **Root cause:** a vendor-branded chart catalog was withdrawn from docker.io (it is also vendor-named).
 - **Fix:** `registry.k8s.io/kubectl` via chart values.
 - **Prevention:** the `verify` workflow fails if any chart renders a `bitnami/` image.
 

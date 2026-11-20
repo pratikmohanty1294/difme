@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21", cache: maven }
       # Maven Central rate-limits and occasionally fails shared CI IPs (429 / "artifact absent" seen 2026-11-20);
-      # resolve through Google's public Maven Central mirror, as the image builds do.
+      # resolve through a public Maven Central mirror, as the image builds do.
       - name: Maven mirror
         run: |
           mkdir -p ~/.m2

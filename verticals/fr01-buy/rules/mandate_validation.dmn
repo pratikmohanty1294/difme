@@ -39,7 +39,7 @@
       </rule>
       <rule id="m6">
         <inputEntry id="m6_1"><text>-</text></inputEntry><inputEntry id="m6_2"><text>-</text></inputEntry><inputEntry id="m6_3"><text>-</text></inputEntry><inputEntry id="m6_4"><text>-</text></inputEntry><inputEntry id="m6_5"><text>&lt;= 0</text></inputEntry><inputEntry id="m6_6"><text>-</text></inputEntry><inputEntry id="m6_7"><text>-</text></inputEntry><inputEntry id="m6_8"><text>-</text></inputEntry><inputEntry id="m6_9"><text>-</text></inputEntry>
-        <outputEntry id="m6_o1"><text>"NO_BUDGET"</text></outputEntry><outputEntry id="m6_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m6_o3"><text>"Set a total budget. Mastercard requires a budget before an agent may buy without you present."</text></outputEntry>
+        <outputEntry id="m6_o1"><text>"NO_BUDGET"</text></outputEntry><outputEntry id="m6_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m6_o3"><text>"Set a total budget. Card-network rules require a budget before an agent may buy without you present."</text></outputEntry>
       </rule>
       <rule id="m7">
         <inputEntry id="m7_1"><text>-</text></inputEntry><inputEntry id="m7_2"><text>-</text></inputEntry><inputEntry id="m7_3"><text>-</text></inputEntry><inputEntry id="m7_4"><text>-</text></inputEntry><inputEntry id="m7_5"><text>&gt; limit</text></inputEntry><inputEntry id="m7_6"><text>-</text></inputEntry><inputEntry id="m7_7"><text>-</text></inputEntry><inputEntry id="m7_8"><text>-</text></inputEntry><inputEntry id="m7_9"><text>-</text></inputEntry>
@@ -51,19 +51,19 @@
       </rule>
       <rule id="m9">
         <inputEntry id="m9_1"><text>-</text></inputEntry><inputEntry id="m9_2"><text>-</text></inputEntry><inputEntry id="m9_3"><text>-</text></inputEntry><inputEntry id="m9_4"><text>-</text></inputEntry><inputEntry id="m9_5"><text>-</text></inputEntry><inputEntry id="m9_6"><text>&lt; 1</text></inputEntry><inputEntry id="m9_7"><text>-</text></inputEntry><inputEntry id="m9_8"><text>-</text></inputEntry><inputEntry id="m9_9"><text>-</text></inputEntry>
-        <outputEntry id="m9_o1"><text>"NO_MERCHANTS"</text></outputEntry><outputEntry id="m9_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m9_o3"><text>"Pick at least one approved merchant. Mastercard requires approved merchants for purchases without you present."</text></outputEntry>
+        <outputEntry id="m9_o1"><text>"NO_MERCHANTS"</text></outputEntry><outputEntry id="m9_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m9_o3"><text>"Pick at least one approved merchant. Card-network rules require approved merchants for purchases without you present."</text></outputEntry>
       </rule>
       <rule id="m10">
         <inputEntry id="m10_1"><text>-</text></inputEntry><inputEntry id="m10_2"><text>-</text></inputEntry><inputEntry id="m10_3"><text>-</text></inputEntry><inputEntry id="m10_4"><text>-</text></inputEntry><inputEntry id="m10_5"><text>-</text></inputEntry><inputEntry id="m10_6"><text>-</text></inputEntry><inputEntry id="m10_7"><text>&lt; 1</text></inputEntry><inputEntry id="m10_8"><text>-</text></inputEntry><inputEntry id="m10_9"><text>-</text></inputEntry>
-        <outputEntry id="m10_o1"><text>"NO_GOODS"</text></outputEntry><outputEntry id="m10_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m10_o3"><text>"Pick what the agent may buy. Mastercard requires a description of the goods."</text></outputEntry>
+        <outputEntry id="m10_o1"><text>"NO_GOODS"</text></outputEntry><outputEntry id="m10_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m10_o3"><text>"Pick what the agent may buy. Card-network rules require a description of the goods."</text></outputEntry>
       </rule>
       <rule id="m11">
         <inputEntry id="m11_1"><text>-</text></inputEntry><inputEntry id="m11_2"><text>-</text></inputEntry><inputEntry id="m11_3"><text>-</text></inputEntry><inputEntry id="m11_4"><text>-</text></inputEntry><inputEntry id="m11_5"><text>-</text></inputEntry><inputEntry id="m11_6"><text>-</text></inputEntry><inputEntry id="m11_7"><text>-</text></inputEntry><inputEntry id="m11_8"><text>&lt; 1</text></inputEntry><inputEntry id="m11_9"><text>-</text></inputEntry>
-        <outputEntry id="m11_o1"><text>"NO_VALIDITY"</text></outputEntry><outputEntry id="m11_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m11_o3"><text>"Set how long the instruction is valid. Mastercard requires a validity period."</text></outputEntry>
+        <outputEntry id="m11_o1"><text>"NO_VALIDITY"</text></outputEntry><outputEntry id="m11_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m11_o3"><text>"Set how long the instruction is valid. Card-network rules require a validity period."</text></outputEntry>
       </rule>
       <rule id="m12">
         <inputEntry id="m12_1"><text>-</text></inputEntry><inputEntry id="m12_2"><text>-</text></inputEntry><inputEntry id="m12_3"><text>-</text></inputEntry><inputEntry id="m12_4"><text>-</text></inputEntry><inputEntry id="m12_5"><text>-</text></inputEntry><inputEntry id="m12_6"><text>-</text></inputEntry><inputEntry id="m12_7"><text>-</text></inputEntry><inputEntry id="m12_8"><text>&gt; 7</text></inputEntry><inputEntry id="m12_9"><text>-</text></inputEntry>
-        <outputEntry id="m12_o1"><text>"VALIDITY_TOO_LONG"</text></outputEntry><outputEntry id="m12_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m12_o3"><text>"An instruction can last at most 7 days, then you confirm a new one with your passkey (DiscountAI policy: Visa asks for fresh authentication on older instructions)."</text></outputEntry>
+        <outputEntry id="m12_o1"><text>"VALIDITY_TOO_LONG"</text></outputEntry><outputEntry id="m12_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m12_o3"><text>"An instruction can last at most 7 days, then you confirm a new one with your passkey (DiscountAI policy: Card-network rules ask for fresh authentication on older instructions)."</text></outputEntry>
       </rule>
       <rule id="m13">
         <inputEntry id="m13_1"><text>-</text></inputEntry><inputEntry id="m13_2"><text>-</text></inputEntry><inputEntry id="m13_3"><text>-</text></inputEntry><inputEntry id="m13_4"><text>-</text></inputEntry><inputEntry id="m13_5"><text>-</text></inputEntry><inputEntry id="m13_6"><text>-</text></inputEntry><inputEntry id="m13_7"><text>-</text></inputEntry><inputEntry id="m13_8"><text>-</text></inputEntry><inputEntry id="m13_9"><text>"IN_DOMESTIC_AFA","US_GLOBAL"</text></inputEntry>

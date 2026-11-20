@@ -59,7 +59,7 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-20 | Where does the agent live, given nothing may run on the PC? | A cloud agent session (it can be driven from a phone). Heavy work runs in GitHub Actions. |
 | 2026-11-20 | How does work continue with zero local execution? | Cloud session; even `git` and `gh` move off the PC. |
 | 2026-11-20 | formio 4.11 hard-requires the proprietary `@formio/feature-flags`. Which way? | Shim it out (MIT stand-in in `vendor/formio/server/shims/`). |
-| 2026-11-19 | Codespace blocked (HTTP 402 billing). How to continue? | Free alternative: Oracle Cloud Always Free A1. Keep retrying Oracle (capacity) and keep the Codespace alive for when the monthly hours reset. |
+| 2026-11-19 | Codespace blocked (HTTP 402 billing). How to continue? | Free alternative: a free-tier arm64 cloud VM. Keep retrying the cloud VM (capacity) and keep the Codespace alive for when the monthly hours reset. |
 | 2026-11-19 | Saga routing vs DIRECT | Measure first (A/B done, see status.md); the routing choice itself is still open below. |
 | 2026-11-19 | Install order for the remaining profiles | The recommended order above, one at a time. |
 | 2026-11-19 | Sizing approach | Dev right-sizing overlay (Kyverno, CPU requests ÷ 4); measure after right-sizing with everything up. |

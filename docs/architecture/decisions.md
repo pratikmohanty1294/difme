@@ -202,7 +202,7 @@ Kept on purpose:
 ## ADR-018 — DIFME product scope and DiscountAI integration choices (owner-approved 2026-11-18)
 Source documents: DIFME PRD/FRD v1.0 and DiscountAI E2E Architecture v4.1. The financial platform built so far is the substrate.
 - **Order of work:** platform items first (section B: hub, edge app, ML), then the DiscountAI vertical slice (FR-01).
-- **External rails:** a port (interface) per rail, with an open-source simulator behind it. Covered rails: Visa VIC/TAP, Mastercard Agent Pay, VTS/MDES tokenization, RBI-licensed PA escrow, merchant PSP checkout (UCP/ACP), UPI. ISO 8583 0100/0110 runs through jPOS. Real providers plug in later without changes elsewhere.
+- **External rails:** a port (interface) per rail, with an open-source simulator behind it. Covered rails: card-network agentic credentials (two networks), network tokenization services, RBI-licensed PA escrow, merchant PSP checkout (UCP/ACP), UPI. ISO 8583 0100/0110 runs through jPOS. Real providers plug in later without changes elsewhere.
 - **Matching engine** (SBBA auction, CLOB, 50 ms window, < 5 ms p99): Java 25 with Aeron + SBE + Agrona (zero-GC hot path). Aeron Cluster provides a Raft-replicated, deterministic order book. This replaces the documents' Rust choice, because Aeron's first-class clients are Java and C.
 - **Licence swaps** (hard rule, see ADR-009): the documents name CockroachDB (source-available since 2024), DragonflyDB (BSL 1.1) and Redpanda (BSL). They map to **YugabyteDB**, **Valkey** and **Apache Kafka**, all already in the platform.
 

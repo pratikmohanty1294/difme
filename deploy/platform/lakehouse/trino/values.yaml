@@ -4,7 +4,7 @@
 server:
   workers: 0
   config: { query: { maxMemory: "512MB" } }   # heap-sized (default 4GB assumes big workers)
-# s3.region: SeaweedFS ignores it, but the AWS SDK refuses to start without one ("Unable to load region", 44731237973).
+# s3.region: SeaweedFS ignores it, but the S3 client SDK refuses to start without one ("Unable to load region", 44731237973).
 # Catalog properties read ${ENV:...}; without these the coordinator exits at start ("Environment variable is not set:
 # POLARIS_CREDENTIAL", cluster-verify 44717717115). YSQL auth is off in dev, so the password is a placeholder.
 env:

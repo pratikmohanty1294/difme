@@ -13,7 +13,7 @@ on:
       node:        { type: boolean, default: false }
       prebuild:    { type: string, default: "true" }
       version:     { type: string, default: "0.1.0" }
-      # Multi-arch (2026-11-20: the runtime moves to an arm64 Oracle Cloud VM). Arch-independent builds (jars, JS
+      # Multi-arch (2026-11-20: the runtime moves to an arm64 cloud VM). Arch-independent builds (jars, JS
       # bundles) publish both platforms from one job; native binaries build per arch on a matching runner with a
       # tag suffix, and _manifest.yml joins them under the plain tag.
       platforms:   { type: string, default: "linux/amd64,linux/arm64" }
@@ -37,7 +37,7 @@ jobs:
         uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "25", cache: maven }
       # Maven Central rate-limits shared CI IPs (HTTP 429 seen 2026-11-20 with ~30 parallel jobs); resolve through
-      # Google's public Maven Central mirror instead.
+      # a public Maven Central mirror instead.
       - if: inputs.java
         name: Maven mirror
         run: |
@@ -53,8 +53,8 @@ jobs:
         run: ${{ inputs.prebuild }}
       - if: contains(inputs.platforms, ',')
         uses: docker/setup-qemu-action@v3
-      # Docker Hub base images (rust, node, golang, debian, eclipse-temurin) come through Google's pull-through cache
-      # first: anonymous Docker Hub pulls hit HTTP 429 when ~25 image jobs start together (2026-11-20, flink-jobs).
+      # docker.io base images (rust, node, golang, debian, eclipse-temurin) come through a public pull-through cache
+      # first: anonymous docker.io pulls hit HTTP 429 when ~25 image jobs start together (2026-11-20, flink-jobs).
       # BuildKit falls back to docker.io itself when the mirror lacks an image.
       - uses: docker/setup-buildx-action@v3
         with:

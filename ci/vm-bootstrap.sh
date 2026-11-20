@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time setup of a plain Ubuntu 24.04 VM as the DIFME runtime (replaces the Codespace; 2026-11-20).
-# Target: Oracle Cloud Always Free Ampere A1 (arm64, 4 OCPU / 24 GB RAM, boot volume up to 200 GB), but any
+# Target: a free-tier arm64 cloud VM (arm64, 4 OCPU / 24 GB RAM, boot volume up to 200 GB), but any
 # amd64/arm64 Ubuntu 24.04 host works. Run as the default sudo user (ubuntu):
 #   curl -fsSL https://raw.githubusercontent.com/pratikmohanty1294/difme/main/ci/vm-bootstrap.sh | bash
 # Afterwards drive it from anywhere with:  DIFME_VM=ubuntu@<ip> DIFME_VM_KEY=~/.ssh/<key> bash ci/cs.sh '<cmd>'

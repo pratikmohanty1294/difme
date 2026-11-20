@@ -24,7 +24,13 @@ spec:
           ports: [{ containerPort: 5432 }]
           volumeMounts:
             - { name: data, mountPath: /var/lib/postgresql/data }
-            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+            # One file per script (subPath), not the whole directory: mounting the ConfigMap over
+            # /docker-entrypoint-initdb.d hid the image's own init, which creates the DocumentDB extension FerretDB needs
+            # (formio: 'schema "documentdb_api" does not exist'; creating it by hand failed and stopped the init chain).
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/10-fluxnova.sql, subPath: 10-fluxnova.sql }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/20-temporal.sh, subPath: 20-temporal.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/30-risingwave.sh, subPath: 30-risingwave.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/40-harbor.sh, subPath: 40-harbor.sh }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
           readinessProbe: { exec: { command: [pg_isready, -U, difme] }, periodSeconds: 5 }
       volumes: [{ name: init, configMap: { name: postgres-docdb-init } }]
@@ -36,11 +42,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata: { name: postgres-docdb-init }
 data:
-  # FerretDB 2 needs the DocumentDB extension in the database it uses (postgres). The image creates it with its own
-  # init script, but this ConfigMap replaces /docker-entrypoint-initdb.d, so do it here (cluster-verify 2026-11-20:
-  # formio failed with 'schema "documentdb_api" does not exist').
-  05-documentdb.sql: |
-    CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
   10-fluxnova.sql: |
     CREATE DATABASE fluxnova;
     CREATE DATABASE keycloak;

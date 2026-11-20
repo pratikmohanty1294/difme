@@ -23,3 +23,8 @@
 ### Argo Rollouts crash: cannot get configmap
 - **Root cause:** its manifest was installed into the `argocd` namespace, but its RBAC binds the `argo-rollouts` service account.
 - **Fix:** install into the `argo-rollouts` namespace.
+
+### Kyverno `+(value)` on env entries corrupts containers (A/B 44687672715, 2026-11-20) — rejected
+- **Symptom:** with the `default-malloc-arena-max` rule (add `MALLOC_ARENA_MAX` where absent), base and core failed to sync: `Deployment "temporal-frontend" is invalid: env[0].valueFrom: may not be specified when value is not empty`.
+- **Root cause:** the add-if-absent anchor inside an env list, applied through Kyverno's autogen rules to Deployment templates, did not merge by env name; it added `value` to an existing entry that uses `valueFrom`.
+- **Rule:** don't inject env defaults with `patchStrategicMerge` + `+(value)`. Use a `foreach` over containers with a precondition that the variable is absent and a JSON patch that appends to `/env/-` (and handle containers without an env list), or set the variable per component. Verify any cluster-wide mutation with cluster-verify before merging.

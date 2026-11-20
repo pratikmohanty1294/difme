@@ -33,6 +33,7 @@ settlement:
   identity: "A = P − d·P; B = A + Y + F; S = P − B; payout = A + Y"
   trigger: signed merchant invoice + carrier tracking webhook (POE)
   split_release: principal A before the card due date; yield Y after the return window
+  return_window_days: 7            # yield Y is released this long after proof of delivery (owner to confirm)
   guarantee_fund_bps_of_fee: 1000
   refunds: two-leg (merchant → buying partner card; exchange → buyer instrument)
 evidence:

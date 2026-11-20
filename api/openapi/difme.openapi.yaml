@@ -114,6 +114,36 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { description: Unknown auction }
         "409": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/parties:
+    post:
+      operationId: registerParty
+      summary: Register a merchant ("merchant:<id>") or carrier ("carrier:<name>") Ed25519 key for proofs of delivery
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, publicKey], properties: { name: { type: string, pattern: "^(merchant|carrier):.+$" }, publicKey: { type: string, contentEncoding: base64, description: X.509 SubjectPublicKeyInfo } } } } } }
+      responses:
+        "201": { description: Registered }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/auctions/{auctionId}/fulfilment:
+    post:
+      operationId: submitFulfilment
+      summary: FR-01 proof of delivery (signed merchant invoice for exactly A + signed carrier DELIVERED event); releases fee F, schedules yield Y
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AuctionId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProofOfDelivery" } } } }
+      responses:
+        "200": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
+        "409": { $ref: "#/components/responses/ExchangeError" }
+        "422": { description: Proof rejected (problems listed), content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
+  /v1/exchange/auctions/{auctionId}/settle:
+    post:
+      operationId: settleYield
+      summary: Release the yield Y to the buying partner once the pack's return window has passed
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AuctionId" }]
+      responses:
+        "200": { description: Escrow after release, content: { application/json: { schema: { type: object } } } }
+        "409": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/auctions/{auctionId}/evidence:
     get:
       operationId: getEvidence
@@ -313,6 +343,38 @@ components:
             releasedMinor: { type: integer, format: int64 }
             refundedMinor: { type: integer, format: int64 }
             state: { type: string, enum: [HELD, PARTLY_RELEASED, SETTLED, REFUNDED] }
+    ProofOfDelivery:
+      type: object
+      required: [invoice, delivery]
+      properties:
+        invoice:
+          type: object
+          required: [invoiceId, merchantId, auctionId, amountMinor, currency, signature]
+          properties:
+            invoiceId: { type: string }
+            merchantId: { type: string }
+            auctionId: { type: integer, format: int64 }
+            amountMinor: { type: integer, format: int64 }
+            currency: { type: string, pattern: "^[A-Z]{3}$" }
+            signature: { type: string, contentEncoding: base64, description: Ed25519 over the canonical JSON of the other fields }
+        delivery:
+          type: object
+          required: [carrier, trackingId, auctionId, status, deliveredAtMs, signature]
+          properties:
+            carrier: { type: string }
+            trackingId: { type: string }
+            auctionId: { type: integer, format: int64 }
+            status: { type: string, enum: [DELIVERED, IN_TRANSIT, RETURNED] }
+            deliveredAtMs: { type: integer, format: int64 }
+            signature: { type: string, contentEncoding: base64 }
+    Fulfilment:
+      type: object
+      properties:
+        auctionId: { type: integer, format: int64 }
+        verified: { type: boolean }
+        problems: { type: array, items: { type: string } }
+        yieldReleaseAtMs: { type: integer, format: int64 }
+        escrow: { type: object }
     Problem:
       type: object
       description: RFC 9457 problem details

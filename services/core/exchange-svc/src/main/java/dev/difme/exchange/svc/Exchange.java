@@ -75,6 +75,15 @@ public class Exchange {
     private final AtomicLong stan = new AtomicLong();
     private Map<Long, Execution> executions;
 
+    /** Proof of delivery accepted: fee F released, yield Y released at yieldReleaseAtMs (pack return window). */
+    public record Fulfilment(long auctionId, boolean verified, List<String> problems, EscrowPort.Hold escrow, long yieldReleaseAtMs) {}
+
+    /** Merchant and carrier signing keys ("merchant:<id>", "carrier:<name>"), registered at /v1/exchange/parties. */
+    private final Map<String, PublicKey> partyKeys = new ConcurrentHashMap<>();
+    private Map<Long, Fulfilment> fulfilments;
+    /** Overrides every pack's return window when >= 0 (tests can't wait days). */
+    @ConfigProperty(name = "difme.exchange.return-window-override-ms", defaultValue = "-1") long returnWindowOverrideMs;
+
     @ConfigProperty(name = "difme.exchange.packs") List<String> packIds;
     @ConfigProperty(name = "difme.exchange.max-auctions") int maxAuctions;
     @ConfigProperty(name = "difme.exchange.bids-per-auction") int bidsPerAuction;
@@ -120,6 +129,12 @@ public class Exchange {
         executions = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<Long, Execution> e) {
+                return size() > keep;
+            }
+        });
+        fulfilments = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Long, Fulfilment> e) {
                 return size() > keep;
             }
         });
@@ -277,6 +292,61 @@ public class Exchange {
             executions.put(auctionId, e);
             return e;
         }
+    }
+
+    public void registerPartyKey(String name, PublicKey key) {
+        partyKeys.put(name, key);
+    }
+
+    /**
+     * Checks the fulfilment proof of an executed auction. On success the fee F goes to the exchange, the yield Y is
+     * scheduled after the pack's return window, and a fulfillment artifact joins the evidence chain. Null when the
+     * auction has no successful execution; a failed check returns the problems and changes nothing.
+     */
+    public Fulfilment fulfil(long auctionId, ProofOfDelivery.Proof proof) {
+        Execution e = executions.get(auctionId);
+        Result r = results.get(auctionId);
+        if (e == null || !e.fulfilled() || r == null || r.award() == null) return null;
+        synchronized (fulfilments) {
+            Fulfilment done = fulfilments.get(auctionId);
+            if (done != null) return done;
+            CommerceSplit s = r.award().split();
+            String holdId = "auction-" + auctionId;
+            List<String> problems = ProofOfDelivery.check(proof, auctionId, e.merchantId(), s.a(), partyKeys);
+            if (!problems.isEmpty()) return new Fulfilment(auctionId, false, problems, rails.escrow.get(holdId), 0);
+            EscrowPort.Hold hold = s.fee() > 0 ? rails.escrow.release(holdId, "fee", "exchange", s.fee()) : rails.escrow.get(holdId);
+            long window = returnWindowOverrideMs >= 0 ? returnWindowOverrideMs : packs.get(r.pack()).returnWindowDays() * 86_400_000L;
+            long yieldAt = proof.delivery().deliveredAtMs() + window;
+            EvidenceChain chain = chains.get(auctionId);
+            if (chain != null) {
+                Map<String, Object> f = new LinkedHashMap<>();
+                f.put("invoiceId", proof.invoice().invoiceId());
+                f.put("merchantId", proof.invoice().merchantId());
+                f.put("amount", proof.invoice().amountMinor());
+                f.put("currency", "INR");
+                f.put("carrier", proof.delivery().carrier());
+                f.put("trackingId", proof.delivery().trackingId());
+                f.put("deliveredAtMs", proof.delivery().deliveredAtMs());
+                f.put("yieldReleaseAtMs", yieldAt);
+                chain.append(EvidenceChain.Type.fulfillment, EvidenceChain.Signal.Attested, f);
+            }
+            Fulfilment ok = new Fulfilment(auctionId, true, List.of(), hold, yieldAt);
+            fulfilments.put(auctionId, ok);
+            metrics.counter("difme_exchange_fulfilments_total", "pack", r.pack()).increment();
+            return ok;
+        }
+    }
+
+    /** Releases the yield Y once the return window has passed. Null when there is no accepted fulfilment. */
+    public EscrowPort.Hold settle(long auctionId, long nowMs) {
+        Fulfilment f = fulfilments.get(auctionId);
+        Result r = results.get(auctionId);
+        Execution e = executions.get(auctionId);
+        if (f == null || r == null || e == null) return null;
+        if (nowMs < f.yieldReleaseAtMs()) throw new IllegalStateException("return window open for another " + (f.yieldReleaseAtMs() - nowMs) + " ms");
+        long y = r.award().split().yield();
+        String holdId = "auction-" + auctionId;
+        return y > 0 ? rails.escrow.release(holdId, "yield", "partner-" + e.boughtBy(), y) : rails.escrow.get(holdId);
     }
 
     public Result result(long auctionId) {

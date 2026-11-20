@@ -50,6 +50,8 @@ Newest first within each section. When the owner answers a question, move it fro
 | 2026-11-19 | Evidence chain: who witnesses in production, and where the operator key lives | Dev keys are generated at start. OpenBao transit is the candidate for the operator key. |
 | 2026-11-19 | Collateral V = A, and the default partner tier | FR-14 collateral at close. |
 | 2026-11-19 | `min_minor` collateral floors per vertical | ₹500 placeholders. |
+| 2026-11-20 | FR-01 return window before the yield Y is released | `return_window_days: 7` placeholder in `verticals/fr01-buy/vertical.yaml`. |
+| 2026-11-20 | Exchange-tracked partner reputation | Bids still carry a self-reported reputation; FR-16 updates from fulfilment/slashing are the next step. |
 | 2026-11-19 | v4.1 money letters | A charged at the merchant, B = A + Y + F paid by the buyer; the PRD has them swapped. |
 | 2026-11-19 | Istio → Cilium mesh; Argo CD → Flux | Footprint candidates (status.md, next step 2). |
 | 2026-11-19 | Kafka: `apache/kafka-native` vs Strimzi brokers | kafka-native can't run under Strimzi; adopting it means a plain StatefulSet broker. |

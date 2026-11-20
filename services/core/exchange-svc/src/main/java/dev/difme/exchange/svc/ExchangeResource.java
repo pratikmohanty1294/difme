@@ -167,6 +167,47 @@ public class ExchangeResource {
 
     public record Execute(String merchantId) {}
 
+    public record Party(String name, String publicKey) {}
+
+    /** Registers a merchant ("merchant:<id>") or carrier ("carrier:<name>") Ed25519 key (X.509 SubjectPublicKeyInfo, base64). */
+    @POST
+    @Path("/parties")
+    public Response party(Party p) {
+        if (p == null || p.name() == null || !(p.name().startsWith("merchant:") || p.name().startsWith("carrier:")) || p.publicKey() == null) {
+            return Response.status(400).entity(Map.of("error", "name must start with merchant: or carrier:, publicKey required")).build();
+        }
+        try {
+            var key = java.security.KeyFactory.getInstance("Ed25519")
+                    .generatePublic(new java.security.spec.X509EncodedKeySpec(Base64.getDecoder().decode(p.publicKey())));
+            exchange.registerPartyKey(p.name(), key);
+            return Response.status(201).build();
+        } catch (java.security.GeneralSecurityException | IllegalArgumentException e) {
+            return Response.status(400).entity(Map.of("error", "publicKey is not an Ed25519 X.509 key")).build();
+        }
+    }
+
+    /** FR-01 proof of delivery: signed merchant invoice + carrier delivery event. */
+    @POST
+    @Path("/auctions/{id}/fulfilment")
+    public Response fulfilment(@PathParam("id") long auctionId, ProofOfDelivery.Proof proof) {
+        Exchange.Fulfilment f = exchange.fulfil(auctionId, proof);
+        if (f == null) return Response.status(409).entity(Map.of("error", "auction has no successful execution")).build();
+        return f.verified() ? Response.ok(f).build() : Response.status(422).entity(f).build();
+    }
+
+    /** Releases the yield Y after the return window. */
+    @POST
+    @Path("/auctions/{id}/settle")
+    public Response settle(@PathParam("id") long auctionId) {
+        try {
+            var hold = exchange.settle(auctionId, System.currentTimeMillis());
+            if (hold == null) return Response.status(409).entity(Map.of("error", "no accepted fulfilment")).build();
+            return Response.ok(hold).build();
+        } catch (IllegalStateException e) {
+            return Response.status(409).entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+
     /** Carries out the award over the rails (escrow hold, failover across winner and backups, principal release). */
     @POST
     @Path("/auctions/{id}/execute")

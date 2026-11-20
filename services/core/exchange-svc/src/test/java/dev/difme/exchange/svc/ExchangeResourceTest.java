@@ -152,7 +152,7 @@ class ExchangeResourceTest {
 
     /** ADR-018 rails: escrow holds B, the winner's card can't cover A (51), the backup buys, the winner is slashed. */
     @Test
-    void awardIsExecutedOverTheRailsWithFailoverToTheBackup() throws InterruptedException {
+    void awardIsExecutedOverTheRailsWithFailoverToTheBackup() throws Exception {
         long id = given().contentType(ContentType.JSON).body(intent(900, 9_500_000))
                 .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
         given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
@@ -184,5 +184,49 @@ class ExchangeResourceTest {
                 .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(200).body("boughtBy", equalTo(41));   // once only
         given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-1\"}")
                 .post("/v1/exchange/auctions/987654321/execute").then().statusCode(404);
+
+        // ---- FR-01 proof of delivery: signed invoice + carrier event, then fee F now and yield Y after the window ----
+        java.security.KeyPair merchant = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        java.security.KeyPair carrier = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        for (var party : java.util.Map.of("merchant:m-1", merchant, "carrier:bluedart", carrier).entrySet()) {
+            given().contentType(ContentType.JSON).body(java.util.Map.of("name", party.getKey(), "publicKey",
+                    java.util.Base64.getEncoder().encodeToString(party.getValue().getPublic().getEncoded())))
+                    .post("/v1/exchange/parties").then().statusCode(201);
+        }
+        long delivered = System.currentTimeMillis();
+        given().contentType(ContentType.JSON).body(proof(merchant, carrier, id, 7_999_999, delivered))
+                .post("/v1/exchange/auctions/" + id + "/fulfilment").then().statusCode(422)
+                .body("problems[0]", org.hamcrest.Matchers.containsString("differs from the principal A"));
+        given().post("/v1/exchange/auctions/" + id + "/settle").then().statusCode(409);          // nothing accepted yet
+        given().contentType(ContentType.JSON).body(proof(merchant, carrier, id, 8_000_000, delivered))
+                .post("/v1/exchange/auctions/" + id + "/fulfilment").then().statusCode(200)
+                .body("verified", equalTo(true))
+                .body("escrow.releasedMinor", equalTo(8_100_000));                               // A + fee F
+        given().post("/v1/exchange/auctions/" + id + "/settle").then().statusCode(200)
+                .body("state", equalTo("SETTLED"))
+                .body("releasedMinor", equalTo(8_500_000));                                      // A + F + Y = B
+        given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200)
+                .body("artifacts.type", hasItem("fulfillment"))
+                .body("verdict.hashes", equalTo(true));
+    }
+
+    static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
+                                              long amount, long deliveredAt) throws Exception {
+        var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",
+                "auctionId", auction, "amountMinor", amount, "currency", "INR"));
+        var delivery = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("carrier", "bluedart", "trackingId", "BD123",
+                "auctionId", auction, "status", "DELIVERED", "deliveredAtMs", deliveredAt));
+        invoice.put("signature", sign(merchant, invoice));
+        delivery.put("signature", sign(carrier, delivery));
+        return java.util.Map.of("invoice", invoice, "delivery", delivery);
+    }
+
+    static String sign(java.security.KeyPair k, java.util.Map<String, Object> unsigned) throws Exception {
+        var s = java.security.Signature.getInstance("Ed25519");
+        s.initSign(k.getPrivate());
+        var payload = new java.util.TreeMap<>(unsigned);
+        payload.remove("signature");
+        s.update(dev.difme.exchange.kernel.Canonical.json(payload).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return java.util.Base64.getEncoder().encodeToString(s.sign());
     }
 }

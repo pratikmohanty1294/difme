@@ -1,1 +1,5 @@
 profile: ambient
+# CNI paths: the chart defaults (/etc/cni/net.d, /opt/cni/bin) are where Cilium writes on our k3d node; the node listing
+# in cluster-verify 44708558896 showed /etc/cni/net.d/05-cilium.conflist and an empty k3s dir, so the `platform: k3d`
+# profile (k3s dirs) pointed istio-cni at nothing. Readiness also needs Cilium's cni.exclusive=false, or Cilium keeps
+# removing istio-cni's chained entry from its conflist (deploy/platform/kube-system/cilium/values.yaml).

@@ -50,6 +50,13 @@ if [ $rc -ne 0 ]; then
     # Errors of the previous run: a long config dump (Trino's Bootstrap table) pushes them out of the tail.
     kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers --previous 2>/dev/null | grep -E 'ERROR|FATAL|Exception:|Caused by|panic' | grep -v '^\s*at ' | head -8 | sed 's/^/  (previous error) /' | cut -c1-300
     kubectl -n "${p%%/*}" describe pod "${p#*/}" 2>/dev/null | sed -n '/^Events:/,$p' | tail -8
+    # Startup lines: setup steps log once at start and scroll out of --tail (formio's db setup, 2026-11-20).
+    echo "  (startup)"; kubectl -n "${p%%/*}" logs "${p#*/}" --all-containers 2>/dev/null | grep -vE '^    at |Update found|[█▄▀]' | head -70 | cut -c1-300
+    # The body of a failing HTTP readiness probe often names the cause (formio's /health 400, 2026-11-20).
+    probe=$(kubectl -n "${p%%/*}" get pod "${p#*/}" -o jsonpath='{.spec.containers[0].readinessProbe.httpGet.port} {.spec.containers[0].readinessProbe.httpGet.path}' 2>/dev/null)
+    if [ -n "${probe% *}" ] && [ "${probe#* }" != "$probe" ]; then
+      echo "  readiness body (${probe#* }):"; kubectl get --raw "/api/v1/namespaces/${p%%/*}/pods/${p#*/}:${probe% *}/proxy${probe#* }" 2>&1 | head -c 600; echo
+    fi
   done
   # Apps can stay Progressing while every pod is Ready (a FlinkDeployment whose job keeps failing, a Rollout, a Job).
   # Print the resources Argo CD itself marks unhealthy, with their status and events (found 2026-11-20: flink-jobs).
@@ -60,10 +67,24 @@ if [ $rc -ne 0 ]; then
         echo "--- $a: $kind $ns/$name $hs ${msg:-}" | cut -c1-300
         kubectl -n "$ns" get "$kind" "$name" -o jsonpath='{.status}' 2>/dev/null | cut -c1-900; echo
         kubectl -n "$ns" get events --field-selector "involvedObject.name=$name" --sort-by=.lastTimestamp 2>/dev/null | tail -5 | cut -c1-250
+        if [ "$kind" = DaemonSet ]; then           # node agents (istio-cni, ztunnel): their own log says why they aren't ready
+          kubectl -n "$ns" logs "ds/$name" --all-containers --tail=60 2>&1 | grep -viE 'ip6?tables|^-A |^-N |^\*|COMMIT' | tail -25 | cut -c1-300
+        fi
         if [ "$kind" = FlinkDeployment ]; then
           kubectl -n "$ns" logs "deploy/$name" --tail=40 2>&1 | grep -iE 'exception|error|caused by|failed' | tail -15 | cut -c1-300
         fi
       done
+  done
+  if kubectl -n istio-system get ds istio-cni-node >/dev/null 2>&1; then   # where do CNI configs live on this k3d node?
+    for d in /etc/cni/net.d /var/lib/rancher/k3s/agent/etc/cni/net.d; do
+      echo "--- node $d: $(docker exec k3d-difme-server-0 ls -la "$d" 2>&1 | tail -n +2 | awk '{print $NF}' | tr '\n' ' ')"
+    done
+  fi
+  # Synced+Healthy is required; name what drifts (istio-base/istiod, 2026-11-20).
+  echo "== out-of-sync resources (Argo CD view)"
+  for a in $(apps | awk '$3 == "OutOfSync" {print $1}'); do
+    kubectl -n argocd get application "$a" -o jsonpath='{range .status.resources[?(@.status=="OutOfSync")]}{.kind} {.namespace} {.name}{"\n"}{end}' \
+      | head -8 | sed "s/^/  $a: /"
   done
   kubectl get rollouts -A 2>/dev/null | head; kubectl get rs -n core-platform 2>/dev/null | head -15
   echo "== recent warning events"; kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>/dev/null | tail -20 | cut -c1-250

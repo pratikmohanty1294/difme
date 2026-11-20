@@ -19,7 +19,10 @@ spec:
             - { name: ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: formio, key: root-password } } }
             - { name: PORT, value: "3001" }
           ports: [{ containerPort: 3001 }]
-          readinessProbe: { httpGet: { path: /health, port: 3001 }, periodSeconds: 10 }
+          # Not /health: formio 4.11 OSS has no such route, the alias middleware looks up a form called "health" and
+          # answers 400 "Invalid alias" (debug logs, cluster-verify 44725904035). /access is whitelisted for anonymous
+          # GET and reads the roles from the database, so it reports a working API and DB.
+          readinessProbe: { httpGet: { path: /access, port: 3001 }, periodSeconds: 10 }
           resources: { requests: { cpu: 50m, memory: 192Mi }, limits: { memory: 448Mi } }
 ---
 apiVersion: v1

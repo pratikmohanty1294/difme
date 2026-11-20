@@ -1,0 +1,12 @@
+# Istio ambient on Cilium (Istio platform prerequisites): kubelet probes into ambient pods are SNAT-ed to
+# 169.254.7.127. Our default-deny CiliumNetworkPolicies dropped them, every probe timed out and the core services and
+# Temporal restarted in a loop once their namespaces joined the mesh (cluster-verify 2026-11-20).
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata: { name: allow-ambient-hostprobes }
+spec:
+  description: Allows SNAT-ed kubelet health probes into ambient pods
+  enableDefaultDeny: { egress: false, ingress: false }   # adds an allow; never turns default-deny on by itself
+  endpointSelector: {}
+  ingress:
+    - fromCIDR: ["169.254.7.127/32"]

@@ -251,3 +251,9 @@
 - **Root cause:** Kyverno `mutate-defaults` sets `readOnlyRootFilesystem: true` on every container; nginx-unprivileged keeps its pid and temp paths in `/tmp`.
 - **Fix:** one kustomize patch in `back-office-ui/backoffice-web/kustomization.yaml` gives every Deployment a 16 Mi disk-backed `/tmp`.
 - **Rule:** any new image (nginx, JVM, Node) needs its writable paths mounted before it ships; check the image's temp, cache and pid directories.
+
+### Istio ambient on Cilium in k3d: istio-cni never ready (2026-11-20)
+- **Symptom:** istio-cni-node readiness 503 for 50 min while its agent was enrolling pods normally.
+- **Evidence:** node listing showed only `/etc/cni/net.d/05-cilium.conflist`; `/var/lib/rancher/k3s/agent/etc/cni/net.d` empty.
+- **Causes:** (1) `global.platform: k3d` points istio-cni at the k3s CNI dirs, but with flannel disabled Cilium writes to the defaults; (2) Cilium's default `cni.exclusive: true` removes other plugins' entries from its conflist, so istio-cni's chained plugin kept disappearing.
+- **Fix:** chart-default CNI dirs for istio-cni; Cilium `cni: { exclusive: false }`.

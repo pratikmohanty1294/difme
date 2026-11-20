@@ -56,14 +56,14 @@ spec:
           args: [verification-service, --config, /opt/veraison/config/config.yaml]
           env: [{ name: GOMEMLIMIT, value: 48MiB }]
           ports: [{ name: verify, containerPort: 8080 }]
-          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }]
+          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }, { name: stores, mountPath: /opt/veraison/stores }]   # its start-up creates stores/ (read-only root FS otherwise)
           resources: { requests: { cpu: 10m, memory: 24Mi }, limits: { memory: 96Mi } }
         - name: provisioning
           image: ghcr.io/pratikmohanty1294/difme-veraison:0.1.0
           args: [provisioning-service, --config, /opt/veraison/config/config.yaml]
           env: [{ name: GOMEMLIMIT, value: 48MiB }]
           ports: [{ name: provision, containerPort: 8888 }]
-          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }]
+          volumeMounts: [{ name: config, mountPath: /opt/veraison/config }, { name: stores, mountPath: /opt/veraison/stores }]   # its start-up creates stores/ (read-only root FS otherwise)
           resources: { requests: { cpu: 10m, memory: 24Mi }, limits: { memory: 96Mi } }
 ---
 apiVersion: v1

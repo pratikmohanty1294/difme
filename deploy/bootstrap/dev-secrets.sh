@@ -79,6 +79,8 @@ fi
 secret governance    datahub-db password="$YB"
 secret observability grafana-admin admin-user=admin admin-password="$(rand)"
 secret security      keycloak admin-password="$(rand)"
+# OpenBao static auto-unseal key (32 bytes, hex). Dev only; production uses a KMS/transit seal.
+secret security      openbao-unseal key="$(head -c 32 /dev/urandom | xxd -p -c 64)"
 secret security      warpgate admin-password="$(rand)"
 # Veraison EAR signing key: EC P-256 as a JWK (Veraison's loader only reads JWK). b64u: hex -> base64url.
 b64u() { xxd -r -p | base64 -w0 | tr '+/' '-_' | tr -d '='; }

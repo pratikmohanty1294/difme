@@ -9,13 +9,16 @@ server:
     # Dev runs one history pod with a handful of workflows, so 4 shards. The count is fixed when the database is first
     # set up and can't be changed later: production must set its own (512+) before its first install.
     numHistoryShards: 4
+    # Memory pass (A/B): every pooled connection is a Postgres backend process (~8–12 MiB); Postgres processes were
+    # ~1 GiB PSS at idle (83 processes, cluster-verify 44748980093). Four Temporal services × (default + visibility)
+    # pools; dev load needs a handful each. Production overlays raise them.
     persistence:
       default:
         driver: sql
-        sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal, user: temporal, existingSecret: temporal-db, maxConns: 20 }
+        sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal, user: temporal, existingSecret: temporal-db, maxConns: 5, maxIdleConns: 2, maxConnLifetime: 1h }
       visibility:
         driver: sql
-        sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal_visibility, user: temporal, existingSecret: temporal-db, maxConns: 10 }
+        sql: { driver: postgres12, host: postgres-docdb.database-tier.svc, port: 5432, database: temporal_visibility, user: temporal, existingSecret: temporal-db, maxConns: 3, maxIdleConns: 1, maxConnLifetime: 1h }
     # The schema job also registers the namespace the services use (otherwise cmd-svc/saga-orchestrator fail with
     # "Namespace default is not found" on a fresh database; found live). Retention 3d keeps visibility rows small.
     namespaces: { create: true, namespace: [{ name: default, retention: 3d }] }

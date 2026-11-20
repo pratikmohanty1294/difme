@@ -36,4 +36,6 @@ if [ $rc -ne 0 ]; then
   echo "== recent warning events"; kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>/dev/null | tail -20 | cut -c1-250
 fi
 echo "== $P: after"; bash ci/mem-report.sh 12
+# Process/thread level (owner rule 2026-11-20): every process in every pod, its PSS, threads and thread groups.
+echo "== $P: processes"; sudo -n env "PATH=$PATH" "KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}" bash ci/proc-report.sh 45 2>/dev/null || bash ci/proc-report.sh 45
 exit $rc

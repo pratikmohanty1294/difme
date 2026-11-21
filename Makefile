@@ -77,3 +77,7 @@ lint:            ## Semgrep, Buf, Spectral, AsyncAPI
 	asyncapi validate api/asyncapi/difme.asyncapi.yaml
 
 verify: lint tla test   ## Run every local quality gate
+
+# Licence scan of every third-party package (owner rule: free and open source only). Report: docs/knowledge-base/licence-scan.md
+licence-scan:
+	python3 ci/licence-scan.py --report docs/knowledge-base/licence-scan.md

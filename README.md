@@ -82,7 +82,7 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 10 | Hosted load-test execution | **k6-operator** (self-hosted) — free replacement | `tests/load/` |
 | 11.1 | RATS RFC 9334 (TEE, EAT, verifier) | **Veraison** verifier + software-simulated TEE in the emulator | `services/attestation/`, `edge/` |
 | 11.2 | Syft SBOM, Harbor, GUAC | Same | `.github/workflows/`, `deploy/platform/harbor/` |
-| 13 | Scenarios A–D (on-prem, cloud, hybrid, QUIC proxy chain) | Kustomize overlays + Terraform modules + local QUIC relay | `deploy/overlays/`, `infra/terraform/`, `services/hub/quic-relay/` |
+| 13 | Scenarios A–D (on-prem, cloud, hybrid, QUIC proxy chain) | Kustomize overlays + OpenTofu modules (planned; Terraform is BSL) + local QUIC relay | `deploy/overlays/`, `infra/` (planned), `services/hub/quic-relay/` |
 | 14 | `@ConsistencyProfile` routing matrix | Same | `services/core/consistency-router/` |
 | 16 | OpenCost cost-per-transaction | Same | `deploy/platform/opencost/` |
 | 17 | v2.0 candidates | Tracked, not built | `docs/roadmap.md` |
@@ -98,7 +98,7 @@ config/          Feature flags, consistency profiles
 deploy/          Argo CD apps, Helm values, Kustomize overlays, profiles
 docs/            Architecture, decisions, runbooks
 edge/            Mobile app, Rust CRDT core, Wasmtime plug-ins, ONNX fraud model
-infra/           Terraform modules (cloud scenario B/C)
+infra/           OpenTofu modules for cloud scenarios B/C (planned; Terraform is BSL)
 ml/              Fraud model training → ONNX, Feast definitions
 policies/        Kyverno, OPA Rego, Semgrep rules
 services/        core (Quarkus), hub (Rust), attestation

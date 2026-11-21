@@ -29,5 +29,29 @@
       "cypress-tests",
       "api-reference"
     ]
+  },
+  "ph-ee-common": {
+    "upstream": "https://github.com/openMF/ph-ee-connector-common",
+    "tag": "v1.9.1",
+    "commit": "8a6c8facdff8353d83e74c18ac139c0456620f01"
+  },
+  "ph-ee-channel": {
+    "upstream": "https://github.com/openMF/ph-ee-connector-channel",
+    "tag": "v1.9.0",
+    "commit": "848b1743c77c818f359d8e06da7dcb471b0f6c8f"
+  },
+  "ph-ee-ams-mifos": {
+    "upstream": "https://github.com/openMF/ph-ee-connector-ams-mifos",
+    "tag": "v1.7.0",
+    "commit": "49fd0a5c6533983d5aa0d1a2267727a24fd32a6f",
+    "omitted": [
+      "keystore.jks"
+    ]
+  },
+  "ph-ee-flows": {
+    "upstream": "https://github.com/openMF/ph-ee-env-labs",
+    "tag": "(no release tag; pinned by commit)",
+    "commit": "accaf2d69e8fe6d091ba11be7f19a934d0385660",
+    "kept_only": "orchestration/feel"
   }
 }

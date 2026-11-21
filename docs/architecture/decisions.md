@@ -263,7 +263,7 @@ is vendored as pinned source in `vendor/` (`ci/vendor-sync.sh`, `vendor/VENDORED
 |---|---|---|---|
 | PSP (payment aggregator / gateway) for merchants and agents | **Juspay Hyperswitch** v1.129.0, test processor | Apache-2.0 | As requested. Its test processor's base URL points at DIFME's acquirer, so card payments reach the scheme (no change to Hyperswitch). |
 | Core banking (CBS) | **Apache Fineract** 1.16.1 | Apache-2.0 | As requested. Escrow, merchant, partner and buyer accounts; transfers idempotent by `Idempotency-Key`. |
-| Payment hub | **DIFME payment-hub on Temporal** (`services/core/payment-hub`) | ours | Owner choice over Mifos Payment Hub EE, which needs Zeebe (Camunda License 1.0, not OSI) and Elasticsearch. |
+| Payment hub | **Mifos Payment Hub EE on Fluxnova** (vendored, MPL-2.0) | MPL-2.0 | Owner choice: keep Mifos's connectors and BPMN flows, replace only Zeebe (Camunda License 1.0, not OSI) with Fluxnova. Interim: `services/core/payment-hub` on Temporal until the port passes the end-to-end tests. |
 | ISO 8583 + card network | **moov-io/iso8583** v0.26.4 in `services/scheme-sim` (scheme + issuers, ISO adapter, acquirer) | Apache-2.0 | Owner choice over jPOS (AGPL-3.0): a small Go library and a lighter service. |
 
 Flow: exchange → payment hub → Hyperswitch → acquirer → ISO 8583 → scheme/issuer; money is booked in Fineract (card

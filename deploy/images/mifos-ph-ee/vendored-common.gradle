@@ -1,0 +1,25 @@
+// Builds the Mifos PH-EE connectors against the vendored ph-ee-connector-common (vendor/mifos-ph-ee/connector-common,
+// published to mavenLocal first) instead of the SNAPSHOTs upstream pulls from a third-party Artifactory.
+allprojects {
+    repositories {
+        mavenLocal()
+    }
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.mifos' && details.requested.name == 'ph-ee-connector-common') {
+                details.useVersion '1.9.1-SNAPSHOT'
+                details.because 'vendored connector-common (DIFME)'
+            }
+        }
+    }
+}
+
+// connector-ams-mifos targets Java 13 but connector-common targets 17; everything runs on 17, so build for 17.
+allprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin('java')) {
+            java.sourceCompatibility = JavaVersion.VERSION_17
+            java.targetCompatibility = JavaVersion.VERSION_17
+        }
+    }
+}

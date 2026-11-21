@@ -175,6 +175,24 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { description: Unknown vertical }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/reports/orders:
+    get:
+      operationId: ordersReport
+      summary: Orders report as a file for regulators, partners and auditors (file-based reporting, owner 2026-11-21)
+      description: "Orders closed between from and to (IST days, inclusive; default today). CSV, or JSON with meta.rowsSha256 (SHA-256 of the compact JSON of rows) and meta.signatureEd25519 by the operator key named meta.signedBy (GET /v1/exchange/keys). The digest is also in X-Report-SHA256. Verify with ci/verify-report.py."
+      security: [{ oauth2: [exchange:read] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: pack, in: query, schema: { type: string } }
+        - { name: format, in: query, schema: { type: string, enum: [csv, json], default: csv } }
+      responses:
+        "200":
+          description: The report file
+          headers: { X-Report-SHA256: { schema: { type: string } }, Content-Disposition: { schema: { type: string } } }
+          content: { text/csv: { schema: { type: string } }, application/json: { schema: { type: object } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/custom-rules/check:
     post:
       operationId: checkCustomRules

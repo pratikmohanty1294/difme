@@ -30,7 +30,8 @@ const GROUPS: Group[] = [
       { route: 'exchange/attributes', label: 'Rule attributes', icon: SlidersHorizontal },
       { route: 'exchange/network', label: LIVE ? 'Partners' : 'Network & nodes', icon: Network },
       { route: 'audit', label: 'Proof chain', icon: ShieldCheck },
-      { route: 'audit/compliance', label: 'Regulator node', icon: Landmark },
+      // Regulator reporting is file based (owner 2026-11-21): live builds offer Reports instead of the regulator node.
+      ...(LIVE ? [{ route: 'exchange/reports' as const, label: 'Reports', icon: Landmark }] : [{ route: 'audit/compliance' as const, label: 'Regulator node', icon: Landmark }]),
     ],
   },
   {

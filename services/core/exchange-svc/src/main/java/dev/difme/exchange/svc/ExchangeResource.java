@@ -298,6 +298,90 @@ public class ExchangeResource {
         return settings(packId);
     }
 
+    static final String[] REPORT_COLUMNS = {"closedAt", "auctionId", "pack", "state", "merchant", "bMinor", "aMinor", "yieldMinor", "feeMinor",
+            "buyerSavesMinor", "winnerNode", "mandateId", "tier", "boughtBy", "failovers", "slashedMinor", "refundedMinor", "escrowState",
+            "yieldReleaseAt", "settingsVersion", "evidenceArtifacts", "evidenceVerified", "evidenceSealHash"};
+
+    /**
+     * Orders report for a date range (IST days, inclusive), for regulators and partners as a file. CSV, or JSON with a
+     * SHA-256 of the rows and the exchange operator's Ed25519 signature over it (verify with GET /v1/exchange/keys).
+     * Every format carries the digest in X-Report-SHA256.
+     */
+    @GET
+    @Path("/reports/orders")
+    public Response ordersReport(@jakarta.ws.rs.QueryParam("from") String from, @jakarta.ws.rs.QueryParam("to") String to,
+                                 @jakarta.ws.rs.QueryParam("pack") String packId, @jakarta.ws.rs.QueryParam("format") String format) {
+        if (packId != null && exchange.pack(packId) == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        java.time.ZoneId ist = java.time.ZoneId.of("Asia/Kolkata");
+        java.time.LocalDate f, t;
+        try {
+            f = from == null || from.isBlank() ? java.time.LocalDate.now(ist) : java.time.LocalDate.parse(from);
+            t = to == null || to.isBlank() ? f : java.time.LocalDate.parse(to);
+        } catch (java.time.format.DateTimeParseException e) {
+            return Response.status(400).entity(Map.of("error", "from and to are dates like 2026-11-21")).build();
+        }
+        if (t.isBefore(f) || f.plusDays(366).isBefore(t)) return Response.status(400).entity(Map.of("error", "to must be on or after from, within a year")).build();
+        String fmt = format == null || format.isBlank() ? "csv" : format.toLowerCase(java.util.Locale.ROOT);
+        if (!fmt.equals("csv") && !fmt.equals("json")) return Response.status(400).entity(Map.of("error", "format is csv or json")).build();
+        long fromMs = f.atStartOfDay(ist).toInstant().toEpochMilli(), toMs = t.plusDays(1).atStartOfDay(ist).toInstant().toEpochMilli();
+        List<Map<String, Object>> rows = new java.util.ArrayList<>();
+        for (Map<String, Object> r : exchange.reportRows(packId, fromMs, toMs)) {
+            Map<String, Object> o = new LinkedHashMap<>();
+            for (String c : REPORT_COLUMNS) o.put(c, switch (c) {
+                case "closedAt" -> java.time.Instant.ofEpochMilli((Long) r.get("closedAtMs")).atZone(ist).toOffsetDateTime().toString();
+                case "escrowState" -> r.get("escrow") instanceof Map<?, ?> m ? m.get("state") : null;
+                case "yieldReleaseAt" -> r.get("yieldReleaseAtMs") instanceof Long ms ? java.time.Instant.ofEpochMilli(ms).atZone(ist).toOffsetDateTime().toString() : null;
+                default -> r.get(c);
+            });
+            rows.add(o);
+        }
+        String name = "difme-orders-" + (packId == null ? "all" : packId) + "-" + f + (t.equals(f) ? "" : "_" + t) + "." + fmt;
+        byte[] body;
+        String sha;
+        try {
+            var mapper = StateStore.JSON;
+            byte[] rowsJson = mapper.writeValueAsBytes(rows);
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(rowsJson);
+            sha = java.util.HexFormat.of().formatHex(digest);
+            if (fmt.equals("json")) {
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("report", "orders");
+                meta.put("pack", packId == null ? "all" : packId);
+                meta.put("from", f.toString());
+                meta.put("to", t.toString());
+                meta.put("timezone", "Asia/Kolkata");
+                meta.put("generatedAt", java.time.OffsetDateTime.now(ist).toString());
+                meta.put("rows", rows.size());
+                meta.put("rowsSha256", sha);
+                meta.put("signedBy", exchange.operatorKeyName());
+                meta.put("signatureEd25519", exchange.signReport(digest));
+                meta.put("verify", "SHA-256 of the compact JSON of `rows` must equal rowsSha256; the signature is over those 32 bytes with the key named signedBy at GET /v1/exchange/keys.");
+                Map<String, Object> doc = new LinkedHashMap<>();
+                doc.put("meta", meta);
+                doc.put("rows", rows);
+                body = mapper.writeValueAsBytes(doc);
+            } else {
+                StringBuilder csv = new StringBuilder(String.join(",", REPORT_COLUMNS)).append("\r\n");
+                for (Map<String, Object> r : rows) {
+                    List<String> cells = new java.util.ArrayList<>();
+                    for (String c : REPORT_COLUMNS) {
+                        Object v = r.get(c);
+                        String x = v == null ? "" : String.valueOf(v);
+                        if (x.matches("^[=+\\-@].*") && !(v instanceof Number)) x = "'" + x;   // no spreadsheet formula injection
+                        cells.add(x.contains(",") || x.contains("\"") || x.contains("\n") ? "\"" + x.replace("\"", "\"\"") + "\"" : x);
+                    }
+                    csv.append(String.join(",", cells)).append("\r\n");
+                }
+                body = csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        return Response.ok(body).type(fmt.equals("json") ? "application/json" : "text/csv; charset=utf-8")
+                .header("Content-Disposition", "attachment; filename=\"" + name + "\"")
+                .header("X-Report-SHA256", sha).build();
+    }
+
     public record MandateStatusChange(String status) {}
 
     /** Pause (stops new bids), resume, or revoke (terminate; final) a mandate. Awards already made are unaffected. */

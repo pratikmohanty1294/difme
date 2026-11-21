@@ -15,7 +15,10 @@ const srv = http.createServer((req, res) => {
     let body = ''; req.on('data', (c) => body += c); req.on('end', async () => {
       try {
         const r = await fetch(REAL + req.url.replace(/^\/api/, ''), { method: req.method, headers: { 'Content-Type': 'application/json' }, body: body || undefined });
-        res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(await r.text());
+        // Pass the headers a download needs (nginx does the same in the cluster).
+        const h = { 'Content-Type': r.headers.get('content-type') ?? 'application/json' };
+        for (const k of ['content-disposition', 'x-report-sha256']) if (r.headers.get(k)) h[k] = r.headers.get(k);
+        res.writeHead(r.status, h); res.end(Buffer.from(await r.arrayBuffer()));
       } catch { res.writeHead(502); res.end('{}'); }
     }); return;
   }
@@ -85,7 +88,22 @@ srv.listen(18187, async () => {
     await p.getByRole('button', { name: /^Save 1 change/ }).click(); await p.waitForTimeout(800);
     check('reset to defaults (850)', (await api('GET', '/fr01-buy/settings')).json.settings.minRiskScore === 850);
     await p.screenshot({ path: path.join(OUT, 'operator-config.png'), fullPage: true });
+    // Reports (file-based regulator reporting): no regulator node; download the signed JSON and verify it as a recipient.
+    const nav = await p.locator('aside').first().innerText();
+    check('nav: Reports, no Regulator node', nav.includes('Reports') && !nav.includes('Regulator node'));
+    await p.getByRole('link', { name: 'Reports' }).first().click(); await p.waitForTimeout(800);
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.getByRole('link', { name: /Download signed JSON/ }).click()]);
+    const file = path.join(OUT, dl.suggestedFilename());
+    await dl.saveAs(file);
+    const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+    check(`report downloaded as ${dl.suggestedFilename()} with this order`, /^difme-orders-all-\d{4}-\d\d-\d\d\.json$/.test(dl.suggestedFilename()) && doc.rows.some((r) => r.auctionId === aid && r.state === 'PARTLY_RETURNED' && r.evidenceVerified === true));
+    if (process.env.VERIFY_PY) {
+      const v = require('child_process').spawnSync(process.env.VERIFY_PY, ['-I', path.join(__dirname, '../../../ci/verify-report.py'), file, `${REAL}/v1/exchange/keys`], { encoding: 'utf8' });
+      check(`recipient's verifier accepts it: ${v.stdout.trim().slice(0, 60)}`, v.status === 0);
+    }
     check('no page errors', errors.length === 0);
+    // Clean up: a standing mandate left active would bid in other tests' auctions on the same exchange.
+    await api('POST', `/fr01-buy/mandates/${m.json.mandateId}/status`, { status: 'REVOKED' });
   } catch (e) {
     console.log('FAIL step:', e.message.split('\n')[0]); checks.push(false);
     await p.screenshot({ path: path.join(OUT, 'operator-failed.png'), fullPage: true });

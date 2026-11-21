@@ -622,6 +622,49 @@ public class Exchange {
         return chains.get(auctionId);
     }
 
+    /**
+     * Order rows for a regulator/partner report (decided 2026-11-21: reporting is file based): every order closed in
+     * [fromMs, toMs) with its money, outcome and evidence status. Oldest first.
+     */
+    public List<Map<String, Object>> reportRows(String pack, long fromMs, long toMs) {
+        List<Result> all;
+        synchronized (results) { all = new ArrayList<>(results.values()); }
+        List<Map<String, Object>> out = new ArrayList<>();
+        Map<String, PublicKey> keys = publicKeys();
+        for (Result r : all) {
+            if (pack != null && !pack.equals(r.pack())) continue;
+            if (r.closedAtMs() < fromMs || r.closedAtMs() >= toMs) continue;
+            Map<String, Object> row = orderRow(r);
+            if (r.award() != null) row.put("buyerSavesMinor", r.award().split().buyerSaves());
+            EvidenceChain chain = chains.get(r.auctionId());
+            if (chain != null) {
+                var seal = chain.seal();
+                var verdict = chain.verify(keys::get);
+                row.put("evidenceArtifacts", chain.artifacts().size());
+                row.put("evidenceSealHash", seal == null ? null : seal.hash());
+                row.put("evidenceVerified", verdict.ok());
+                Object sv = chain.artifacts().isEmpty() ? null : chain.artifacts().getFirst().payload().get("settingsVersion");
+                if (sv != null) row.put("settingsVersion", sv);
+            }
+            out.add(row);
+        }
+        out.sort(java.util.Comparator.comparingLong(m -> (Long) m.get("closedAtMs")));
+        return out;
+    }
+
+    /** Signs a report digest with the exchange operator key (OpenBao transit in the cluster; dev keys locally). */
+    public String signReport(byte[] digest) {
+        try {
+            return java.util.Base64.getEncoder().encodeToString(operator.sign(digest));
+        } catch (Exception e) {
+            throw new IllegalStateException("report could not be signed: " + e.getMessage(), e);
+        }
+    }
+
+    public String operatorKeyName() {
+        return operator.name();
+    }
+
     public Map<String, PublicKey> publicKeys() {
         return Map.of(operator.name(), operator.publicKey(), witness.name(), witness.publicKey());
     }

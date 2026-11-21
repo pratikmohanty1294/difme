@@ -5,10 +5,10 @@ export type Route =
   | 'overview' | 'demo'
   | 'buyer' | 'buyer/requests'
   | 'investor' | 'investor/factory' | 'investor/mandates'
-  | 'exchange' | 'exchange/orderbook' | 'exchange/config' | 'exchange/attributes' | 'exchange/network'
+  | 'exchange' | 'exchange/orderbook' | 'exchange/config' | 'exchange/attributes' | 'exchange/reports' | 'exchange/network'
   | 'audit' | 'audit/compliance';
 
-const ROUTES: Route[] = ['overview', 'demo','buyer', 'buyer/requests', 'investor', 'investor/factory', 'investor/mandates', 'exchange', 'exchange/orderbook', 'exchange/config', 'exchange/attributes', 'exchange/network', 'audit', 'audit/compliance'];
+const ROUTES: Route[] = ['overview', 'demo','buyer', 'buyer/requests', 'investor', 'investor/factory', 'investor/mandates', 'exchange', 'exchange/orderbook', 'exchange/config', 'exchange/attributes', 'exchange/reports', 'exchange/network', 'audit', 'audit/compliance'];
 
 function parse(): { route: Route; param?: string } {
   const raw = window.location.hash.replace(/^#\/?/, '');

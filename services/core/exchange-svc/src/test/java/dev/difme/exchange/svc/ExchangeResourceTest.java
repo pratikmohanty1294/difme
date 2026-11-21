@@ -332,6 +332,38 @@ class ExchangeResourceTest {
         org.junit.jupiter.api.Assertions.assertEquals("SETTLED", ((java.util.Map<?, ?>) row.get("escrow")).get("state"));
         org.junit.jupiter.api.Assertions.assertTrue(((Number) row.get("closedAtMs")).longValue() > 0);
         given().get("/v1/exchange/orders?pack=nope").then().statusCode(404);
+        // File-based report for regulators (2026-11-21): today's orders as signed JSON and as CSV.
+        String today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).toString();
+        var rep = given().get("/v1/exchange/reports/orders?format=json&from=" + today).then().statusCode(200)
+                .header("Content-Disposition", org.hamcrest.Matchers.containsString("difme-orders-all-" + today + ".json"))
+                .extract();
+        var doc = rep.jsonPath();
+        java.util.List<java.util.Map<String, Object>> rows = doc.getList("rows");
+        var mine = rows.stream().filter(r -> ((Number) r.get("auctionId")).longValue() == id).findFirst().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("PARTLY_RETURNED", mine.get("state"));
+        org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, mine.get("evidenceVerified"));
+        // The digest is over the compact JSON of `rows` exactly as served; the signature verifies with the published key.
+        try {
+            var tree = new com.fasterxml.jackson.databind.ObjectMapper().readTree(rep.asByteArray());
+            byte[] rowsJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(tree.get("rows"));
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(rowsJson);
+            org.junit.jupiter.api.Assertions.assertEquals(java.util.HexFormat.of().formatHex(digest), doc.getString("meta.rowsSha256"));
+            org.junit.jupiter.api.Assertions.assertEquals(doc.getString("meta.rowsSha256"), rep.header("X-Report-SHA256"));
+            String keyB64 = given().get("/v1/exchange/keys").jsonPath().getString(doc.getString("meta.signedBy"));
+            var key = java.security.KeyFactory.getInstance("Ed25519").generatePublic(new java.security.spec.X509EncodedKeySpec(java.util.Base64.getDecoder().decode(keyB64)));
+            var sig = java.security.Signature.getInstance("Ed25519");
+            sig.initVerify(key);
+            sig.update(digest);
+            org.junit.jupiter.api.Assertions.assertTrue(sig.verify(java.util.Base64.getDecoder().decode(doc.getString("meta.signatureEd25519"))), "report signature");
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+        String csv = given().get("/v1/exchange/reports/orders?format=csv&from=" + today + "&to=" + today).then().statusCode(200)
+                .contentType(org.hamcrest.Matchers.startsWith("text/csv")).extract().asString();
+        org.junit.jupiter.api.Assertions.assertTrue(csv.startsWith("closedAt,auctionId,pack,state,merchant,bMinor"), csv.substring(0, 80));
+        org.junit.jupiter.api.Assertions.assertTrue(csv.contains("," + id + ",fr01-buy,PARTLY_RETURNED,"), "row for " + id);
+        given().get("/v1/exchange/reports/orders?from=21-11-2026").then().statusCode(400);
+        given().get("/v1/exchange/reports/orders?format=pdf").then().statusCode(400);
     }
 
     /** A paused mandate stops standing and its bids are refused; resume restores it; revoke is final. */

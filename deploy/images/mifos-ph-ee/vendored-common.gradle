@@ -1,11 +1,17 @@
 // Builds the Mifos PH-EE connectors against the vendored ph-ee-connector-common (vendor/mifos-ph-ee/connector-common,
-// published to mavenLocal first) instead of the SNAPSHOTs upstream pulls from a third-party Artifactory.
+// published to mavenLocal first) instead of the SNAPSHOTs upstream pulls from a third-party Artifactory, and on Fluxnova
+// instead of Zeebe: the Zeebe client is replaced by services/zeebe-on-fluxnova (same API subset, Fluxnova REST).
 allprojects {
     repositories {
         mavenLocal()
     }
     configurations.configureEach {
         resolutionStrategy.eachDependency { details ->
+            // Module and version together: Spring's dependency management re-applies Zeebe's version after a plain substitution.
+            if (details.requested.group == 'io.camunda' && details.requested.name == 'zeebe-client-java') {
+                details.useTarget 'dev.difme:zeebe-client-fluxnova:1.0.0'
+                details.because 'Fluxnova replaces Zeebe (DIFME)'
+            }
             if (details.requested.group == 'org.mifos' && details.requested.name == 'ph-ee-connector-common') {
                 details.useVersion '1.9.1-SNAPSHOT'
                 details.because 'vendored connector-common (DIFME)'
@@ -21,5 +27,22 @@ allprojects {
             java.sourceCompatibility = JavaVersion.VERSION_17
             java.targetCompatibility = JavaVersion.VERSION_17
         }
+    }
+}
+
+// connector-channel uses Guava (MpesaUtils) without declaring it: it came in through the real Zeebe client's gRPC stack.
+allprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin('java') && project.name == 'ph-ee-connector-channel') {
+            dependencies { implementation 'com.google.guava:guava:33.4.8-jre' }
+        }
+    }
+}
+
+// connector-common declares the Zeebe client but never uses it (no references in its code); Spring's dependency
+// management there forces Zeebe's version even onto a retargeted module, so the dependency is simply dropped.
+allprojects {
+    if (project.name == 'ph-ee-connector-common') {
+        configurations.configureEach { exclude group: 'io.camunda', module: 'zeebe-client-java' }
     }
 }

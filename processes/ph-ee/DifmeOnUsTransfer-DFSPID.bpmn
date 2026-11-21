@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DIFME on-us transfer for Mifos Payment Hub EE: payer and payee both bank with DIFME's Fineract. Written in PH-EE's
+  Zeebe dialect from PH-EE's own task types only (connector-ams-mifos, connector-channel) and converted for Fluxnova by
+  ci/zeebe-bpmn-to-fluxnova.py, like the vendored flows. It is PayerFundTransfer-DFSPID without the Mojaloop legs
+  (party lookup, payee quote, payer confirmation, switch transfer): the payee is credited in the same Fineract instead.
+  Order as in PayerFundTransfer: block the payer, credit the payee, then book the payer. A failed credit releases the
+  block; a failed booking leaves the funds blocked (recoverable) and goes to an operator.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="difme-onus" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="DifmeOnUsTransfer-DFSPID" name="DIFME on-us transfer" isExecutable="true">
+    <bpmn:startEvent id="start" name="Transfer initiation"><bpmn:outgoing>s1</bpmn:outgoing></bpmn:startEvent>
+
+    <bpmn:serviceTask id="localQuote" name="Local Quote">
+      <bpmn:extensionElements><zeebe:taskDefinition type="payer-local-quote-DFSPID" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>s1</bpmn:incoming><bpmn:outgoing>s2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="quoted" default="s3"><bpmn:incoming>s2</bpmn:incoming><bpmn:outgoing>s3</bpmn:outgoing><bpmn:outgoing>quoteFailed</bpmn:outgoing></bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="block" name="Payer Block Funds">
+      <bpmn:extensionElements><zeebe:taskDefinition type="block-funds" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>s3</bpmn:incoming><bpmn:outgoing>s4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="blocked" default="s5"><bpmn:incoming>s4</bpmn:incoming><bpmn:outgoing>s5</bpmn:outgoing><bpmn:outgoing>blockFailed</bpmn:outgoing></bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="credit" name="Payee Deposit">
+      <bpmn:extensionElements><zeebe:taskDefinition type="payee-deposit-transfer-DFSPID" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>s5</bpmn:incoming><bpmn:outgoing>s6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="credited" default="s7"><bpmn:incoming>s6</bpmn:incoming><bpmn:outgoing>s7</bpmn:outgoing><bpmn:outgoing>creditFailed</bpmn:outgoing></bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="book" name="Payer Book Funds">
+      <bpmn:extensionElements><zeebe:taskDefinition type="book-funds" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>s7</bpmn:incoming><bpmn:outgoing>s8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="booked" default="s9"><bpmn:incoming>s8</bpmn:incoming><bpmn:outgoing>s9</bpmn:outgoing><bpmn:outgoing>bookFailed</bpmn:outgoing></bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="success" name="Send Successful Fund Transfer Event To Channel">
+      <bpmn:extensionElements><zeebe:taskDefinition type="send-success-to-channel" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>s9</bpmn:incoming><bpmn:outgoing>s10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="done" name="Transfer completed"><bpmn:incoming>s10</bpmn:incoming></bpmn:endEvent>
+
+    <bpmn:serviceTask id="release" name="Payer Release Block">
+      <bpmn:extensionElements><zeebe:taskDefinition type="release-block" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>creditFailed</bpmn:incoming><bpmn:outgoing>r1</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="error" name="Send Error Event To Channel">
+      <bpmn:extensionElements><zeebe:taskDefinition type="send-error-to-channel" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>quoteFailed</bpmn:incoming><bpmn:incoming>blockFailed</bpmn:incoming><bpmn:incoming>r1</bpmn:incoming><bpmn:outgoing>e1</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="failed" name="Transfer failed"><bpmn:incoming>e1</bpmn:incoming></bpmn:endEvent>
+
+    <bpmn:serviceTask id="unknown" name="Send Unknown Status Event To Channel">
+      <bpmn:extensionElements><zeebe:taskDefinition type="send-unknown-to-channel" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>bookFailed</bpmn:incoming><bpmn:outgoing>u1</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="notifyAms" name="Notify AMS Book failure">
+      <bpmn:extensionElements><zeebe:taskDefinition type="notify-ams-failure" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>u1</bpmn:incoming><bpmn:outgoing>u2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="operator" name="Funds blocked, operator notified"><bpmn:incoming>u2</bpmn:incoming></bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="s1" sourceRef="start" targetRef="localQuote" />
+    <bpmn:sequenceFlow id="s2" sourceRef="localQuote" targetRef="quoted" />
+    <bpmn:sequenceFlow id="s3" sourceRef="quoted" targetRef="block" />
+    <bpmn:sequenceFlow id="quoteFailed" sourceRef="quoted" targetRef="error">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= localQuoteFailed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="s4" sourceRef="block" targetRef="blocked" />
+    <bpmn:sequenceFlow id="s5" sourceRef="blocked" targetRef="credit" />
+    <bpmn:sequenceFlow id="blockFailed" sourceRef="blocked" targetRef="error">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= transferPrepareFailed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="s6" sourceRef="credit" targetRef="credited" />
+    <bpmn:sequenceFlow id="s7" sourceRef="credited" targetRef="book" />
+    <bpmn:sequenceFlow id="creditFailed" sourceRef="credited" targetRef="release">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= transferCreateFailed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="r1" sourceRef="release" targetRef="error" />
+    <bpmn:sequenceFlow id="s8" sourceRef="book" targetRef="booked" />
+    <bpmn:sequenceFlow id="s9" sourceRef="booked" targetRef="success" />
+    <bpmn:sequenceFlow id="bookFailed" sourceRef="booked" targetRef="unknown">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= transferCreateFailed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="s10" sourceRef="success" targetRef="done" />
+    <bpmn:sequenceFlow id="e1" sourceRef="error" targetRef="failed" />
+    <bpmn:sequenceFlow id="u1" sourceRef="unknown" targetRef="notifyAms" />
+    <bpmn:sequenceFlow id="u2" sourceRef="notifyAms" targetRef="operator" />
+  </bpmn:process>
+</bpmn:definitions>

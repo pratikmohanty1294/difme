@@ -21,4 +21,27 @@ Building (no source changes needed): JDK 17 (as upstream), Gradle wrapper 7.3, w
 instead of the SNAPSHOTs upstream pulls from a third-party Artifactory, and builds `connector-ams-mifos` for Java 17
 (upstream says 13; the shared library needs 17).
 
-Local changes: none yet. Each change for the Fluxnova port is listed here with its reason.
+Local changes to the Mifos source: **none**. The port to Fluxnova is done around it:
+- `services/zeebe-on-fluxnova` replaces the Zeebe client (same API subset, on Fluxnova's REST API); the init script
+  swaps it in (`io.camunda:zeebe-client-java` → `dev.difme:zeebe-client-fluxnova`). connector-common declares the Zeebe
+  client without using it: dropped there. connector-channel uses Guava without declaring it (it came with the Zeebe
+  client's gRPC stack): declared by the init script.
+- Flows are converted by `ci/zeebe-bpmn-to-fluxnova.py` (`bill-request-DFSPID.bpmn` is an incomplete upstream draft:
+  skipped). DIFME's own flow `processes/ph-ee/DifmeOnUsTransfer-DFSPID.bpmn` is written in the same Zeebe dialect from
+  PH-EE task types only.
+
+Settings the connectors need beyond upstream's defaults (DIFME runtime config):
+- `zeebe.broker.contactpoint`: Fluxnova's engine REST URL; `dfspids`: the Fineract tenant (worker topics are named after it).
+- `security.jws.enable` / `security.jws.response.enable: false` (connector-common 1.9.1 conditions on them).
+- connector-channel: `bpmns.tenants[].flows.payment-transfer` (a missing list is a NullPointerException on every
+  transfer) and `redis.*` (its request idempotency store; DIFME's Valkey in the cluster).
+- connector-ams-mifos: `ams.local.*` hosts and tenants, and `ams.local.keystore-path` (it loads a keystore at start
+  even for plain-HTTP Fineract: a throwaway one is generated, upstream's is not used).
+
+Upstream quirk noted: the payee-deposit worker completes its job twice (from the Fineract route, then unconditionally);
+the second completion is refused as on Zeebe, and the first (real) outcome stands.
+
+Verified 2026-11-21 (local, Fluxnova 3.1.1 + Fineract 1.16.1): a transfer posted to PH-EE's own channel API
+(`POST /channel/transfer`) ran DifmeOnUsTransfer on Fluxnova through PH-EE's Fineract connector: local quote → block →
+payee deposit → book → success; payer 10,000 → 8,500, payee 0 → 1,500. Over the balance: Fineract's interop quote
+refuses (403), the flow ends at "send error to channel", balances unchanged.

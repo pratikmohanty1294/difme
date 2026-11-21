@@ -56,6 +56,20 @@ export interface MandateIn {
 }
 export interface CatalogAttribute { key: string; type: 'number' | 'string' | 'boolean'; label?: string | null; example?: string | null }
 export interface AttributeCatalog { pack: string; builtIn: { key: string; type: string }[]; attributes: CatalogAttribute[] }
+export interface OrderRow {
+  auctionId: number; pack: string; closedAtMs: number; state: string; ranked: number; merchant?: string;
+  winnerNode?: number; mandateId?: number; tier?: string; aMinor?: number; yieldMinor?: number; feeMinor?: number; bMinor?: number;
+  boughtBy?: number; failovers?: number; slashedMinor?: number; yieldReleaseAtMs?: number; refundedMinor?: number;
+  escrow?: { state: string; heldMinor: number; releasedMinor: number; refundedMinor: number };
+}
+export interface OrdersView {
+  orders: OrderRow[];
+  totals: { orders: number; byState: Record<string, number>; boughtMinor: number; buyersSavedMinor: number; feesMinor: number; partnerYieldMinor: number; refundedMinor: number };
+}
+export interface PartnerRow {
+  nodeRef: number; partnerRef: string; tier: string; verifiedDeliveries: number; reputation: number | null;
+  mandates: number; activeMandates: number; awards: number; yieldEarnedMinor: number; budgetLeftMinor: number; depositMinor: number;
+}
 export interface OrderInfo { merchant?: string; category?: string; brand?: string; mcc?: string; quantity?: number; city?: string; pincode?: string }
 export interface CustomCheck { ok: boolean; problems?: string[]; outcome?: { action: 'APPROVE' | 'REJECT' | 'FLAG'; message: string; rule: number } }
 export interface MandateRegistered { mandateId: number; depositRequiredMinor: number; findings: Finding[] }
@@ -91,6 +105,10 @@ export const exchange = {
   /** Replaces the master list (the operator's upload). 422/409 carry `problems`. */
   replaceAttributes: (attributes: { key: string; type: string; label?: string; example?: string }[]) =>
     call<AttributeCatalog>('PUT', `/${PACK}/attributes`, { attributes }),
+  /** Operator: orders newest first, with totals; optional state filter. */
+  orders: (state?: string, limit = 200) => call<OrdersView>('GET', `/orders?limit=${limit}${state ? `&state=${encodeURIComponent(state)}` : ''}`),
+  /** Operator: buying partners the exchange knows through their mandates. */
+  partnerList: () => call<{ pack: string; partners: PartnerRow[] }>('GET', `/${PACK}/partners`),
   /** Cheap reachability probe (the public verification keys). */
   ping: () => call<Record<string, string>>('GET', '/keys', undefined, 3000).then(() => true, () => false),
 };

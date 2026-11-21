@@ -322,6 +322,16 @@ class ExchangeResourceTest {
                 .body("refundedMinor", equalTo(200_000))
                 .body("state", equalTo("SETTLED"));
         given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200).body("artifacts.type", hasItem("refund"));
+        // The operator's order list shows where this order stands, from the exchange's own records.
+        var row = given().get("/v1/exchange/orders?state=PARTLY_RETURNED&limit=500").then().statusCode(200)
+                .body("totals.orders", org.hamcrest.Matchers.greaterThan(0))
+                .extract().jsonPath().getMap("orders.find { it.auctionId == " + id + "L }");
+        org.junit.jupiter.api.Assertions.assertNotNull(row, "order " + id + " listed as PARTLY_RETURNED");
+        org.junit.jupiter.api.Assertions.assertEquals(4_250_000, ((Number) row.get("refundedMinor")).longValue());
+        org.junit.jupiter.api.Assertions.assertEquals(8_500_000, ((Number) row.get("bMinor")).longValue());
+        org.junit.jupiter.api.Assertions.assertEquals("SETTLED", ((java.util.Map<?, ?>) row.get("escrow")).get("state"));
+        org.junit.jupiter.api.Assertions.assertTrue(((Number) row.get("closedAtMs")).longValue() > 0);
+        given().get("/v1/exchange/orders?pack=nope").then().statusCode(404);
     }
 
     /** A paused mandate stops standing and its bids are refused; resume restores it; revoke is final. */
@@ -501,6 +511,12 @@ class ExchangeResourceTest {
                 .body("yieldByDay." + Exchange.istDay(), equalTo(64_000))   // the day-by-day history the investor chart shows
                 .body("standing", equalTo(false));
         given().get("/v1/exchange/fr01-buy/mandates/987654321").then().statusCode(404);
+        // The partner list: this mandate's node, with its award and yield.
+        var p = given().get("/v1/exchange/fr01-buy/partners").then().statusCode(200).extract().jsonPath()
+                .getMap("partners.find { it.partnerRef == 'standing-1' }");
+        org.junit.jupiter.api.Assertions.assertNotNull(p);
+        org.junit.jupiter.api.Assertions.assertTrue(((Number) p.get("awards")).intValue() >= 1);
+        org.junit.jupiter.api.Assertions.assertTrue(((Number) p.get("yieldEarnedMinor")).longValue() >= 64_000);
     }
 }
 

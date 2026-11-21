@@ -111,6 +111,27 @@ paths:
         "404": { description: Unknown vertical }
         "409": { $ref: "#/components/responses/ExchangeError" }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/orders:
+    get:
+      operationId: listOrders
+      summary: The operator's order list, newest first, with totals (NO_MATCH, AWARDED, FAILED, BOUGHT, DELIVERED, RETURNED, PARTLY_RETURNED, SETTLED)
+      security: [{ oauth2: [exchange:read] }]
+      parameters:
+        - { name: pack, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        "200": { description: Orders and totals, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/{pack}/partners:
+    get:
+      operationId: listPartners
+      summary: Buying partners the exchange knows through their mandates (tier, deliveries, reputation, mandates, yield)
+      security: [{ oauth2: [exchange:read] }]
+      parameters: [{ name: pack, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Partners, content: { application/json: { schema: { type: object } } } }
+        "404": { description: Unknown vertical }
   /v1/exchange/custom-rules/check:
     post:
       operationId: checkCustomRules

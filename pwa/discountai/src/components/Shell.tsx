@@ -24,11 +24,11 @@ const GROUPS: Group[] = [
   },
   {
     title: 'Exchange OME', app: 'exchange', module: 'Exchange', tone: 'bg-exchange-600', items: [
-      { route: 'exchange', label: 'Live auction', icon: Activity },
-      { route: 'exchange/orderbook', label: 'Order book', icon: BookOpen },
+      { route: 'exchange', label: LIVE ? 'Orders' : 'Live auction', icon: Activity },
+      ...(LIVE ? [] : [{ route: 'exchange/orderbook' as const, label: 'Order book', icon: BookOpen }]),
       { route: 'exchange/config', label: 'Auction config', icon: SlidersHorizontal },
       { route: 'exchange/attributes', label: 'Rule attributes', icon: SlidersHorizontal },
-      { route: 'exchange/network', label: 'Network & nodes', icon: Network },
+      { route: 'exchange/network', label: LIVE ? 'Partners' : 'Network & nodes', icon: Network },
       { route: 'audit', label: 'Proof chain', icon: ShieldCheck },
       { route: 'audit/compliance', label: 'Regulator node', icon: Landmark },
     ],

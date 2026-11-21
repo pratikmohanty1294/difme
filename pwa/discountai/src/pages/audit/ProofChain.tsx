@@ -46,7 +46,7 @@ export default function ProofChain({ focus }: { focus?: string }) {
             </select>
           </>
         )} />
-      {LIVE && <LiveEvidence />}
+      {LIVE && <LiveEvidence initial={focus} />}
       {req?.evidence && <div className="mb-6"><EvidenceView key={req.id} ev={req.evidence} /></div>}
       {req && !req.evidence && <div className="mb-6"><Callout tone="info" title="Evidence chains appear when the order settles">The three per-payment chains are sealed as the order completes.</Callout></div>}
       {!req ? <Empty title="No proofs yet">Submit a marketplace request from the buyer agent to generate a live chain.</Empty> : (

@@ -252,6 +252,24 @@ public class ExchangeResource {
         return attributes(packId);
     }
 
+    /** The operator's order list (newest first) with totals. Optional ?pack=, ?state=, ?limit= (1..500, default 100). */
+    @GET
+    @Path("/orders")
+    public Response orders(@jakarta.ws.rs.QueryParam("pack") String packId, @jakarta.ws.rs.QueryParam("state") String state,
+                           @jakarta.ws.rs.QueryParam("limit") Integer limit) {
+        if (packId != null && exchange.pack(packId) == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        int n = limit == null ? 100 : Math.max(1, Math.min(500, limit));
+        return Response.ok(Map.of("orders", exchange.orders(packId, state, n), "totals", exchange.orderTotals(packId))).build();
+    }
+
+    /** Buying partners the exchange knows through their mandates. */
+    @GET
+    @Path("/{pack}/partners")
+    public Response partners(@PathParam("pack") String packId) {
+        if (exchange.pack(packId) == null) return Response.status(404).build();
+        return Response.ok(Map.of("pack", packId, "partners", exchange.partners(packId))).build();
+    }
+
     public record MandateStatusChange(String status) {}
 
     /** Pause (stops new bids), resume, or revoke (terminate; final) a mandate. Awards already made are unaffected. */

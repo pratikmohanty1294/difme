@@ -63,7 +63,8 @@ public class Exchange {
     /** What the exchange (not the bidder) knows about an open auction; the facts bid-time rules are checked against. */
     public record Context(long cardPriceMinor, long yieldRoomMinor, Map<String, Object> facts) {}
 
-    public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
+    /** closedAtMs: when the auction closed (0 in records stored before it was kept). */
+    public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award, long closedAtMs) {}
 
     /**
      * The award carried out over the rails: the buyer's B held in escrow, the winner and hot backups tried in rank
@@ -796,6 +797,121 @@ public class Exchange {
         return h;
     }
 
+    /**
+     * The operator's order list: the newest closed auctions of a pack (all packs when null) with where each order
+     * stands, from the exchange's own records. State: NO_MATCH, AWARDED (not bought yet), FAILED (nobody could buy;
+     * buyer refunded), BOUGHT, DELIVERED, RETURNED / PARTLY_RETURNED, SETTLED (yield released).
+     */
+    public List<Map<String, Object>> orders(String pack, String state, int limit) {
+        List<Result> all;
+        synchronized (results) { all = new ArrayList<>(results.values()); }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (int i = all.size() - 1; i >= 0 && out.size() < limit; i--) {
+            Result r = all.get(i);
+            if (pack != null && !pack.equals(r.pack())) continue;
+            Map<String, Object> row = orderRow(r);
+            if (state == null || state.equals(row.get("state"))) out.add(row);
+        }
+        return out;
+    }
+
+    /** Counts and money totals over every order the exchange still holds (minor units). */
+    public Map<String, Object> orderTotals(String pack) {
+        List<Result> all;
+        synchronized (results) { all = new ArrayList<>(results.values()); }
+        Map<String, Long> byState = new java.util.TreeMap<>();
+        long gmv = 0, fees = 0, yields = 0, refunds = 0, saved = 0;
+        for (Result r : all) {
+            if (pack != null && !pack.equals(r.pack())) continue;
+            Map<String, Object> row = orderRow(r);
+            byState.merge((String) row.get("state"), 1L, Long::sum);
+            Execution e = executions.get(r.auctionId());
+            if (e != null && e.fulfilled() && r.award() != null) {
+                CommerceSplit s = r.award().split();
+                gmv += s.b(); fees += s.fee(); yields += s.yield(); saved += s.buyerSaves();
+            }
+            Return ret = returns.get(r.auctionId());
+            if (ret != null) { refunds += ret.buyerRefundMinor(); fees -= ret.feeReversedMinor(); yields -= ret.yieldVoidedMinor(); }
+        }
+        Map<String, Object> t = new LinkedHashMap<>();
+        t.put("orders", byState.values().stream().mapToLong(Long::longValue).sum());
+        t.put("byState", byState);
+        t.put("boughtMinor", gmv);
+        t.put("buyersSavedMinor", saved);
+        t.put("feesMinor", fees);
+        t.put("partnerYieldMinor", yields);
+        t.put("refundedMinor", refunds);
+        return t;
+    }
+
+    private Map<String, Object> orderRow(Result r) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        long id = r.auctionId();
+        Execution e = executions.get(id);
+        Fulfilment f = fulfilments.get(id);
+        Return ret = returns.get(id);
+        EscrowPort.Hold hold = null;
+        try { hold = rails.escrow.get("auction-" + id); } catch (IllegalArgumentException none) { /* not executed */ }
+        String state = r.award() == null ? "NO_MATCH" : e == null ? "AWARDED" : !e.fulfilled() ? "FAILED" : f == null || !f.verified() ? "BOUGHT"
+                : ret != null ? (ret.fractionBps() >= 10_000 ? "RETURNED" : "PARTLY_RETURNED")
+                : hold != null && hold.state() == EscrowPort.State.SETTLED ? "SETTLED" : "DELIVERED";
+        row.put("auctionId", id);
+        row.put("pack", r.pack());
+        row.put("closedAtMs", r.closedAtMs());
+        row.put("state", state);
+        row.put("ranked", r.ranked());
+        EvidenceChain chain = chains.get(id);
+        if (chain != null && !chain.artifacts().isEmpty()) {
+            Object merchant = chain.artifacts().getFirst().payload().get("merchant");
+            if (merchant != null) row.put("merchant", merchant);
+        }
+        if (r.award() != null) {
+            CommerceSplit s = r.award().split();
+            row.put("winnerNode", r.award().winner().nodeRef());
+            if (r.award().mandateId() != null) row.put("mandateId", r.award().mandateId());
+            row.put("tier", r.award().tier().name());
+            row.put("aMinor", s.a()); row.put("yieldMinor", s.yield()); row.put("feeMinor", s.fee()); row.put("bMinor", s.b());
+        }
+        if (e != null) {
+            row.put("boughtBy", e.boughtBy());
+            row.put("failovers", Math.max(0, e.attempts().size() - 1));
+            row.put("slashedMinor", e.slashedMinor());
+        }
+        if (f != null && f.verified()) row.put("yieldReleaseAtMs", f.yieldReleaseAtMs());
+        if (ret != null) row.put("refundedMinor", ret.buyerRefundMinor());
+        if (hold != null) row.put("escrow", Map.of("state", hold.state().name(), "heldMinor", hold.heldMinor(),
+                "releasedMinor", hold.releasedMinor(), "refundedMinor", hold.refundedMinor()));
+        return row;
+    }
+
+    /** Buying partners the exchange knows (through their mandates): tier, deliveries, reputation, mandates, yield. */
+    public List<Map<String, Object>> partners(String pack) {
+        Map<Integer, Map<String, Object>> byNode = new java.util.TreeMap<>();
+        mandates.forEach((id, m) -> {
+            if (!m.pack().equals(pack)) return;
+            Map<String, Object> p = byNode.computeIfAbsent(m.nodeRef(), n -> {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("nodeRef", n);
+                x.put("partnerRef", m.terms().partnerRef());
+                x.put("tier", tierOf(pack, n).name());
+                x.put("verifiedDeliveries", verifiedDeliveries(pack, n));
+                x.put("reputation", trackedReputation(pack, n));
+                x.put("mandates", 0); x.put("activeMandates", 0); x.put("awards", 0);
+                x.put("yieldEarnedMinor", 0L); x.put("budgetLeftMinor", 0L); x.put("depositMinor", 0L);
+                return x;
+            });
+            p.merge("mandates", 1, (a, b) -> (Integer) a + (Integer) b);
+            if (m.standing()) p.merge("activeMandates", 1, (a, b) -> (Integer) a + (Integer) b);
+            p.merge("awards", m.awards().get(), (a, b) -> (Integer) a + (Integer) b);
+            p.merge("yieldEarnedMinor", m.yieldEarnedMinor().get(), (a, b) -> (Long) a + (Long) b);
+            if (m.status().get() != MandateStatus.REVOKED) {
+                p.merge("budgetLeftMinor", m.budgetLeftMinor().get(), (a, b) -> (Long) a + (Long) b);
+                p.merge("depositMinor", m.terms().depositMinor(), (a, b) -> (Long) a + (Long) b);
+            }
+        });
+        return new ArrayList<>(byNode.values());
+    }
+
     public Result result(long auctionId) {
         return results.get(auctionId);
     }
@@ -875,7 +991,7 @@ public class Exchange {
                 seal(pack, auctionId, chain);
             }
         }
-        results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award));
+        results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award, System.currentTimeMillis()));
         openAuctions.remove(auctionId);
         saveAuction(auctionId);
         metrics.counter("difme_exchange_auctions_closed_total", "pack", pack, "matched", ranked > 0 ? "yes" : "no").increment();

@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ShieldCheck, ShieldX } from 'lucide-react';
 import { exchange, ExchangeError, type EvidenceView } from '../../api/exchange';
 import { shortHash } from '../../sim/format';
 import { Badge, Callout, Card, JsonView } from '../../components/ui';
 
 /** Exchange operator: the server's evidence chain for any auction, verified by the exchange against its published keys. */
-export function LiveEvidence() {
-  const [id, setId] = useState('');
+export function LiveEvidence({ initial }: { initial?: string }) {
+  const [id, setId] = useState(initial && /^\d+$/.test(initial) ? initial : '');
   const [ev, setEv] = useState<EvidenceView>();
   const [err, setErr] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -18,6 +18,8 @@ export function LiveEvidence() {
     catch (e) { setErr(e instanceof ExchangeError && e.status === 404 ? `No evidence chain for auction ${n}.` : String(e instanceof Error ? e.message : e)); }
     finally { setBusy(false); }
   };
+  // Opened from the operator's order list (#/audit/<auction>): load that auction straight away.
+  useEffect(() => { if (id) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const v = ev?.verdict;
   const ok = v && v.hashes && v.links && v.seal && v.witnesses;
   return (

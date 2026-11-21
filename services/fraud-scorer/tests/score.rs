@@ -34,7 +34,7 @@ fn ordinary_order_is_allowed_and_a_stacked_risk_order_is_blocked() {
 #[tokio::test]
 async fn http_contract() {
     let Some(s) = scorer() else { return };
-    let app = router(s);
+    let app = router(s, None);
     let body = serde_json::to_vec(&SAFE).unwrap();
     let r = app.clone().oneshot(Request::post("/v1/score").header("content-type", "application/json").body(Body::from(body)).unwrap())
         .await.unwrap();

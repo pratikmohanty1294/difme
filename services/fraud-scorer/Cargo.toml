@@ -16,6 +16,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # ONNX Runtime loaded at start from ORT_DYLIB_PATH (the image ships libonnxruntime.so from the official wheel), so the
 # build needs no download and the runtime version is pinned in one place (deploy/images/fraud-scorer/Dockerfile).
+# Feast online store (HTTP feature server, in-cluster plain HTTP): no TLS stack needed.
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
 
 [dev-dependencies]

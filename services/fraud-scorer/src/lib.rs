@@ -7,6 +7,8 @@ use ort::{session::Session, value::Tensor};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
+pub mod feast;
+
 /// Feature order the model was trained with (ml/fraud/train.py FEATURES); checked against model.json at start.
 pub const FEATURES: [&str; 6] =
     ["amount_zscore", "txn_count_1h", "distinct_counterparties_24h", "geo_jump_km_1h", "new_device_flag", "edge_score_mean_24h"];
@@ -87,17 +89,82 @@ impl Scorer {
     }
 }
 
-pub fn router(scorer: Arc<Scorer>) -> Router {
-    Router::new()
-        .route("/healthz", get(|| async { "ok" }))
-        .route("/v1/model", get(|State(s): State<Arc<Scorer>>| async move {
-            Json(serde_json::json!({ "model": s.version, "features": FEATURES }))
-        }))
-        .route("/v1/score", post(score))
-        .with_state(scorer)
+/// An order to score from the online store: features come from Feast by account and device.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Order {
+    pub account_id: String,
+    pub device_id: String,
+    pub amount_minor: i64,
 }
 
-async fn score(State(s): State<Arc<Scorer>>, Json(f): Json<Features>) -> Result<Json<Score>, (StatusCode, Json<serde_json::Value>)> {
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderScore {
+    #[serde(flatten)]
+    pub score: Score,
+    pub features: Features,
+    /// Online features Feast didn't have (new account or device, expired), filled with the defaults in `derive`.
+    pub missing: Vec<&'static str>,
+}
+
+/// Model features from the online store row. Missing values: no history → counts 0, z-score 0, no geo jump;
+/// unknown device → new_device_flag 1 and a neutral-low edge score of 500 (no attestation history). Amounts are minor
+/// units; the spread is floored at ₹1 so a near-constant history doesn't turn small differences into huge z-scores.
+pub fn derive(amount_minor: i64, row: &std::collections::HashMap<String, f64>) -> (Features, Vec<&'static str>) {
+    let mut missing = Vec::new();
+    let mut get = |k: &'static str, default: f64| row.get(k).copied().unwrap_or_else(|| { missing.push(k); default });
+    let count = get("txn_count_1h", 0.0);
+    let mean = get("txn_amount_mean_30d", f64::NAN);
+    let std = get("txn_amount_std_30d", f64::NAN);
+    let cps = get("distinct_counterparties_24h", 0.0);
+    let geo = get("geo_jump_km_1h", 0.0);
+    let new_dev = get("new_device_flag", 1.0);
+    let edge = get("edge_score_mean_24h", 500.0);
+    let z = if mean.is_finite() && std.is_finite() { (amount_minor as f64 - mean) / std.max(100.0) } else { 0.0 };
+    let f = Features {
+        amount_zscore: z as f32, txn_count_1h: count.max(0.0) as f32, distinct_counterparties_24h: cps.max(0.0) as f32,
+        geo_jump_km_1h: geo.max(0.0) as f32, new_device_flag: if new_dev >= 0.5 { 1.0 } else { 0.0 },
+        edge_score_mean_24h: edge.clamp(0.0, 1000.0) as f32,
+    };
+    (f, missing)
+}
+
+#[derive(Clone)]
+struct App {
+    scorer: Arc<Scorer>,
+    feast: Option<Arc<feast::Client>>,
+}
+
+pub fn router(scorer: Arc<Scorer>, feast: Option<Arc<feast::Client>>) -> Router {
+    Router::new()
+        .route("/healthz", get(|| async { "ok" }))
+        .route("/v1/model", get(|State(a): State<App>| async move {
+            Json(serde_json::json!({ "model": a.scorer.version, "features": FEATURES, "feast": a.feast.is_some() }))
+        }))
+        .route("/v1/score", post(score))
+        .route("/v1/score/order", post(score_order))
+        .with_state(App { scorer, feast })
+}
+
+type ApiError = (StatusCode, Json<serde_json::Value>);
+fn err(code: StatusCode, msg: impl Into<String>) -> ApiError {
+    (code, Json(serde_json::json!({ "error": msg.into() })))
+}
+
+async fn score_order(State(a): State<App>, Json(o): Json<Order>) -> Result<Json<OrderScore>, ApiError> {
+    if o.account_id.is_empty() || o.device_id.is_empty() || o.amount_minor <= 0 {
+        return Err(err(StatusCode::UNPROCESSABLE_ENTITY, "accountId, deviceId and a positive amountMinor are required"));
+    }
+    let Some(feast) = a.feast else { return Err(err(StatusCode::SERVICE_UNAVAILABLE, "no feature store configured (FEAST_URL)")) };
+    let row = feast.fetch(&o.account_id, &o.device_id).await.map_err(|e| err(StatusCode::BAD_GATEWAY, e))?;
+    let (features, missing) = derive(o.amount_minor, &row);
+    let score = a.scorer.score(&features).map_err(|e| err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(OrderScore { score, features, missing }))
+}
+
+async fn score(State(a): State<App>, Json(f): Json<Features>) -> Result<Json<Score>, ApiError> {
+    let s = a.scorer;
     if let Some(why) = f.invalid() {
         return Err((StatusCode::UNPROCESSABLE_ENTITY, Json(serde_json::json!({ "error": why }))));
     }

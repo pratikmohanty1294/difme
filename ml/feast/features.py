@@ -1,4 +1,8 @@
-"""Fraud features (PDF §7.4 L1: z-score > 3 → high-risk review queue)."""
+"""Fraud features (PDF §7.4 L1: z-score > 3 → high-risk review queue).
+
+Amounts are integer minor units (paise), like every DIFME amount; services/fraud-scorer computes the order's z-score
+from txn_amount_mean_30d / txn_amount_std_30d in the same unit.
+"""
 from datetime import timedelta
 
 from feast import Entity, FeatureView, Field, ValueType

@@ -1,0 +1,164 @@
+package field
+
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+)
+
+var _ Field = (*Track3)(nil)
+
+type Track3 struct {
+	FormatCode           string `json:"format_code,omitempty"`
+	PrimaryAccountNumber string `json:"primary_account_number,omitempty"`
+	DiscretionaryData    string `json:"discretionary_data,omitempty"`
+
+	spec *Spec
+	data *Track3
+}
+
+const (
+	track3Format = `%s%s=%s`
+)
+
+var track3Regex = regexp.MustCompile(`^([0-9]{2})([0-9]{1,19})\=([^\?]+)$`)
+
+func NewTrack3(spec *Spec) *Track3 {
+	return &Track3{
+		spec: spec,
+	}
+}
+
+func (f *Track3) NewInstance() Field {
+	return NewTrack3(f.spec)
+}
+
+func (f *Track3) Spec() *Spec {
+	return f.spec
+}
+
+func (f *Track3) SetSpec(spec *Spec) {
+	f.spec = spec
+}
+
+func (f *Track3) SetBytes(b []byte) error {
+	return f.unpack(b)
+}
+
+func (f *Track3) Bytes() ([]byte, error) {
+	return f.pack()
+}
+
+func (f *Track3) String() (string, error) {
+	b, err := f.pack()
+	if err != nil {
+		return "", fmt.Errorf("failed to encode string: %w", err)
+	}
+	return string(b), nil
+}
+
+func (f *Track3) Pack() ([]byte, error) {
+	data, err := f.pack()
+	if err != nil {
+		return nil, err
+	}
+
+	packer := f.spec.getPacker()
+
+	return packer.Pack(data, f.spec)
+}
+
+// returns number of bytes was read
+func (f *Track3) Unpack(data []byte) (int, error) {
+	unpacker := f.spec.getUnpacker()
+
+	raw, bytesRead, err := unpacker.Unpack(data, f.spec)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(raw) > 0 {
+		err = f.unpack(raw)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return bytesRead, nil
+}
+
+// Deprecated. Use Marshal instead
+func (f *Track3) SetData(data interface{}) error {
+	return f.Marshal(data)
+}
+
+func (f *Track3) Unmarshal(v interface{}) error {
+	if v == nil {
+		return nil
+	}
+
+	track, ok := v.(*Track3)
+	if !ok {
+		return fmt.Errorf("unsupported type: expected *Track3, got %T", v)
+	}
+
+	track.PrimaryAccountNumber = f.PrimaryAccountNumber
+	track.FormatCode = f.FormatCode
+	track.DiscretionaryData = f.DiscretionaryData
+
+	return nil
+}
+
+func (f *Track3) Marshal(v interface{}) error {
+	if v == nil {
+		return nil
+	}
+
+	track, ok := v.(*Track3)
+	if !ok {
+		return fmt.Errorf("unsupported type: expected *Track3, got %T", v)
+	}
+
+	f.FormatCode = track.FormatCode
+	f.PrimaryAccountNumber = track.PrimaryAccountNumber
+	f.DiscretionaryData = track.DiscretionaryData
+
+	f.data = track
+
+	return nil
+}
+
+func (f *Track3) unpack(raw []byte) error {
+	if raw == nil || !track3Regex.Match(raw) {
+		return errors.New("invalid track data")
+	}
+
+	matches := track3Regex.FindStringSubmatch(string(raw))
+	for index, val := range matches {
+		value := strings.TrimSpace(val)
+		if len(value) == 0 || value == "=" {
+			continue
+		}
+
+		switch index {
+		case 1: // Format Code
+			f.FormatCode = value
+		case 2: // Payment card number (PAN)
+			f.PrimaryAccountNumber = value
+		case 3: // Security Data + Additional Data
+			f.DiscretionaryData = value
+		}
+	}
+
+	if f.data != nil {
+		*(f.data) = *f
+	}
+
+	return nil
+}
+
+func (f *Track3) pack() ([]byte, error) {
+	raw := fmt.Sprintf(track3Format, f.FormatCode, f.PrimaryAccountNumber, f.DiscretionaryData)
+	return []byte(raw), nil
+}

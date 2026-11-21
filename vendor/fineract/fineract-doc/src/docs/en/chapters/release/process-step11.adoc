@@ -1,0 +1,17 @@
+= Step 11: Finish Vote
+
+== Description
+
+Conclude voting with https://release-test.apache.org[the ATR (ASF Trusted Releases) tool].
+
+The ATR tally mechanism is not perfect. Manually confirm the tally and adjust as necessary before resolving the vote.
+
+== Gradle Task
+
+.Command
+[source,text,subs="attributes+,+macros"]
+----
+./gradlew fineractReleaseStep11
+----
+
+NOTE: Use the ATR for this task.

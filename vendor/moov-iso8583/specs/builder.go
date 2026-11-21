@@ -1,0 +1,614 @@
+package specs
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"path"
+	"reflect"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/moov-io/iso8583"
+	"github.com/moov-io/iso8583/encoding"
+	"github.com/moov-io/iso8583/field"
+	"github.com/moov-io/iso8583/padding"
+	"github.com/moov-io/iso8583/prefix"
+	moovsort "github.com/moov-io/iso8583/sort"
+	"github.com/moov-io/iso8583/utils"
+	"gopkg.in/yaml.v3"
+)
+
+type FieldConstructorFunc func(spec *field.Spec) field.Field
+
+var (
+	FieldConstructor = map[string]FieldConstructorFunc{
+		"String":    func(spec *field.Spec) field.Field { return field.NewString(spec) },
+		"Track2":    func(spec *field.Spec) field.Field { return field.NewTrack2(spec) },
+		"Numeric":   func(spec *field.Spec) field.Field { return field.NewNumeric(spec) },
+		"Binary":    func(spec *field.Spec) field.Field { return field.NewBinary(spec) },
+		"Bitmap":    func(spec *field.Spec) field.Field { return field.NewBitmap(spec) },
+		"Composite": func(spec *field.Spec) field.Field { return field.NewComposite(spec) },
+		"Hex":       func(spec *field.Spec) field.Field { return field.NewHex(spec) },
+		"Track1":    func(spec *field.Spec) field.Field { return field.NewTrack1(spec) },
+		"Track3":    func(spec *field.Spec) field.Field { return field.NewTrack3(spec) },
+	}
+
+	PrefixesExtToInt = map[string]prefix.Prefixer{
+		"None.Fixed":   prefix.None.Fixed,
+		"ASCII.Fixed":  prefix.ASCII.Fixed,
+		"ASCII.L":      prefix.ASCII.L,
+		"ASCII.LL":     prefix.ASCII.LL,
+		"ASCII.LLL":    prefix.ASCII.LLL,
+		"ASCII.LLLL":   prefix.ASCII.LLLL,
+		"BCD.Fixed":    prefix.BCD.Fixed,
+		"BCD.L":        prefix.BCD.L,
+		"BCD.LL":       prefix.BCD.LL,
+		"BCD.LLL":      prefix.BCD.LLL,
+		"BCD.LLLL":     prefix.BCD.LLLL,
+		"Hex.Fixed":    prefix.Hex.Fixed,
+		"Hex.L":        prefix.Hex.L,
+		"Hex.LL":       prefix.Hex.LL,
+		"Hex.LLL":      prefix.Hex.LLL,
+		"Hex.LLLL":     prefix.Hex.LLLL,
+		"EBCDIC.Fixed": prefix.EBCDIC.Fixed,
+		"EBCDIC.L":     prefix.EBCDIC.L,
+		"EBCDIC.LL":    prefix.EBCDIC.LL,
+		"EBCDIC.LLL":   prefix.EBCDIC.LLL,
+		"EBCDIC.LLLL":  prefix.EBCDIC.LLLL,
+		"Binary.Fixed": prefix.Binary.Fixed,
+		"Binary.L":     prefix.Binary.L,
+		"Binary.LL":    prefix.Binary.LL,
+		"Binary.LLL":   prefix.Binary.LLL,
+		"Binary.LLLL":  prefix.Binary.LLLL,
+		"BerTLV":       prefix.BerTLV,
+	}
+
+	EncodingsExtToInt = map[string]encoding.Encoder{
+		"ASCII":      encoding.ASCII,
+		"BCD":        encoding.BCD,
+		"EBCDIC":     encoding.EBCDIC,
+		"Binary":     encoding.Binary,
+		"HexToASCII": encoding.BytesToASCIIHex,
+		"ASCIIToHex": encoding.ASCIIHexToBytes,
+		"LBCD":       encoding.LBCD,
+		"BerTLVTag":  encoding.BerTLVTag,
+		"EBCDIC1047": encoding.EBCDIC1047,
+	}
+
+	EncodingsIntToExt = map[string]string{
+		"asciiEncoder":      "ASCII",
+		"bcdEncoder":        "BCD",
+		"ebcdicEncoder":     "EBCDIC",
+		"binaryEncoder":     "Binary",
+		"hexToASCIIEncoder": "HexToASCII",
+		"asciiToHexEncoder": "ASCIIToHex",
+		"lBCDEncoder":       "LBCD",
+		"berTLVEncoderTag":  "BerTLVTag",
+		"ebcdic1047Encoder": "EBCDIC1047",
+	}
+
+	PaddersIntToExt = map[string]string{
+		"leftPadder":  "Left",
+		"rightPadder": "Right",
+		"nonePadder":  "None",
+	}
+
+	PaddersExtToInt = map[string]func(pad string) padding.Padder{
+		"Left": func(pad string) padding.Padder {
+			if runes := []rune(pad); len(runes) == 1 {
+				return padding.Left(runes[0])
+			}
+			return nil
+		},
+		"Right": func(pad string) padding.Padder {
+			if runes := []rune(pad); len(runes) == 1 {
+				return padding.Right(runes[0])
+			}
+			return nil
+		},
+		"None": func(pad string) padding.Padder { return padding.None },
+	}
+
+	SortExtToInt = map[string]moovsort.StringSlice{
+		"Strings":      moovsort.Strings,
+		"StringsByInt": moovsort.StringsByInt,
+		"StringsByHex": moovsort.StringsByHex,
+	}
+)
+
+// Deprecated: Use ImportJSON, ExportJSON package-level functions instead.
+var Builder MessageSpecBuilder = &messageSpecBuilder{}
+
+// Deprecated: Use ImportJSON, ExportJSON package-level functions instead.
+type MessageSpecBuilder interface {
+	ImportJSON([]byte) (*iso8583.MessageSpec, error)
+	ExportJSON(spec *iso8583.MessageSpec) ([]byte, error)
+}
+
+type messageSpecBuilder struct{}
+
+type specDummy struct {
+	Name   string          `json:"name,omitempty"   xml:"name,omitempty"   yaml:"name,omitempty"`
+	Fields orderedFieldMap `json:"fields,omitempty" xml:"fields,omitempty" yaml:"fields,omitempty"`
+}
+
+type fieldDummy struct {
+	Type              string                 `json:"type,omitempty"              xml:"type,omitempty"              yaml:"type,omitempty"`
+	Length            int                    `json:"length,omitempty"            xml:"length,omitempty"            yaml:"length,omitempty"`
+	Description       string                 `json:"description,omitempty"       xml:"description,omitempty"       yaml:"description,omitempty"`
+	Enc               string                 `json:"enc,omitempty"               xml:"enc,omitempty"               yaml:"enc,omitempty"`
+	Prefix            string                 `json:"prefix,omitempty"            xml:"prefix,omitempty"            yaml:"prefix,omitempty"`
+	Padding           *paddingDummy          `json:"padding,omitempty"           xml:"padding,omitempty"           yaml:"padding,omitempty"`
+	Tag               *tagDummy              `json:"tag,omitempty"               xml:"tag,omitempty"               yaml:"tag,omitempty"`
+	Subfields         map[string]*fieldDummy `json:"subfields,omitempty"         xml:"subfields:omitempty"         yaml:"subfields,omitempty"`
+	Bitmap            *fieldDummy            `json:"bitmap,omitempty"            xml:"bitmap,omitempty"            yaml:"bitmap,omitempty"`
+	DisableAutoExpand bool                   `json:"disableAutoExpand,omitempty" xml:"disableAutoExpand,omitempty" yaml:"disableAutoExpand,omitempty"`
+}
+
+type paddingDummy struct {
+	Type string `json:"type" xml:"type" yaml:"type"`
+	Pad  string `json:"pad"  xml:"pad"  yaml:"pad"`
+}
+
+type tagDummy struct {
+	Length              int           `json:"length,omitempty"               xml:"length,omitempty"               yaml:"length,omitempty"`
+	Enc                 string        `json:"enc,omitempty"                  xml:"enc,omitempty"                  yaml:"enc,omitempty"`
+	Padding             *paddingDummy `json:"padding,omitempty"              xml:"padding,omitempty"              yaml:"padding,omitempty"`
+	Sort                string        `json:"sort,omitempty"                 xml:"sort,omitempty"                 yaml:"sort,omitempty"`
+	SkipUnknownTLVTags  bool          `json:"skipUnknownTLVTags,omitempty"   xml:"skipUnknownTLVTags,omitempty"   yaml:"skipUnknownTLVTags,omitempty"`
+	StoreUnknownTLVTags bool          `json:"storeUnknownTLVTags,omitempty"  xml:"storeUnknownTLVTags,omitempty"  yaml:"storeUnknownTLVTags,omitempty"`
+	PrefUnknownTLV      string        `json:"prefUnknownTLV,omitempty"       xml:"prefUnknownTLV,omitempty"       yaml:"prefUnknownTLV,omitempty"`
+}
+
+// constructField builds a field from its spec, turning a spec-validation panic
+// into an error.
+//
+// Field constructors panic on an invalid spec by design, and for static specs
+// that is the right call: a mistake is a programming error and failing at init
+// beats failing mid-transaction. Import is where that assumption stops holding.
+// The spec arrives as a document at runtime, so a malformed one is bad data
+// rather than a bug, and ImportJSON/ImportYAML already promise an error for it.
+// The panic value carries the specific reason, so it becomes the message.
+func constructField(constructor FieldConstructorFunc, spec *field.Spec, index string) (f field.Field, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid spec for field: %s. %v", index, r)
+		}
+	}()
+	return constructor(spec), nil
+}
+
+func importField(dummyField *fieldDummy, index string) (*field.Spec, error) {
+	fieldSpec := &field.Spec{
+		Length:      dummyField.Length,
+		Description: dummyField.Description,
+	}
+
+	pref, ok := PrefixesExtToInt[dummyField.Prefix]
+	if !ok {
+		return nil, fmt.Errorf("unknown prefix: %s for field: %s", dummyField.Prefix, index)
+	}
+	fieldSpec.Pref = pref
+
+	if dummyField.Padding != nil {
+		if padderConstructor, ok := PaddersExtToInt[dummyField.Padding.Type]; ok {
+			fieldSpec.Pad = padderConstructor(dummyField.Padding.Pad)
+		}
+	}
+
+	if len(dummyField.Subfields) == 0 {
+		enc, ok := EncodingsExtToInt[dummyField.Enc]
+		if !ok {
+			return nil, fmt.Errorf("unknown encoding: %s for field: %s", dummyField.Enc, index)
+		}
+		fieldSpec.Enc = enc
+	} else {
+		fieldSpec.Subfields = map[string]field.Field{}
+		for key, dummyField := range dummyField.Subfields {
+			subfieldSpec, err := importField(dummyField, key)
+			if err != nil {
+				return nil, err
+			}
+
+			constructor, ok := FieldConstructor[dummyField.Type]
+			if !ok {
+				return nil, fmt.Errorf("no constructor for filed type: %s for field: %s", dummyField.Type, index)
+			}
+			subfield, err := constructField(constructor, subfieldSpec, key)
+			if err != nil {
+				return nil, err
+			}
+			fieldSpec.Subfields[key] = subfield
+		}
+
+		if dummyField.Tag != nil {
+			fieldSpec.Tag = &field.TagSpec{
+				Length:              dummyField.Tag.Length,
+				SkipUnknownTLVTags:  dummyField.Tag.SkipUnknownTLVTags,
+				StoreUnknownTLVTags: dummyField.Tag.StoreUnknownTLVTags,
+			}
+
+			if enc, ok := EncodingsExtToInt[dummyField.Tag.Enc]; ok {
+				fieldSpec.Tag.Enc = enc
+			}
+
+			if dummyField.Tag.Padding != nil {
+				padderConstructor, ok := PaddersExtToInt[dummyField.Tag.Padding.Type]
+				if !ok {
+					return nil, fmt.Errorf("unknown padding type: %s for tag in field: %s", dummyField.Tag.Padding.Type, index)
+				}
+				fieldSpec.Tag.Pad = padderConstructor(dummyField.Tag.Padding.Pad)
+			}
+
+			sortFunc, ok := SortExtToInt[dummyField.Tag.Sort]
+			if !ok {
+				return nil, fmt.Errorf("unknown sort function: %s for tag in field: %s", dummyField.Tag.Sort, index)
+			}
+			fieldSpec.Tag.Sort = sortFunc
+
+			if dummyField.Tag.PrefUnknownTLV != "" {
+				prefixer, ok := PrefixesExtToInt[dummyField.Tag.PrefUnknownTLV]
+				if !ok {
+					return nil, fmt.Errorf("unknown prefix: %s for tag prefUnknownTLV in field: %s", dummyField.Tag.PrefUnknownTLV, index)
+				}
+				fieldSpec.Tag.PrefUnknownTLV = prefixer
+			}
+		}
+
+		if dummyField.Bitmap != nil {
+			bitmapSpec, err := importField(dummyField.Bitmap, "field bitmap")
+			if err != nil {
+				return nil, err
+			}
+
+			fieldSpec.Bitmap = field.NewBitmap(bitmapSpec)
+		}
+
+	}
+	fieldSpec.DisableAutoExpand = dummyField.DisableAutoExpand
+	return fieldSpec, nil
+}
+
+func importSpec(dummySpec *specDummy) (*iso8583.MessageSpec, error) {
+	if len(dummySpec.Fields) == 0 {
+		return nil, fmt.Errorf("no fields defined in spec")
+	}
+
+	spec := iso8583.MessageSpec{
+		Name:   dummySpec.Name,
+		Fields: make(map[int]field.Field),
+	}
+
+	for key, dummyField := range dummySpec.Fields {
+		index, err := strconv.Atoi(key)
+		if err != nil {
+			return nil, fmt.Errorf("invalid field index: %w", err)
+		}
+		fieldSpec, err := importField(dummyField, key)
+		if err != nil {
+			return nil, fmt.Errorf("error importing field: %d. %w", index, err)
+		}
+		constructor := FieldConstructor[dummyField.Type]
+		if constructor == nil {
+			return nil, fmt.Errorf(
+				"no constructor for filed type: %s for field: %d",
+				dummyField.Type,
+				index,
+			)
+		}
+		f, err := constructField(constructor, fieldSpec, key)
+		if err != nil {
+			return nil, err
+		}
+		spec.Fields[index] = f
+	}
+
+	return &spec, nil
+}
+
+func exportSpec(origSpec *iso8583.MessageSpec) (*specDummy, error) {
+	if origSpec == nil {
+		return nil, fmt.Errorf("invalid message spec")
+	}
+	dummy := &specDummy{
+		Name:   origSpec.Name,
+		Fields: map[string]*fieldDummy{},
+	}
+
+	for index, origField := range origSpec.Fields {
+		f, err := exportField(origField)
+		if err != nil {
+			return nil, fmt.Errorf("failed to export field: %d. %w", index, err)
+		}
+		dummy.Fields[strconv.Itoa(index)] = f
+	}
+
+	return dummy, nil
+}
+
+// ImportJSON unmarshals a JSON spec into a MessageSpec.
+func ImportJSON(raw []byte) (*iso8583.MessageSpec, error) {
+	dummySpec := specDummy{}
+	err := json.Unmarshal(raw, &dummySpec)
+	if err != nil {
+		return nil, utils.NewSafeError(err, "failed to JSON unmarshal bytes to MessageSpec")
+	}
+
+	return importSpec(&dummySpec)
+}
+
+func (builder *messageSpecBuilder) ImportJSON(raw []byte) (*iso8583.MessageSpec, error) {
+	return ImportJSON(raw)
+}
+
+func exportField(internalField field.Field) (*fieldDummy, error) {
+	spec := internalField.Spec()
+	fieldType := reflect.TypeOf(internalField).Elem().Name()
+	dummyField := &fieldDummy{
+		Type:        fieldType,
+		Length:      spec.Length,
+		Description: spec.Description,
+	}
+
+	if spec.Pref == nil {
+		return nil, fmt.Errorf("missing required spec.Pref")
+	}
+	// Inspect() makes a trick for us when we don't have to implement
+	// any internal to external representation logic.
+	dummyField.Prefix = spec.Pref.Inspect()
+
+	if spec.Pad != nil {
+		dummyPad, err := exportPad(spec.Pad)
+		if err != nil {
+			return nil, err
+		}
+		dummyField.Padding = dummyPad
+	}
+
+	if len(spec.Subfields) == 0 {
+		// Encoding only applies to primitive field types
+		if spec.Enc == nil {
+			return nil, fmt.Errorf("missing required spec.Enc")
+		}
+		enc, err := exportEnc(spec.Enc)
+		if err != nil {
+			return nil, err
+		}
+		dummyField.Enc = enc
+
+	} else {
+		dummyField.Subfields = map[string]*fieldDummy{}
+		for index, origField := range spec.Subfields {
+			f, err := exportField(origField)
+			if err != nil {
+				return nil, err
+			}
+			dummyField.Subfields[index] = f
+		}
+
+		if spec.Tag != nil {
+			tag, err := exportTag(spec.Tag)
+			if err != nil {
+				return nil, err
+			}
+			dummyField.Tag = tag
+		}
+
+		if spec.Bitmap != nil {
+			bitmap, err := exportField(spec.Bitmap)
+			if err != nil {
+				return nil, err
+			}
+			dummyField.Bitmap = bitmap
+		}
+	}
+	dummyField.DisableAutoExpand = spec.DisableAutoExpand
+
+	return dummyField, nil
+}
+
+func exportTag(tag *field.TagSpec) (*tagDummy, error) {
+	dummy := &tagDummy{
+		Length:              tag.Length,
+		SkipUnknownTLVTags:  tag.SkipUnknownTLVTags,
+		StoreUnknownTLVTags: tag.StoreUnknownTLVTags,
+	}
+	if tag.Pad != nil {
+		var err error
+		if dummy.Padding, err = exportPad(tag.Pad); err != nil {
+			return nil, err
+		}
+	}
+
+	if tag.Enc != nil {
+		var err error
+		if dummy.Enc, err = exportEnc(tag.Enc); err != nil {
+			return nil, err
+		}
+	}
+	if tag.Sort != nil {
+		name, err := exportSort(tag.Sort)
+		if err != nil {
+			return nil, err
+		}
+		dummy.Sort = name
+	}
+	if tag.PrefUnknownTLV != nil {
+		dummy.PrefUnknownTLV = tag.PrefUnknownTLV.Inspect()
+	}
+	return dummy, nil
+}
+
+func exportPad(pad padding.Padder) (*paddingDummy, error) {
+	paddingType := reflect.TypeOf(pad).Elem().Name()
+	if padder, found := PaddersIntToExt[paddingType]; found {
+		return &paddingDummy{
+			Type: padder,
+			Pad:  string(pad.Inspect()),
+		}, nil
+	}
+	return nil, fmt.Errorf("unknown padding type: %s", paddingType)
+}
+
+// exportSort names a sort function so a spec can be read back. Only the
+// functions ImportJSON and ImportYAML can resolve are nameable: exporting any
+// other one produced a document that the importer then rejected with "unknown
+// sort function", so a custom sort turned a round trip into a file that looked
+// fine and could not be loaded. Failing here puts the error in front of whoever
+// can act on it.
+func exportSort(sort moovsort.StringSlice) (string, error) {
+	name := getFunctionName(sort)
+	if _, ok := SortExtToInt[name]; !ok {
+		return "", fmt.Errorf("unknown sort function: %s; only %s can be exported, "+
+			"because those are the ones an import can resolve", name, knownSortNames())
+	}
+	return name, nil
+}
+
+func knownSortNames() string {
+	names := make([]string, 0, len(SortExtToInt))
+	for name := range SortExtToInt {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
+}
+
+func exportEnc(enc encoding.Encoder) (string, error) {
+	// set encoding
+	encType := reflect.TypeOf(enc).Elem().Name()
+	if e, found := EncodingsIntToExt[encType]; found {
+		return e, nil
+	} else {
+		return "", fmt.Errorf("unknown encoding type: %s", encType)
+	}
+}
+
+// ExportJSON marshals a MessageSpec into indented JSON.
+func ExportJSON(origSpec *iso8583.MessageSpec) ([]byte, error) {
+	dummy, err := exportSpec(origSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	outputBuffer := new(bytes.Buffer)
+	enc := json.NewEncoder(outputBuffer)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "\t")
+
+	if err := enc.Encode(dummy); err != nil {
+		return nil, utils.NewSafeError(err, "failed to perform JSON encoding")
+	}
+
+	return outputBuffer.Bytes(), nil
+}
+
+func (builder *messageSpecBuilder) ExportJSON(origSpec *iso8583.MessageSpec) ([]byte, error) {
+	return ExportJSON(origSpec)
+}
+
+// ImportYAML unmarshals a YAML spec into a MessageSpec.
+func ImportYAML(raw []byte) (*iso8583.MessageSpec, error) {
+	dummySpec := specDummy{}
+	err := yaml.Unmarshal(raw, &dummySpec)
+	if err != nil {
+		return nil, utils.NewSafeError(err, "failed to YAML unmarshal bytes to MessageSpec")
+	}
+
+	return importSpec(&dummySpec)
+}
+
+// ExportYAML marshals a MessageSpec into YAML.
+func ExportYAML(origSpec *iso8583.MessageSpec) ([]byte, error) {
+	dummy, err := exportSpec(origSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := yaml.Marshal(dummy)
+	if err != nil {
+		return nil, utils.NewSafeError(err, "failed to perform YAML encoding")
+	}
+
+	return data, nil
+}
+
+type orderedFieldMap map[string]*fieldDummy
+
+func (om orderedFieldMap) sortedKeys() ([]int, error) {
+	keys := make([]int, 0, len(om))
+	for k := range om {
+		index, err := strconv.Atoi(k)
+		if err != nil {
+			return nil, fmt.Errorf("converting field index into int: %w", err)
+		}
+		keys = append(keys, index)
+	}
+	sort.Ints(keys)
+	return keys, nil
+}
+
+func (om orderedFieldMap) MarshalYAML() (interface{}, error) {
+	keys, err := om.sortedKeys()
+	if err != nil {
+		return nil, err
+	}
+
+	node := &yaml.Node{Kind: yaml.MappingNode}
+	for _, key := range keys {
+		strIndex := strconv.Itoa(key)
+
+		keyNode := &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: strIndex,
+		}
+
+		valNode := &yaml.Node{}
+		if err := valNode.Encode(om[strIndex]); err != nil {
+			return nil, err
+		}
+
+		node.Content = append(node.Content, keyNode, valNode)
+	}
+
+	return node, nil
+}
+
+func (om orderedFieldMap) MarshalJSON() ([]byte, error) {
+	keys, err := om.sortedKeys()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := &bytes.Buffer{}
+	buf.WriteByte('{')
+	for i, key := range keys {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		strIndex := strconv.Itoa(key)
+		k, err := json.Marshal(strIndex)
+		if err != nil {
+			return nil, err
+		}
+		v, err := json.Marshal(om[strIndex])
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(k)
+		buf.WriteByte(':')
+		buf.Write(v)
+	}
+	buf.WriteByte('}')
+
+	return buf.Bytes(), nil
+}
+
+func getFunctionName(foo interface{}) string {
+	funcPath := runtime.FuncForPC(reflect.ValueOf(foo).Pointer()).Name()
+	return path.Ext(funcPath)[1:]
+}

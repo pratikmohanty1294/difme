@@ -8,5 +8,26 @@
     "upstream": "https://github.com/formio/formio.js",
     "tag": "v5.7.0",
     "commit": "514fad43ec21df8d1319cbaa5aa6fc1ccefa8f31"
+  },
+  "moov-iso8583": {
+    "upstream": "https://github.com/moov-io/iso8583",
+    "tag": "v0.26.4",
+    "commit": "71ff57e2913fbafa85e06ef262d902a7b42c9c43"
+  },
+  "fineract": {
+    "upstream": "https://github.com/apache/fineract",
+    "tag": "1.16.1",
+    "commit": "c643dab306fe29798951591ce825fd5e5272923e"
+  },
+  "hyperswitch": {
+    "upstream": "https://github.com/juspay/hyperswitch",
+    "tag": "v1.129.0",
+    "commit": "cf913c5aaa226e102b257a81a3a53ac841bf45bd",
+    "omitted": [
+      "docs",
+      "postman",
+      "cypress-tests",
+      "api-reference"
+    ]
   }
 }

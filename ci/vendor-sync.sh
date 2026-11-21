@@ -19,8 +19,7 @@ case "$what" in
   # Mifos Payment Hub EE (MPL-2.0; owner 2026-11-21: reuse it, with Fluxnova in place of Zeebe).
   ph-ee-common)    repo=openMF/ph-ee-connector-common;    dest=vendor/mifos-ph-ee/connector-common ;;
   ph-ee-channel)   repo=openMF/ph-ee-connector-channel;   dest=vendor/mifos-ph-ee/connector-channel ;;
-  # keystore.jks holds a private key (upstream's dev TLS store): not committed.
-  ph-ee-ams-mifos) repo=openMF/ph-ee-connector-ams-mifos; dest=vendor/mifos-ph-ee/connector-ams-mifos; prune=(keystore.jks) ;;
+  ph-ee-ams-mifos) repo=openMF/ph-ee-connector-ams-mifos; dest=vendor/mifos-ph-ee/connector-ams-mifos ;;
   # The BPMN flows only; the rest of env-labs is their own cluster's Helm/env config.
   ph-ee-flows)     repo=openMF/ph-ee-env-labs;            dest=vendor/mifos-ph-ee/flows; keep=orchestration/feel ;;
   *) echo "unknown target $what"; exit 1 ;;
@@ -37,6 +36,8 @@ rm -rf "$dest" && mkdir -p "$dest"
 [ -z "$keep" ] || cp "$tmp/src/LICENSE" "$dest/LICENSE"
 rm -rf "$dest/.github" "$dest/.circleci" "$dest/CLAUDE.md" "$dest/AGENTS.md" "$dest/.claude" "$dest/.cursor" "$dest/.devcontainer"
 find "$dest" -name CLAUDE.md -o -name AGENTS.md | xargs -r rm -f
+# Private keys (upstream dev TLS stores and the like) are never committed, wherever they sit in the tree.
+find "$dest" \( -name '*.jks' -o -name '*.p12' -o -name '*.pfx' -o -name '*.key' \) -print -delete
 for p in "${prune[@]}"; do rm -rf "${dest:?}/$p"; done
 rm -rf "$tmp"
 ${PYTHON:-python3} - "$what" "$repo" "$tag" "$sha" "${prune[*]:-}" "$keep" <<'PY'

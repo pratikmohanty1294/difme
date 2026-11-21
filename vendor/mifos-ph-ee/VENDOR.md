@@ -11,7 +11,9 @@ commits are in `vendor/VENDORED.json`.
 | `connector-ams-mifos` | openMF/ph-ee-connector-ams-mifos v1.7.0 | Fineract (AMS) connector: block / book / release funds through Fineract's interoperation API |
 | `flows` | openMF/ph-ee-env-labs, `orchestration/feel` at a pinned commit (no release tags) | The BPMN payment flows |
 
-Not committed on purpose: `connector-ams-mifos/keystore.jks` (upstream's development TLS store, holds a private key).
+Not committed on purpose: upstream's development TLS keystores (`keystore.jks` in both connectors; they hold private
+keys). `ci/vendor-sync.sh` drops any `*.jks`, `*.p12`, `*.pfx`, `*.key`. DIFME runs the connectors with
+`server.ssl.enabled=false`; pod-to-pod traffic is encrypted by the Istio ambient mesh.
 
 Building (no source changes needed): JDK 17 (as upstream), Gradle wrapper 7.3, with
 `deploy/images/mifos-ph-ee/vendored-common.gradle` as an init script. It builds the connectors against the vendored

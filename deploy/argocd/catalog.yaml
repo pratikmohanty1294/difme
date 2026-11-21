@@ -84,6 +84,7 @@ components:
   - { name: fineract,          ns: rails,           kind: path, profile: rails, wave: 1, pdf: "rails" }   # CBS (Fineract 1.16.1, shared Postgres)
   - { name: hyperswitch,       ns: rails,           kind: path, profile: rails, wave: 1, pdf: "rails" }   # PSP (Hyperswitch v1.129.0, dummy connector)
   - { name: payment-hub,       ns: rails,           kind: path, profile: rails, wave: 2, pdf: "rails" }   # payment hub on Temporal (PSP + CBS)
+  - { name: exchange-rails,    ns: core-platform,   kind: path, profile: rails, wave: 3, pdf: "rails" }   # exchange → payment hub link (ConfigMap)
 
   # ── Layers 9–10 · Observability + FinOps (profile: observability) ──────────
   - { name: victoria-metrics,  ns: observability,   kind: helm, profile: observability, wave: -1, pdf: "10", repo: https://victoriametrics.github.io/helm-charts, chart: victoria-metrics-k8s-stack, version: 0.39.0 }

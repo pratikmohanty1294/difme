@@ -3,3 +3,4 @@ scheme-sim
 fineract
 hyperswitch
 payment-hub
+exchange-rails

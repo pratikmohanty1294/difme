@@ -468,6 +468,9 @@ spec:
         - configMapRef:
             name: exchange-evidence
             optional: true
+        - configMapRef:
+            name: exchange-rails
+            optional: true
         volumeMounts:
         - name: tmp
           mountPath: /tmp

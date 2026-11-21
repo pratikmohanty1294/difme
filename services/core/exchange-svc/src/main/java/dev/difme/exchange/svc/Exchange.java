@@ -138,6 +138,11 @@ public class Exchange {
     @ConfigProperty(name = "difme.exchange.store.user", defaultValue = "difme") String storeUser;
     @ConfigProperty(name = "difme.exchange.store.password") java.util.Optional<String> storePassword;   // dev YugabyteDB: none
     @ConfigProperty(name = "difme.exchange.store.flush-ms", defaultValue = "50") long storeFlushMs;
+
+    // Real rails (owner 2026-11-21): card payments and escrow bookings through the payment hub. Off (simulator) unless
+    // a hub URL is set. Partner cards: "partnerNode:PAN:MMYY", comma-separated (test cards on the scheme simulator).
+    @ConfigProperty(name = "difme.exchange.hub.url") java.util.Optional<String> hubUrl;
+    @ConfigProperty(name = "difme.exchange.hub.partner-cards") java.util.Optional<List<String>> hubPartnerCards;
     /** Dev only: keep the in-process evidence keys here so chains sealed before a restart still verify after it. */
     @ConfigProperty(name = "difme.evidence.local-keys-dir") java.util.Optional<String> localKeysDir;
     private StateStore store = StateStore.none();
@@ -309,6 +314,7 @@ public class Exchange {
             if (settings.containsKey(id)) retune(id, settings.get(id).settings());   // restored operator settings
             intakes.put(id, new MatchingIntake(ring));
         }
+        connectRails();   // after restore(): restored holds were booked when they were made, not again now
     }
 
     /** Rebuilds the durable state at start (before the matching engines run). */
@@ -754,7 +760,7 @@ public class Exchange {
                         var token = rails.credentials.issue(
                                 new AgentCredentialPort.Instruction(instruction, partner, merchantId, s.a(), "INR"), now);
                         String field11 = String.format("%06d", stan.incrementAndGet() % 1_000_000);
-                        return rails.checkout.authorize(new MerchantCheckoutPort.Authorization(field11, token.token(),
+                        return rails.cardCheckout().authorize(new MerchantCheckoutPort.Authorization(field11, token.token(),
                                 merchantId, s.a(), "INR"), now).responseCode();
                     });
             for (Failover.Attempt at : f.attempts()) {
@@ -1126,8 +1132,35 @@ public class Exchange {
         metrics.counter("difme_exchange_auctions_closed_total", "pack", pack, "matched", ranked > 0 ? "yes" : "no").increment();
     }
 
+    /** Parses "partner:PAN:MMYY" entries; a malformed one fails the start rather than silently dropping a card. */
+    static Map<Long, dev.difme.exchange.rails.PaymentHub.CardOnFile> partnerCards(List<String> entries) {
+        Map<Long, dev.difme.exchange.rails.PaymentHub.CardOnFile> cards = new LinkedHashMap<>();
+        for (String e : entries) {
+            String[] f = e.strip().split(":");
+            if (f.length != 3 || !f[0].matches("\\d+") || !f[1].matches("\\d{12,19}") || !f[2].matches("\\d{4}")) {
+                throw new IllegalStateException("difme.exchange.hub.partner-cards: expected partner:PAN:MMYY, got an entry for partner "
+                        + (f.length > 0 ? f[0] : "?"));
+            }
+            cards.put(Long.parseLong(f[0]), new dev.difme.exchange.rails.PaymentHub.CardOnFile(f[1], f[2].substring(0, 2), "20" + f[2].substring(2), "123"));
+        }
+        return cards;
+    }
+
+    private void connectRails() {
+        if (hubUrl.filter(u -> !u.isBlank()).isEmpty()) return;
+        Map<Long, dev.difme.exchange.rails.PaymentHub.CardOnFile> cards = partnerCards(hubPartnerCards.orElse(List.of()));
+        rails.useHub(new HttpPaymentHub(hubUrl.get()), cards, m -> LOG.warn(m));
+        metrics.gauge("difme_exchange_cbs_pending", rails, r -> r.cbsMirror() == null ? 0 : r.cbsMirror().pending());
+        metrics.gauge("difme_exchange_cbs_refused", rails, r -> r.cbsMirror() == null ? 0 : r.cbsMirror().refused());
+        LOG.infof("rails: payment hub %s, %d partner cards on file", hubUrl.get(), cards.size());
+    }
+
     @PreDestroy
     void stop() {
+        if (rails.cbsMirror() != null) {
+            rails.cbsMirror().drain(5_000);
+            rails.cbsMirror().close();
+        }
         runners.forEach(AgentRunner::close);
         store.close();   // flushes what's pending
     }

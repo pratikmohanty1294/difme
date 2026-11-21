@@ -40,13 +40,17 @@ def manifests(s: dict) -> list[dict]:
     # (deploy/platform/core-platform/exchange-evidence); without it the service keeps local dev keys. The projected
     # token (audience "vault") is what the exchange presents to OpenBao's Kubernetes auth.
     if s.get("evidence"):
-        container["envFrom"] = [{"configMapRef": {"name": "exchange-evidence", "optional": True}}]
+        container.setdefault("envFrom", []).append({"configMapRef": {"name": "exchange-evidence", "optional": True}})
         volumes.append({"name": "openbao-sa", "projected": {"sources": [{"serviceAccountToken": {
             "audience": "vault", "expirationSeconds": 3600, "path": "token"}}]}})
         mounts.append({"name": "openbao-sa", "mountPath": "/var/run/secrets/openbao-sa", "readOnly": True})
     # Durable exchange state (StateStore, 2026-11-21): latest version of each record in YugabyteDB, schema "exchange".
     if s.get("store"):
         env.append({"name": "DIFME_EXCHANGE_STORE_URL", "value": "jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme"})
+    # Real rails (2026-11-21): the rails profile ships ConfigMap exchange-rails (payment hub URL, partner cards on file).
+    # Without it the exchange keeps its simulated rails, so the core profile works on its own.
+    if s.get("rails"):
+        container.setdefault("envFrom", []).append({"configMapRef": {"name": "exchange-rails", "optional": True}})
     if mounts:
         container["volumeMounts"] = mounts
     # No service-link env (KUBERNETES-style <SVC>_PORT=tcp://...): our services resolve by DNS, and those variables

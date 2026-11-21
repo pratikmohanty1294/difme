@@ -47,6 +47,7 @@ scheme-sim
 fineract
 hyperswitch
 payment-hub
+exchange-rails
 victoria-metrics
 loki
 tempo

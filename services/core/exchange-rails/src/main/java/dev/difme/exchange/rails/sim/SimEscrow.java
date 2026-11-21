@@ -6,7 +6,23 @@ import java.util.Set;
 
 /** In-memory escrow enforcing conservation (released + refunded ≤ held) with idempotent hold/release/refund. */
 public final class SimEscrow implements EscrowPort {
+    /** Told about each money movement once it is decided (e.g. to book it on a core banking system). */
+    public interface Mirror {
+        void hold(String holdId, String payer, long amountMinor);
+        void release(String holdId, String releaseId, String payee, long amountMinor);
+        void refund(String holdId, String refundId, String payer, long amountMinor);
+    }
+
+    private static final Mirror NONE = new Mirror() {
+        public void hold(String h, String p, long a) {}
+        public void release(String h, String r, String p, long a) {}
+        public void refund(String h, String r, String p, long a) {}
+    };
+
     private final Map<String, Hold> holds = Bounded.map();
+    private volatile Mirror mirror = NONE;
+
+    public void mirrorTo(Mirror m) { mirror = m == null ? NONE : m; }
     private final Set<String> releases = java.util.Collections.newSetFromMap(Bounded.map());
 
     @Override
@@ -21,6 +37,7 @@ public final class SimEscrow implements EscrowPort {
         }
         Hold h = new Hold(holdId, payer, amountMinor, 0, 0, State.HELD);
         holds.put(holdId, h);
+        mirror.hold(holdId, payer, amountMinor);
         return h;
     }
 
@@ -36,6 +53,7 @@ public final class SimEscrow implements EscrowPort {
         Hold n = new Hold(holdId, h.payer(), h.heldMinor(), released, h.refundedMinor(),
                 released + h.refundedMinor() == h.heldMinor() ? State.SETTLED : State.PARTLY_RELEASED);   // a partial refund counts
         holds.put(holdId, n);
+        mirror.release(holdId, releaseId, payee, amountMinor);
         return n;
     }
 
@@ -45,6 +63,7 @@ public final class SimEscrow implements EscrowPort {
         if (h.remainingMinor() == 0) return h;
         Hold n = new Hold(holdId, h.payer(), h.heldMinor(), h.releasedMinor(), h.refundedMinor() + h.remainingMinor(), State.REFUNDED);
         holds.put(holdId, n);
+        mirror.refund(holdId, "all", h.payer(), h.remainingMinor());
         return n;
     }
 
@@ -61,6 +80,7 @@ public final class SimEscrow implements EscrowPort {
         Hold n = new Hold(holdId, h.payer(), h.heldMinor(), h.releasedMinor(), refunded,
                 done ? (h.releasedMinor() == 0 ? State.REFUNDED : State.SETTLED) : h.state());
         holds.put(holdId, n);
+        mirror.refund(holdId, refundId, h.payer(), amountMinor);
         return n;
     }
 

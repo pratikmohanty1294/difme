@@ -1,0 +1,2 @@
+resources: [exchange-rails.yaml]
+namespace: core-platform

@@ -262,7 +262,11 @@ public class QuoteRoutes extends ErrorHandlerRouteBuilder {
                     PartyIdInfo payerParty = channelRequest.getPayer().getPartyIdInfo();
                     String payerFspId = partyProperties.getPartyByTenant(exchange.getProperty(TENANT_ID, String.class)).getFspId();
                     PartyIdInfo requestPayeePartyIdInfo = channelRequest.getPayee().getPartyIdInfo();
-                    String payeeFspId = partyProperties.getPartyByTenant(requestPayeePartyIdInfo.getFspId()).getFspId();
+                    // DIFME patch: the payee's FSP is the one the party lookup found (PARTY_LOOKUP_FSP_ID); upstream looked it
+                    // up as a tenant by the channel request's payee fspId, which only works when both FSPs are tenants here.
+                    String lookedUpFspId = exchange.getProperty(PARTY_LOOKUP_FSP_ID, String.class);
+                    String payeeFspId = lookedUpFspId != null && !lookedUpFspId.isBlank() ? lookedUpFspId
+                            : partyProperties.getPartyByTenant(requestPayeePartyIdInfo.getFspId()).getFspId();
                     Party payer = new Party(
                             new PartyIdInfo(payerParty.getPartyIdType(),
                                     payerParty.getPartyIdentifier(),

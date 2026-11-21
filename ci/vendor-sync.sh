@@ -3,7 +3,8 @@
 # from there). Usage: ci/vendor-sync.sh <target> <tag|commit>, e.g. ci/vendor-sync.sh hyperswitch v1.129.0
 # (a 40-hex commit pins repos without release tags).
 # A shallow git clone of the tag (no history), minus upstream CI, assistant files and non-build material, recorded in
-# vendor/VENDORED.json. Local changes to vendored code go in vendor/<target>/PATCHES.md, never silently.
+# vendor/VENDORED.json. Local changes to vendored code are patch files in vendor/patches/<target>/ (re-applied here) and
+# are listed in the target's VENDOR.md, never silent edits.
 set -euo pipefail
 what=$1 tag=$2
 prune=() keep=""
@@ -50,6 +51,11 @@ ${PYTHON:-python3} ci/find-private-keys.py "$dest" | while IFS= read -r k; do ec
 find "$dest" -name '*.key' -size +0 -print -delete   # key files with other encodings
 for p in "${prune[@]}"; do rm -rf "${dest:?}/$p"; done
 rm -rf "$tmp"
+# DIFME's patches to this target (vendor/patches/<target>/*.patch, applied in order; each states its reason).
+for p in vendor/patches/"$what"/*.patch; do
+  [ -e "$p" ] || continue
+  patch -s -p1 -d "$dest" < "$p" && echo "applied $p"
+done
 ${PYTHON:-python3} - "$what" "$repo" "$tag" "$sha" "${prune[*]:-}" "$keep" <<'PY'
 import json, sys, pathlib
 what, repo, tag, sha, prune, keep = sys.argv[1:]

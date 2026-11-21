@@ -45,18 +45,24 @@ public class InterledgerPaymentOerCodec implements InterledgerPaymentCodec {
     // 2. InterledgerPayment has no "extension presence bitmap". See javadoc for this class for
     // more details.
 
+    // DIFME patch: ILP v1 packets as Mojaloop encodes them (ilp-packet-v1): after the type byte (read by CodecContext),
+    // the fields sit in a length-prefixed envelope that ends with an extensions byte. Read the envelope, then the
+    // fields inside it; anything after the data (extensions) is ignored.
+    final InputStream contents =
+        new java.io.ByteArrayInputStream(context.read(OerOctetString.class, inputStream).getValue());
+
     // 3. Read the destinationAmount, which is a UInt64.
     /* NOTE: we don't expect amounts to exceed 2^63 - 1, so we risk the conversion to long */
-    long destinationAmount = context.read(OerUint64.class, inputStream)
+    long destinationAmount = context.read(OerUint64.class, contents)
         .getValue()
         .longValue();
 
     // 4. Read the Interledger Address.
     final InterledgerAddress destinationAccount =
-        context.read(InterledgerAddress.class, inputStream);
+        context.read(InterledgerAddress.class, contents);
 
     // 5. Read the data portion of the packet.
-    final byte[] data = context.read(OerOctetString.class, inputStream)
+    final byte[] data = context.read(OerOctetString.class, contents)
         .getValue();
 
     return InterledgerPayment.builder()
@@ -81,14 +87,17 @@ public class InterledgerPaymentOerCodec implements InterledgerPaymentCodec {
     // 3. Write the packet type.
     context.write(InterledgerPacketType.class, this.getTypeId(), outputStream);
 
+    // DIFME patch: the fields go in a length-prefixed envelope ending with an empty extensions byte, as Mojaloop's
+    // ilp-packet-v1 writes them (byte-for-byte identical; see vendor/patches/java-ilp-core).
+    final java.io.ByteArrayOutputStream contents = new java.io.ByteArrayOutputStream();
     // 4. Write the amount, which is a UInt64 (fixed at 8 octets)
-    context.write(OerUint64.class, new OerUint64(instance.getDestinationAmount()), outputStream);
-
+    context.write(OerUint64.class, new OerUint64(instance.getDestinationAmount()), contents);
     // 5. Write the Interledger Address as an IA5String.
-    context.write(InterledgerAddress.class, instance.getDestinationAccount(), outputStream);
-
+    context.write(InterledgerAddress.class, instance.getDestinationAccount(), contents);
     // 6. Write the data portion of the packet.
-    context.write(OerOctetString.class, new OerOctetString(instance.getData()), outputStream);
+    context.write(OerOctetString.class, new OerOctetString(instance.getData()), contents);
+    contents.write(0);   // extensions: none
+    context.write(OerOctetString.class, new OerOctetString(contents.toByteArray()), outputStream);
   }
 
 

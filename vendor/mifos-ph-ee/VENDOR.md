@@ -22,7 +22,13 @@ Building (no source changes needed): JDK 17 (as upstream), Gradle wrapper 7.3, w
 instead of the SNAPSHOTs upstream pulls from a third-party Artifactory, and builds `connector-ams-mifos` for Java 17
 (upstream says 13; the shared library needs 17).
 
-Local changes to the Mifos source: **none**. The port to Fluxnova is done around it:
+Local changes to the Mifos source: two patches to connector-mojaloop (`vendor/patches/ph-ee-mojaloop/`, re-applied by
+`ci/vendor-sync.sh`), both making PH-EE talk to a real Mojaloop bank rather than to a second tenant of the same hub:
+- `0001` quote: the payee's FSP is the one the party lookup found; upstream looked the payee FSP up as a local tenant.
+- `0002` quote: the payer no longer re-derives the payee's ILP condition with its own secret (only possible when both
+  FSPs share one secret); it checks the packet carries this quote and the condition is a 32-byte SHA-256. The
+  fulfilment is checked at commit by the switch (see Known gaps).
+Everything else is done around the source:
 - `services/zeebe-on-fluxnova` replaces the Zeebe client (same API subset, on Fluxnova's REST API); the init script
   swaps it in (`io.camunda:zeebe-client-java` → `dev.difme:zeebe-client-fluxnova`). connector-common declares the Zeebe
   client without using it: dropped there. connector-channel uses Guava without declaring it (it came with the Zeebe
@@ -54,3 +60,14 @@ Verified 2026-11-21 (local, Fluxnova 3.1.1 + Fineract 1.16.1): a transfer posted
 (`POST /channel/transfer`) ran DifmeOnUsTransfer on Fluxnova through PH-EE's Fineract connector: local quote → block →
 payee deposit → book → success; payer 10,000 → 8,500, payee 0 → 1,500. Over the balance: Fineract's interop quote
 refuses (403), the flow ends at "send error to channel", balances unchanged.
+
+Cross-bank, verified 2026-11-21 (local): PH-EE channel API → PayerFundTransfer on Fluxnova → party lookup, quote,
+transfer through the Mojaloop switch (Testing Toolkit hub) to the other bank (SDK scheme adapter + mojaloop-simulator)
+→ COMMITTED → payer booked in Fineract (8,500 → 8,300 INR). Needed besides the patches: the ILP v1 envelope fix in
+java-ilp-core (`vendor/interledger`), `parties` (tenant → Mojaloop fspId) and `switch.*-host` in the runtime config.
+
+Known gaps:
+- Fulfilment vs condition at commit: Mojaloop's switch core (central-ledger) checks it; the Testing Toolkit hub does
+  not, and PH-EE's payer side does not either. To close with the real switch core or a payer-side check.
+- After COMMITTED the other bank's SDK asks the payer for the transfer (`GET /transfers/{id}`), which PH-EE's
+  connector does not serve; harmless for the payment, noisy in the switch log.

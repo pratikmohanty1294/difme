@@ -1,0 +1,7 @@
+{
+  "_comment": "The central switch's participants (Mojaloop Testing Toolkit in hub mode). msisdn: the party-lookup range each bank owns (the account-lookup role). endpoint: where the switch delivers FSPIOP requests and callbacks for that bank. ci/mojaloop-switch-config.py turns this into the toolkit's user_config.json and forward rules.",
+  "participants": {
+    "difme":    {"msisdn": ["919800000000", "919899999999"], "endpoint": "http://ph-ee-connector-mojaloop.rails.svc:5000/switch"},
+    "payeefsp": {"msisdn": ["919900000000", "919999999999"], "endpoint": "http://payeefsp-sdk.rails.svc:4000"}
+  }
+}

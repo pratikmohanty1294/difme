@@ -111,3 +111,15 @@ decompress `pkg-*.tar.zst` with the Python `zstandard` package (no `zstd` binary
   payment hub sets `WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE` and answers repeats from the first run.
 - **Fineract** `Idempotency-Key` header: a repeated command is answered from cache (`x-served-from-cache: true`), not
   booked twice. Savings accounts and clients can be found by `external-id`, so callers need no id mapping.
+### Mifos PH-EE with Mojaloop (2026-11-21)
+- **Licence trap:** PH-EE's Mojaloop connector depends on `org.mifos:interop-ilp-conditions`, whose LICENSE reads
+  "All Rights Reserved. Distribution, reproduction or use is prohibited without permission". Replaced (init script) by
+  `services/fspiop-ilp-models` + vendored Apache-2.0 java-ilp-core. Also `org.json` < 20231013 is under the JSON License
+  (not OSI). Check every transitive dependency's licence, not just the project's own.
+- **ILP v1 wire format:** java-ilp-core 0.6.x writes payment packets without the length-prefixed envelope and the
+  extensions byte; Mojaloop (ilp-packet-v1) uses the final format with long-form OER lengths. Compare bytes, don't trust
+  the version number.
+- **Spring dependency-management** re-applies declared versions after Gradle `eachDependency` rules registered earlier;
+  register DIFME's rules again in `afterEvaluate`.
+- **Restarting a Spring Boot service:** SIGTERM can take >30 s (webServer shutdown timeout); wait for the old process to
+  exit before starting the new one, or the old code keeps serving (we lost time to that).

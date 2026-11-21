@@ -30,6 +30,7 @@ jobs:
       feast: ${{ steps.d.outputs.feast }}
       notary: ${{ steps.d.outputs.notary }}
       fraud: ${{ steps.d.outputs.fraud }}
+      scheme: ${{ steps.d.outputs.scheme }}
       debezium: ${{ steps.d.outputs.debezium }}
       veraison: ${{ steps.d.outputs.veraison }}
     steps:
@@ -57,6 +58,7 @@ jobs:
           check feast '^(ml/feast/|deploy/images/feast/)'
           check notary '^(services/notary/|deploy/images/notary/)'
           check fraud '^(services/fraud-scorer/|ml/fraud/|deploy/images/fraud-scorer/)'
+          check scheme '^(services/scheme-sim/|vendor/moov-iso8583/|deploy/images/scheme-sim/)'
           check debezium '^deploy/images/debezium-connect/'
           check veraison '^deploy/images/veraison/'
   core:
@@ -220,6 +222,14 @@ jobs:
       smoke: |
         docker run -d --name fs -p 18090:8090 "$IMAGE:scan" && sleep 3
         curl -fsS -X POST -H 'content-type: application/json' -d '{"amountZscore":0.2,"txnCount1h":1,"distinctCounterparties24h":2,"geoJumpKm1h":3,"newDeviceFlag":0,"edgeScoreMean24h":860}' localhost:18090/v1/score || { docker logs fs; exit 1; }
+
+  scheme-sim:
+    needs: changes
+    if: needs.changes.outputs.scheme == 'true'
+    uses: ./.github/workflows/_image.yml
+    with:
+      name: difme-scheme-sim
+      dockerfile: deploy/images/scheme-sim/Dockerfile
 
   debezium-connect:
     needs: changes

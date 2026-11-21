@@ -43,6 +43,7 @@ marquez
 feast
 onnx-serving
 mlflow
+scheme-sim
 victoria-metrics
 loki
 tempo

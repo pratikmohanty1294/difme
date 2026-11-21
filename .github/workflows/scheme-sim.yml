@@ -1,0 +1,16 @@
+# Card-scheme simulator and ISO 8583 adapter: vet and race-tested end to end over a real TCP link.
+name: scheme-sim
+on:
+  push: { branches: [main, "wip-*"], paths: ["services/scheme-sim/**", "vendor/moov-iso8583/**", ".github/workflows/scheme-sim.yml"] }
+  pull_request: { paths: ["services/scheme-sim/**", "vendor/moov-iso8583/**"] }
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: services/scheme-sim } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: services/scheme-sim/go.mod }
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...

@@ -175,3 +175,14 @@ metadata:
     difme/workload-type: Deployment
     pod-security.kubernetes.io/enforce: baseline
     istio.io/dataplane-mode: ambient
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Payment-rail simulators (owner 2026-11-21): card scheme + ISO 8583 adapter, PSP (Hyperswitch), CBS (Fineract).
+  name: rails
+  labels:
+    difme/workload-type: Deployment
+    pod-security.kubernetes.io/enforce: baseline
+    istio.io/dataplane-mode: ambient
+

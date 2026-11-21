@@ -1,0 +1,2 @@
+resources: [hyperswitch.yaml]
+namespace: rails

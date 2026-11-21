@@ -44,6 +44,8 @@ feast
 onnx-serving
 mlflow
 scheme-sim
+fineract
+hyperswitch
 victoria-metrics
 loki
 tempo

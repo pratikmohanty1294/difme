@@ -1,0 +1,91 @@
+# Apache Fineract 1.16.1: the core banking (CBS) simulator (owner 2026-11-21). Accounts, loans and savings for buyers'
+# and buying partners' bank sides. Databases on the shared Postgres (90-fineract.sh); plain HTTP inside the mesh.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: fineract }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: fineract, labels: { app: fineract } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: fineract } }
+  template:
+    metadata: { labels: { app: fineract, difme/team: rails, business.metric: core-banking-sim } }
+    spec:
+      serviceAccountName: fineract
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      initContainers:
+        - name: wait-db
+          image: ghcr.io/pratikmohanty1294/difme-fineract:0.1.0
+          command: [bash, -c, 'until (exec 3<>/dev/tcp/postgres-docdb.database-tier.svc/5432) 2>/dev/null; do sleep 3; done']
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 64Mi } }
+      containers:
+        - name: fineract
+          image: ghcr.io/pratikmohanty1294/difme-fineract:0.1.0
+          env:
+            - { name: FINERACT_NODE_ID, value: "1" }
+            - { name: FINERACT_SERVER_SSL_ENABLED, value: "false" }
+            - { name: FINERACT_SERVER_PORT, value: "8080" }
+            - { name: FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME, value: org.postgresql.Driver }
+            - { name: FINERACT_HIKARI_JDBC_URL, value: "jdbc:postgresql://postgres-docdb.database-tier.svc:5432/fineract_tenants" }
+            - { name: FINERACT_HIKARI_USERNAME, value: fineract }
+            - { name: FINERACT_HIKARI_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-db, key: password } } }
+            - { name: FINERACT_HIKARI_MINIMUM_IDLE, value: "1" }
+            - { name: FINERACT_HIKARI_MAXIMUM_POOL_SIZE, value: "5" }    # shared Postgres: keep the pool small
+            - { name: FINERACT_DEFAULT_TENANTDB_HOSTNAME, value: postgres-docdb.database-tier.svc }
+            - { name: FINERACT_DEFAULT_TENANTDB_PORT, value: "5432" }
+            - { name: FINERACT_DEFAULT_TENANTDB_UID, value: fineract }
+            - { name: FINERACT_DEFAULT_TENANTDB_PWD, valueFrom: { secretKeyRef: { name: fineract-db, key: password } } }
+            - { name: FINERACT_DEFAULT_TENANTDB_NAME, value: fineract_default }
+            - { name: FINERACT_DEFAULT_TENANTDB_IDENTIFIER, value: default }
+            - { name: FINERACT_DEFAULT_TENANTDB_TIMEZONE, value: Asia/Kolkata }
+            - { name: FINERACT_DEFAULT_MASTER_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-db, key: master-password } } }
+            - { name: FINERACT_MANAGEMENT_ENDPOINT_WEB_EXPOSURE_INCLUDE, value: "health,info,prometheus" }
+            - { name: FINERACT_CONTENT_FILESYSTEM_ROOT_FOLDER, value: /tmp }
+            - { name: JAVA_TOOL_OPTIONS, value: "-Xmx512m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k" }
+          ports: [{ name: http, containerPort: 8080 }]
+          startupProbe: { httpGet: { path: /fineract-provider/actuator/health, port: 8080 }, periodSeconds: 10, failureThreshold: 60 }   # Liquibase on first start
+          readinessProbe: { httpGet: { path: /fineract-provider/actuator/health, port: 8080 }, periodSeconds: 15 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 100m, memory: 880Mi }, limits: { memory: 1Gi } }   # measured 2026-11-21: 866Mi RSS under load (live heap ~250Mi)
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 256Mi } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: fineract }
+spec: { selector: { app: fineract }, ports: [{ name: http, port: 8080 }] }
+---
+# Fineract ships a public default login (mifos/password). After every sync this switches it to the generated
+# admin-password once (idempotent: does nothing when the generated password already works).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: fineract-admin-password, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+spec:
+  backoffLimit: 30
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext: { runAsNonRoot: true, runAsUser: 100, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: rotate
+          image: curlimages/curl:8.11.1
+          env:
+            - { name: NEW, valueFrom: { secretKeyRef: { name: fineract-db, key: admin-password } } }
+          command: [sh, -c]
+          args:
+            - |
+              set -eu
+              B=http://fineract:8080/fineract-provider
+              until curl -sf $B/actuator/health >/dev/null; do sleep 5; done
+              code() { curl -s -o /dev/null -w '%{http_code}' -H 'Fineract-Platform-TenantId: default' -u "$1" $B/api/v1/offices; }
+              if [ "$(code "mifos:$NEW")" = 200 ]; then echo "admin password already set"; exit 0; fi
+              [ "$(code mifos:password)" = 200 ] || { echo "neither password works"; exit 1; }
+              printf '{"password":"%s","repeatPassword":"%s"}' "$NEW" "$NEW" | curl -sf -X PUT -H 'Fineract-Platform-TenantId: default' \
+                -H 'Content-Type: application/json' -u mifos:password --data @- $B/api/v1/users/1 >/dev/null
+              [ "$(code "mifos:$NEW")" = 200 ] && echo "default admin password replaced"
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 64Mi } }

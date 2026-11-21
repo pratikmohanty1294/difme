@@ -1,0 +1,2 @@
+resources: [fineract.yaml]
+namespace: rails

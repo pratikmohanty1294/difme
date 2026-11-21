@@ -25,6 +25,8 @@ spec:
             - { name: ML_DB_PASSWORD, valueFrom: { secretKeyRef: { name: ml-db, key: password } } }
             - { name: MLFLOW_DB_PASSWORD, valueFrom: { secretKeyRef: { name: mlflow-db, key: password } } }
             - { name: POLARIS_DB_PASSWORD, valueFrom: { secretKeyRef: { name: polaris-db, key: password } } }
+            - { name: FINERACT_DB_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-db, key: password, optional: true } } }
+            - { name: HYPERSWITCH_DB_PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch-db, key: password, optional: true } } }
             - { name: APICURIO_DB_PASSWORD, valueFrom: { secretKeyRef: { name: apicurio-db, key: password } } }
           ports: [{ containerPort: 5432 }]
           volumeMounts:
@@ -40,6 +42,8 @@ spec:
             - { name: init, mountPath: /docker-entrypoint-initdb.d/50-marquez.sh, subPath: 50-marquez.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/60-ml-vectors.sh, subPath: 60-ml-vectors.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/70-polaris.sh, subPath: 70-polaris.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/90-fineract.sh, subPath: 90-fineract.sh }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d/95-hyperswitch.sh, subPath: 95-hyperswitch.sh }
             - { name: init, mountPath: /docker-entrypoint-initdb.d/80-apicurio.sh, subPath: 80-apicurio.sh }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
           readinessProbe: { exec: { command: [pg_isready, -U, difme] }, periodSeconds: 5 }
@@ -119,6 +123,25 @@ data:
     psql -v ON_ERROR_STOP=1 -v pw="$POLARIS_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
     CREATE ROLE polaris LOGIN PASSWORD :'pw';
     CREATE DATABASE polaris OWNER polaris;
+    SQL
+  # Fineract (CBS simulator, rails profile): its tenant store and the default tenant (owner 2026-11-21).
+  90-fineract.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    [ -n "${FINERACT_DB_PASSWORD:-}" ] || { echo "no fineract-db secret: skipping"; exit 0; }
+    psql -v ON_ERROR_STOP=1 -v pw="$FINERACT_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE fineract LOGIN PASSWORD :'pw';
+    CREATE DATABASE fineract_tenants OWNER fineract;
+    CREATE DATABASE fineract_default OWNER fineract;
+    SQL
+  # Hyperswitch (PSP simulator, rails profile): its own database; the router's init container applies the schema.
+  95-hyperswitch.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    [ -n "${HYPERSWITCH_DB_PASSWORD:-}" ] || { echo "no hyperswitch-db secret: skipping"; exit 0; }
+    psql -v ON_ERROR_STOP=1 -v pw="$HYPERSWITCH_DB_PASSWORD" --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+    CREATE ROLE hyperswitch LOGIN PASSWORD :'pw';
+    CREATE DATABASE hyperswitch OWNER hyperswitch;
     SQL
   # Apicurio Registry storage, moved off YugabyteDB (duplicate version rows under load).
   80-apicurio.sh: |

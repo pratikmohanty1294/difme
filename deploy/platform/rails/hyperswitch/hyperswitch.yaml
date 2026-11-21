@@ -1,0 +1,78 @@
+# Juspay Hyperswitch v1.129.0: the PSP simulator (payment aggregator / gateway) for merchants and agents (owner
+# 2026-11-21). Payments run through its dummy connector (a simulated processor); test cards only. Shared Postgres
+# (database "hyperswitch", 95-hyperswitch.sh) and the shared Valkey. Upstream config file, DIFME values as ROUTER__* env.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: hyperswitch }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: hyperswitch, labels: { app: hyperswitch } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: hyperswitch } }
+  template:
+    metadata: { labels: { app: hyperswitch, difme/team: rails, business.metric: psp-sim } }
+    spec:
+      serviceAccountName: hyperswitch
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      initContainers:
+        # Schema first: applies only the migrations not yet recorded (idempotent), then the router starts.
+        - name: migrate
+          image: ghcr.io/pratikmohanty1294/difme-hyperswitch:0.1.0
+          command: [bash, -c, 'until pg_isready -q -h postgres-docdb.database-tier.svc; do sleep 3; done; exec /local/bin/migrate.sh']
+          env:
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: DATABASE_URL, value: "postgresql://hyperswitch@postgres-docdb.database-tier.svc:5432/hyperswitch" }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 20m, memory: 32Mi }, limits: { memory: 128Mi } }
+      containers:
+        - name: router
+          image: ghcr.io/pratikmohanty1294/difme-hyperswitch:0.1.0
+          env:
+            - { name: ROUTER__MASTER_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
+            - { name: ROUTER__MASTER_DATABASE__USERNAME, value: hyperswitch }
+            - { name: ROUTER__MASTER_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: ROUTER__MASTER_DATABASE__DBNAME, value: hyperswitch }
+            - { name: ROUTER__MASTER_DATABASE__MAX_POOL_SIZE, value: "3" }
+            - { name: ROUTER__REPLICA_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
+            - { name: ROUTER__REPLICA_DATABASE__USERNAME, value: hyperswitch }
+            - { name: ROUTER__REPLICA_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: ROUTER__REPLICA_DATABASE__DBNAME, value: hyperswitch }
+            - { name: ROUTER__REPLICA_DATABASE__MAX_POOL_SIZE, value: "3" }
+            - { name: ROUTER__ACCOUNTS_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
+            - { name: ROUTER__ACCOUNTS_DATABASE__USERNAME, value: hyperswitch }
+            - { name: ROUTER__ACCOUNTS_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: ROUTER__ACCOUNTS_DATABASE__DBNAME, value: hyperswitch }
+            - { name: ROUTER__ACCOUNTS_DATABASE__MAX_POOL_SIZE, value: "3" }
+            - { name: ROUTER__GLOBAL_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
+            - { name: ROUTER__GLOBAL_DATABASE__USERNAME, value: hyperswitch }
+            - { name: ROUTER__GLOBAL_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: ROUTER__GLOBAL_DATABASE__DBNAME, value: hyperswitch }
+            - { name: ROUTER__GLOBAL_DATABASE__MAX_POOL_SIZE, value: "3" }
+            - { name: ROUTER__ANALYTICS__SQLX__HOST, value: postgres-docdb.database-tier.svc }
+            - { name: ROUTER__ANALYTICS__SQLX__USERNAME, value: hyperswitch }
+            - { name: ROUTER__ANALYTICS__SQLX__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: ROUTER__ANALYTICS__SQLX__DBNAME, value: hyperswitch }
+            - { name: ROUTER__ANALYTICS__SQLX__MAX_POOL_SIZE, value: "3" }
+            - { name: ROUTER__REDIS__HOST, value: valkey.cache-tier.svc }
+            - { name: ROUTER__REDIS__POOL_SIZE, value: "3" }
+            - { name: ROUTER__SECRETS__ADMIN_API_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: admin-api-key } } }
+            - { name: ROUTER__SECRETS__JWT_SECRET, valueFrom: { secretKeyRef: { name: hyperswitch, key: jwt-secret } } }
+            - { name: ROUTER__SECRETS__MASTER_ENC_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: master-enc-key } } }
+            - { name: ROUTER__API_KEYS__HASH_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: api-key-hash-key } } }
+            - { name: ROUTER__LOG__CONSOLE__LEVEL, value: INFO }
+            - { name: ROUTER__LOG__TELEMETRY__METRICS_ENABLED, value: "false" }
+            - { name: ROUTER__SERVER__WORKERS, value: "2" }
+          ports: [{ name: http, containerPort: 8080 }]
+          startupProbe: { httpGet: { path: /health, port: 8080 }, periodSeconds: 5, failureThreshold: 60 }
+          readinessProbe: { httpGet: { path: /health/ready, port: 8080 }, periodSeconds: 15 }
+          livenessProbe: { httpGet: { path: /health, port: 8080 }, periodSeconds: 30 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 50m, memory: 160Mi }, limits: { memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: hyperswitch }
+spec: { selector: { app: hyperswitch }, ports: [{ name: http, port: 8080 }] }

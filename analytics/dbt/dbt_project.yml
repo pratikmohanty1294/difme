@@ -9,3 +9,5 @@ models:
   difme:
     staging: { +materialized: view, +schema: staging }
     marts: { +materialized: table, +schema: marts }
+    # Feast offline source tables (iceberg.features.*, ml/feast/features.py).
+    features: { +materialized: table, +schema: features }

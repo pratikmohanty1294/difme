@@ -37,6 +37,12 @@ public final class EventArchiveJob {
             CREATE TABLE IF NOT EXISTS lake.events.fraud_alerts (
               payment_id STRING, layer STRING, action STRING, score DOUBLE, rule STRING, archived_at TIMESTAMP(3))
             """);
+        // Edge fraud scores per device (EdgeFraudScore, edge.telemetry.v1): the source of the Feast device_geo features.
+        // score is the on-device fraud probability (0..1, higher = riskier), as in PaymentInitiated.edgeFraudScore.
+        t.executeSql("""
+            CREATE TABLE IF NOT EXISTS lake.events.edge_scores (
+              device_id STRING, payment_id STRING, score DOUBLE, model_version STRING, attested BOOLEAN, archived_at TIMESTAMP(3))
+            """);
 
         t.executeSql("""
             CREATE TEMPORARY TABLE payments_src (
@@ -52,6 +58,14 @@ public final class EventArchiveJob {
                   'properties.auto.offset.reset' = 'earliest', 'value.format' = 'json')
             """.formatted(bootstrap));
 
+        t.executeSql("""
+            CREATE TEMPORARY TABLE edge_src (deviceId STRING, paymentId STRING, score DOUBLE, modelVersion STRING, attested BOOLEAN)
+            WITH ('connector' = 'kafka', 'topic' = 'edge.telemetry.v1', 'properties.bootstrap.servers' = '%s',
+                  'properties.group.id' = 'event-archive-edge', 'scan.startup.mode' = 'group-offsets',
+                  'properties.auto.offset.reset' = 'earliest', 'value.format' = 'json',
+                  'value.json.ignore-parse-errors' = 'true')
+            """.formatted(bootstrap));
+
         StatementSet set = t.createStatementSet();
         set.addInsertSql("""
             INSERT INTO lake.events.payment_events
@@ -63,6 +77,10 @@ public final class EventArchiveJob {
         set.addInsertSql("""
             INSERT INTO lake.events.fraud_alerts
             SELECT paymentId, layer, action, score, rule, LOCALTIMESTAMP FROM alerts_src
+            """);
+        set.addInsertSql("""
+            INSERT INTO lake.events.edge_scores
+            SELECT deviceId, paymentId, score, modelVersion, attested, LOCALTIMESTAMP FROM edge_src WHERE deviceId IS NOT NULL
             """);
         set.execute();
     }

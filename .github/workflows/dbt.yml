@@ -10,7 +10,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install dbt-core==1.12.7 dbt-trino==1.12.0
+      - run: pip install dbt-core==1.12.7 dbt-trino==1.12.0 dbt-duckdb==1.11.1 duckdb==2.0.1
       - name: Compile models (no warehouse connection needed)
         working-directory: analytics/dbt
         run: dbt parse --profiles-dir .
+      - name: Feast feature models on DuckDB (crafted rows, every value checked)
+        run: python -I analytics/dbt/tests_local/features_duckdb.py

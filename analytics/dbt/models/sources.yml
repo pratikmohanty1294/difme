@@ -10,3 +10,5 @@ sources:
           - { name: event_id, tests: [not_null, unique] }
       - name: fraud_alerts
         description: Archived fraud alerts from FraudCepJob and edge/server scoring.
+      - name: edge_scores
+        description: On-device fraud scores per device (EdgeFraudScore on edge.telemetry.v1), archived by EventArchiveJob.

@@ -1,0 +1,13 @@
+version: 2
+models:
+  - name: account_velocity
+    description: Feast account_velocity (ml/feast/features.py); amounts in minor units.
+    columns:
+      - { name: account_id, tests: [not_null, unique] }
+      - { name: event_timestamp, tests: [not_null] }
+      - { name: txn_count_1h, tests: [not_null] }
+  - name: device_geo
+    description: Feast device_geo (ml/feast/features.py); edge score on the model scale (0..1000, higher = trusted).
+    columns:
+      - { name: device_id, tests: [not_null, unique] }
+      - { name: new_device_flag, tests: [not_null, { accepted_values: { values: [0, 1], quote: false } }] }

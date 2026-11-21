@@ -3,7 +3,7 @@
 # `release` set (cloud KMS clients, encryption service, S3): DIFME needs none of them and they double the build.
 # Native binary: built per arch on a matching runner (images.yml), never under emulation.
 FROM rust:1.97-trixie AS build
-RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev libssl-dev pkg-config protobuf-compiler \
+RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev libssl-dev pkg-config protobuf-compiler libprotobuf-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY vendor/hyperswitch /src

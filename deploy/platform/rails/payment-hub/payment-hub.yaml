@@ -1,0 +1,52 @@
+# DIFME payment hub (owner 2026-11-21: on our stack, Temporal): channels call it; it drives the PSP (Hyperswitch, whose
+# card processor is the acquirer on the scheme simulator) and the CBS (Fineract). Money movements are Temporal
+# workflows keyed by the caller's id. Card numbers go to the PSP only, never into workflow history.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: payment-hub }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: payment-hub, labels: { app: payment-hub } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: payment-hub } }
+  template:
+    metadata: { labels: { app: payment-hub, difme/team: rails, business.metric: payment-hub } }
+    spec:
+      serviceAccountName: payment-hub
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: payment-hub
+          image: ghcr.io/pratikmohanty1294/difme-payment-hub:0.1.0
+          env:
+            - { name: TEMPORAL_TARGET, value: "temporal-frontend.temporal.svc:7233" }
+            - { name: FINERACT_URL, value: "http://fineract.rails.svc:8080/fineract-provider" }
+            - { name: FINERACT_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-db, key: admin-password } } }
+            - { name: HYPERSWITCH_URL, value: "http://hyperswitch.rails.svc:8080" }
+            - { name: HYPERSWITCH_ADMIN_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: admin-api-key } } }
+            - { name: ACQUIRER_API_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: acquirer-api-key } } }
+            - { name: JAVA_TOOL_OPTIONS, value: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -Xss512k" }
+          ports: [{ name: http, containerPort: 8090 }]
+          readinessProbe: { httpGet: { path: /q/health/ready, port: 8090 }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /q/health/live, port: 8090 }, periodSeconds: 30 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 384Mi } }
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 64Mi } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: payment-hub }
+spec: { selector: { app: payment-hub }, ports: [{ name: http, port: 8090 }] }
+---
+# Only the exchange moves money through the hub (ztunnel enforces this on the mesh identity; probes are plain kubelet).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: { name: payment-hub-callers }
+spec:
+  selector: { matchLabels: { app: payment-hub } }
+  action: ALLOW
+  rules:
+    - from: [{ source: { principals: ["difme.local/ns/core-platform/sa/exchange-svc"] } }]

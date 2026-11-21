@@ -46,6 +46,7 @@ mlflow
 scheme-sim
 fineract
 hyperswitch
+payment-hub
 victoria-metrics
 loki
 tempo

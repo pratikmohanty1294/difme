@@ -25,6 +25,7 @@
     <module>rehydration-svc</module>
     <module>replay-engine</module>
     <module>process-gateway</module>
+    <module>payment-hub</module>
   </modules>
 
   <properties>

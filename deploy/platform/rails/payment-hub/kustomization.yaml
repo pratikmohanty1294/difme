@@ -1,0 +1,2 @@
+resources: [payment-hub.yaml]
+namespace: rails

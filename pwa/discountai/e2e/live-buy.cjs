@@ -5,6 +5,9 @@
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
 const DIST = path.resolve(process.argv[2]), OUT = process.argv[3], REFUSE = process.argv[4] === 'refuse';
+// EXCHANGE_URL=http://127.0.0.1:8089: forward /api/ to a real exchange-svc instead of the recorded answers (a standing
+// mandate is registered first so the auction has a bid; it bids at its 4 % floor, the same split the checks expect).
+const REAL = process.env.EXCHANGE_URL;
 const calls = [];
 // Exchange arithmetic for one standing bid at a 4 % yield floor (as the cluster answered): A = P − d·P, B = A + Y + F.
 let split = null;
@@ -25,6 +28,14 @@ const api = {
 };
 const srv = http.createServer((req, res) => {
   const key = `${req.method} ${req.url.split('?')[0]}`;
+  if (req.url.startsWith('/api/') && REAL) {
+    let body = ''; req.on('data', (c) => body += c); req.on('end', async () => {
+      calls.push(key + (body ? ' ' + body.slice(0, 160) : ''));
+      if (key.endsWith('/intents') && body) split = fromIntent(JSON.parse(body));
+      const r = await fetch(REAL + req.url.replace(/^\/api/, ''), { method: req.method, headers: { 'Content-Type': 'application/json' }, body: body || undefined });
+      res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(await r.text());
+    }); return;
+  }
   if (req.url.startsWith('/api/')) {
     let body = ''; req.on('data', (c) => body += c); req.on('end', () => {
       calls.push(key + (body ? ' ' + body.slice(0, 160) : ''));
@@ -42,6 +53,12 @@ const srv = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': types[path.extname(f)] ?? 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
 });
 srv.listen(18181, async () => {
+  if (REAL && !REFUSE) {
+    const m = await fetch(REAL + '/v1/exchange/fr01-buy/mandates', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partnerRef: 'e2e-' + Date.now(), limitMinor: 2500000, maxPerOrderMinor: 2500000, minYieldPct: 4, depositMinor: 2000000,
+        budgetTotalMinor: 2500000, merchantCount: 2, goodsCount: 5, validityDays: 5, cardJurisdiction: 'IN_DOMESTIC_AFA' }) });
+    console.log('standing mandate:', m.status, (await m.text()).slice(0, 120));
+  }
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = []; p.on('pageerror', (e) => { errors.push(e.message); console.log('PAGEERROR', e.message); });
   await p.goto('http://127.0.0.1:18181/');

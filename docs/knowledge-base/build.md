@@ -92,3 +92,8 @@
 ### docker.io rate limits in image builds (2026-11-20)
 - **Symptom:** a flink-jobs image leg failed with HTTP 429 from docker.io when ~25 image jobs started together (anonymous pulls).
 - **Fix:** `_image.yml` configures BuildKit with `[registry."docker.io"] mirrors = ["mirror.gcr.io"]`; a public pull-through cache serves rust, node, golang, debian and eclipse-temurin, and BuildKit falls back to docker.io for anything the mirror lacks. No Dockerfile changes.
+### JDK 25 in a cloud session without Adoptium (2026-11-21)
+api.adoptium.net and GitHub release downloads are blocked by the session proxy, but conda-forge is reachable:
+`curl -fsSLO https://conda.anaconda.org/conda-forge/linux-64/openjdk-25.0.5.1-h1602c4f_1.conda`, unzip it, then
+decompress `pkg-*.tar.zst` with the Python `zstandard` package (no `zstd` binary here) and untar; `JAVA_HOME` is
+`<dir>/lib/jvm`. Runs `mvn test` for services/core (46 exchange tests) and the packaged exchange-svc locally.

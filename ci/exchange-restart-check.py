@@ -81,6 +81,8 @@ s, ret = call("POST", f"/auctions/{aid}/returns", {"fractionBps": 5000})
 check("before restart: bought, delivered, half returned", e.get("fulfilled") and f.get("verified") and s == 200)
 before = {"mandate": call("GET", f"/fr01-buy/mandates/{mid}")[1], "result": call("GET", f"/auctions/{aid}")[1],
           "evidence": call("GET", f"/auctions/{aid}/evidence")[1]}
+check("the half return took half the yield off the winning mandate (64000 -> 32000)", before["mandate"].get("yieldEarnedMinor") == 32000)
+check("the day-by-day history shows the same net yield", sum(before["mandate"].get("yieldByDay", {}).values()) == 32000)
 call("POST", f"/fr01-buy/mandates/{mid}/status", {"status": "PAUSED"})
 out = stop(p)
 check("clean shutdown flushed everything", "records not written" not in out)
@@ -89,7 +91,7 @@ p = start()
 try:
     s, mm = call("GET", f"/fr01-buy/mandates/{mid}")
     check("mandate is back", s == 200)
-    for k in ("budgetLeftMinor", "awards", "yieldEarnedMinor", "nodeRef", "partnerRef"):
+    for k in ("budgetLeftMinor", "awards", "yieldEarnedMinor", "nodeRef", "partnerRef", "yieldByDay"):
         check(f"mandate {k} = {before['mandate'][k]}", mm.get(k) == before["mandate"][k])
     check("mandate status change made just before the stop is kept (PAUSED)", mm.get("status") == "PAUSED")
     s, rr = call("GET", f"/auctions/{aid}")

@@ -61,6 +61,8 @@ export interface MandateState {
   mandateId: number; partnerRef: string; nodeRef: number; standing: boolean; budgetTotalMinor: number; budgetLeftMinor: number;
   awards: number; yieldEarnedMinor: number; minYieldPct: number; ageDays: number; validityDays: number; tier: string;
   status: 'ACTIVE' | 'PAUSED' | 'REVOKED';
+  /** Net yield per IST day (yyyy-MM-dd → paise), last 30 days. */
+  yieldByDay?: Record<string, number>;
 }
 
 export const exchange = {
@@ -80,6 +82,8 @@ export const exchange = {
   mandate: (id: number) => call<MandateState>('GET', `/${PACK}/mandates/${id}`),
   /** Pause (no new bids), resume, or revoke (final). */
   setMandateStatus: (id: number, status: MandateState['status']) => call<MandateState>('POST', `/${PACK}/mandates/${id}/status`, { status }),
+  /** What the exchange knows about a buying partner's node: tier, tracked reputation, verified deliveries. */
+  partner: (nodeRef: number) => call<{ nodeRef: number; reputation: number | null; tracked: boolean; verifiedDeliveries: number; tier: string }>('GET', `/${PACK}/partners/${nodeRef}`),
   /** Cheap reachability probe (the public verification keys). */
   ping: () => call<Record<string, string>>('GET', '/keys', undefined, 3000).then(() => true, () => false),
 };

@@ -233,6 +233,7 @@ public class ExchangeResource {
         out.put("nodeRef", ms.nodeRef());
         out.put("standing", ms.standing());
         out.put("status", ms.status().get().name());
+        out.put("yieldByDay", ms.yieldByDay().tailMap(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).minusDays(29).toString()));
         out.put("budgetTotalMinor", ms.terms().budgetTotalMinor());
         out.put("budgetLeftMinor", ms.budgetLeftMinor().get());
         out.put("awards", ms.awards().get());

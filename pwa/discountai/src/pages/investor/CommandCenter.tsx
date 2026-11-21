@@ -4,13 +4,45 @@ import { YIELD_SERIES } from '../../sim/data';
 import { useEngine } from '../../sim/engine';
 import { time, inr, inr2 } from '../../sim/format';
 import { Badge, Callout, Card, FlowTag, Meter, PageHeader, Stat, cx } from '../../components/ui';
-import { LIVE } from '../../api/exchange';
+import { LIVE, exchange } from '../../api/exchange';
+import { useEffect, useState } from 'react';
 import { href } from '../../router';
 import type { FeedItem } from '../../sim/types';
 
 const feedTone: Record<FeedItem['kind'], string> = {
   bid: 'text-ink-500', won: 'text-exchange-600', outbid: 'text-amber-700', settled: 'text-exchange-600', refund: 'text-audit-600', mandate: 'text-investor-600', config: 'text-ink-500', failed: 'text-red-700',
 };
+
+/** Live: the last 7 IST days of net yield, summed over this partner's mandates (live mandates are card, Flow A). */
+function liveSeries(mandates: { yieldByDay?: Record<string, number> }[]) {
+  const ist = (d: Date) => new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  return Array.from({ length: 7 }, (_, i) => {
+    const key = ist(new Date(Date.now() - (6 - i) * 864e5));
+    const flowA = mandates.reduce((a, m) => a + (m.yieldByDay?.[key] ?? 0), 0);
+    return { d: new Date(key + 'T00:00:00Z').toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'UTC' }), flowA, flowB: 0, flowC: 0 };
+  });
+}
+
+/** Live: the exchange's own view of this partner's node (nothing simulated). */
+function LiveNode({ nodeRef, deposit, minYield }: { nodeRef?: number; deposit: number; minYield?: number }) {
+  const [p, setP] = useState<{ reputation: number | null; tracked: boolean; verifiedDeliveries: number; tier: string }>();
+  useEffect(() => {
+    if (nodeRef === undefined) return;
+    const load = () => exchange.partner(nodeRef).then(setP, () => undefined);
+    load();
+    const t = setInterval(load, 10_000);
+    return () => clearInterval(t);
+  }, [nodeRef]);
+  if (nodeRef === undefined) return <p className="text-sm text-ink-600">Deploy a mandate in the smart mandate factory; the exchange then assigns your bidder node.</p>;
+  return (
+    <div className="grid grid-cols-2 gap-3 text-sm">
+      <div><p className="label">Tier</p><p className="text-lg font-semibold">{p ? p.tier.replace('_', ' ').toLowerCase() : '…'}</p></div>
+      <div><p className="label">Verified deliveries</p><p className="text-lg font-semibold tabular">{p ? p.verifiedDeliveries : '…'}</p></div>
+      <div><p className="label">Reputation</p><p className="text-lg font-semibold tabular">{p ? (p.tracked && p.reputation !== null ? p.reputation.toFixed(1) : 'not yet tracked') : '…'}</p></div>
+      <div><p className="label">Yield floor · deposit</p><p className="text-lg font-semibold tabular">{minYield !== undefined ? `${minYield}%` : '—'} · ₹{deposit.toLocaleString('en-IN')}</p></div>
+    </div>
+  );
+}
 
 export default function CommandCenter() {
   const { state } = useEngine();
@@ -41,18 +73,19 @@ export default function CommandCenter() {
         <div className="flex flex-col gap-5 min-w-0">
           <Card title="Yield by settlement flow" sub="Last 7 days · inr" right={<div className="flex gap-3 text-xs text-ink-600">
             <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-investor-600" />Flow A card</span>
-            <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-audit-600" />Flow B Finternet</span>
-            <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-buyer-600" />Flow C UPI</span></div>}>
-            {LIVE ? <Callout tone="info" title="No yield history yet">The exchange reports each mandate's yield so far (below); a day-by-day history appears once it keeps one.</Callout> : <div className="h-64 -ml-3">
+            {!LIVE && <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-audit-600" />Flow B Finternet</span>}
+            {!LIVE && <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-buyer-600" />Flow C UPI</span>}</div>}>
+            {LIVE && !mandates.some((m) => Object.keys(m.yieldByDay ?? {}).length) ? <Callout tone="info" title="No yield yet">Your daily yield appears here once one of your mandates wins an order.</Callout> : <div className="h-64 -ml-3">
               <ResponsiveContainer>
-                <AreaChart data={YIELD_SERIES} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+                <AreaChart data={LIVE ? liveSeries(mandates) : YIELD_SERIES} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#edf1f6" vertical={false} />
                   <XAxis dataKey="d" tickLine={false} axisLine={false} tick={{ fill: '#64728a', fontSize: 12 }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64728a', fontSize: 12 }} width={44} tickFormatter={(v) => `$${v}`} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64728a', fontSize: 12 }} width={44} tickFormatter={(v) => `₹${v}`} />
                   <Tooltip formatter={(v: number) => inr(v)} contentStyle={{ borderRadius: 8, border: '1px solid #dbe1ea', fontSize: 12 }} />
-                  <Area type="monotone" dataKey="flowC" name="Flow C" stackId="1" stroke="#b4520c" fill="#fbe9d9" />
+                  {/* Live mandates are card (Flow A) only: drawing empty B/C series on top would colour the line purple. */}
+                  {!LIVE && <Area type="monotone" dataKey="flowC" name="Flow C" stackId="1" stroke="#b4520c" fill="#fbe9d9" />}
                   <Area type="monotone" dataKey="flowA" name="Flow A" stackId="1" stroke="#2453c2" fill="#e0e8fb" />
-                  <Area type="monotone" dataKey="flowB" name="Flow B" stackId="1" stroke="#6b3fb5" fill="#ece4fa" />
+                  {!LIVE && <Area type="monotone" dataKey="flowB" name="Flow B" stackId="1" stroke="#6b3fb5" fill="#ece4fa" />}
                 </AreaChart>
               </ResponsiveContainer>
             </div>}
@@ -96,16 +129,17 @@ export default function CommandCenter() {
 
           <Card title="Your agent node" sub="As the exchange sees it">
             <div className="flex items-center justify-between mb-3">
-              <div><p className="font-medium">{me.label}</p><p className="text-xs text-ink-500">{me.region} · {me.assetClass}</p></div>
+              <div><p className="font-medium">{me.label}</p><p className="text-xs text-ink-500">{LIVE ? `Bidder node ${mandates.find((m) => m.exchangeNodeRef !== undefined)?.exchangeNodeRef ?? '—'} on the exchange` : `${me.region} · ${me.assetClass}`}</p></div>
               {me.online ? <Badge tone="green" dot>LIVE · listening</Badge> : <Badge tone="amber">Card node offline</Badge>}
             </div>
             {!me.online && <p className="mb-3 text-xs text-amber-800">Deploy a Bank X card mandate in the smart mandate factory to bring this node into Bank X auctions.</p>}
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            {LIVE ? <LiveNode nodeRef={live.find((m) => m.exchangeNodeRef !== undefined)?.exchangeNodeRef ?? mandates.find((m) => m.exchangeNodeRef !== undefined)?.exchangeNodeRef}
+              deposit={live.reduce((a, m) => a + (m.deposit ?? 0), 0)} minYield={live[0]?.minYieldPct} /> : <div className="grid grid-cols-2 gap-3 text-sm">
               <div><p className="label">Reliability (30d EWMA)</p><p className="text-lg font-semibold tabular">{(me.reliability * 100).toFixed(1)}%</p></div>
               <div><p className="label">Yield ask</p><p className="text-lg font-semibold tabular">{me.yieldAskPct.toFixed(1)}% of A</p></div>
               <div><p className="label">ZK proof acceptance</p><p className="text-lg font-semibold tabular">{(me.zkAcceptance * 100).toFixed(1)}%</p></div>
               <div><p className="label">Bid latency · deposit</p><p className="text-lg font-semibold tabular">{me.latencyMs} ms · ₹{me.depositInr.toLocaleString('en-IN')}</p></div>
-            </div>
+            </div>}
             <p className="mt-3 text-xs text-ink-500">Bids are priced from the agent's internal cache only; no external API calls during the auction window.</p>
           </Card>
         </div>

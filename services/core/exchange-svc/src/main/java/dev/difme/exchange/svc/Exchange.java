@@ -57,7 +57,8 @@ public class Exchange {
      * pays the merchant); φ comes from the winner's tier, which the exchange derives from its own history (decided
      * 2026-11-20): COLD_START until enough verified deliveries, then ESTABLISHED.
      */
-    public record Award(Ranked winner, CommerceSplit split, long collateralMinor, Risk.Tier tier) {}
+    /** mandateId: the standing/registered mandate that won, if any (null for agent bids; also in records stored before it). */
+    public record Award(Ranked winner, CommerceSplit split, long collateralMinor, Risk.Tier tier, Long mandateId) {}
 
     /** What the exchange (not the bidder) knows about an open auction; the facts bid-time rules are checked against. */
     public record Context(long cardPriceMinor, long yieldRoomMinor, Map<String, Object> facts) {}
@@ -141,7 +142,7 @@ public class Exchange {
     private StateStore store = StateStore.none();
 
     record MandateRecord(long id, String pack, ExchangeResource.Mandate terms, long registeredAtMillis, long budgetLeftMinor,
-                         int nodeRef, int awards, long yieldEarnedMinor, MandateStatus status) {}
+                         int nodeRef, int awards, long yieldEarnedMinor, MandateStatus status, Map<String, Long> yieldByDay) {}
     record ChainRecord(long auctionId, String id, EvidenceChain.Kind kind, List<EvidenceChain.Artifact> artifacts, EvidenceChain.Seal seal) {}
     record KeyRecord(String name, String x509) {}
     record ScoreRecord(String key, double value) {}
@@ -242,7 +243,8 @@ public class Exchange {
                 MandateRecord m = json.treeToValue(n, MandateRecord.class);
                 mandates.put(m.id(), new MandateState(m.pack(), m.terms(), m.registeredAtMillis(), new AtomicLong(m.budgetLeftMinor()),
                         m.nodeRef(), new java.util.concurrent.atomic.AtomicInteger(m.awards()), new AtomicLong(m.yieldEarnedMinor()),
-                        new java.util.concurrent.atomic.AtomicReference<>(m.status())));
+                        new java.util.concurrent.atomic.AtomicReference<>(m.status()),
+                        new java.util.concurrent.ConcurrentSkipListMap<>(m.yieldByDay() == null ? Map.of() : m.yieldByDay())));
                 partnerNodes.put(m.terms().partnerRef(), m.nodeRef());
                 if (m.terms().customRules() != null) {
                     customRules.put(m.id(), dev.difme.exchange.rules.CustomRules.compile(m.terms().customRules(), "mandate_custom_" + m.id()));
@@ -268,10 +270,15 @@ public class Exchange {
         }
     }
 
+    static String istDay() {
+        return java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).toString();
+    }
+
     private void saveMandate(long id) {
         MandateState m = mandates.get(id);
         if (m != null) store.put("mandate", id, new MandateRecord(id, m.pack(), m.terms(), m.registeredAtMillis(),
-                m.budgetLeftMinor().get(), m.nodeRef(), m.awards().get(), m.yieldEarnedMinor().get(), m.status().get()));
+                m.budgetLeftMinor().get(), m.nodeRef(), m.awards().get(), m.yieldEarnedMinor().get(), m.status().get(),
+                Map.copyOf(m.yieldByDay())));
     }
 
     /** Saves everything the exchange holds for one auction (coalesced: only the newest version is written). */
@@ -345,7 +352,9 @@ public class Exchange {
 
     public record MandateState(String pack, ExchangeResource.Mandate terms, long registeredAtMillis, AtomicLong budgetLeftMinor,
                                int nodeRef, java.util.concurrent.atomic.AtomicInteger awards, AtomicLong yieldEarnedMinor,
-                               java.util.concurrent.atomic.AtomicReference<MandateStatus> status) {
+                               java.util.concurrent.atomic.AtomicReference<MandateStatus> status,
+                               /** Yield per IST day (yyyy-MM-dd): + on each award, − when a return voids it. */
+                               java.util.concurrent.ConcurrentSkipListMap<String, Long> yieldByDay) {
         public int ageDays() {
             return (int) ((System.currentTimeMillis() - registeredAtMillis) / 86_400_000L);
         }
@@ -422,7 +431,7 @@ public class Exchange {
         if (m.customRules() != null) customRules.put(id, dev.difme.exchange.rules.CustomRules.compile(m.customRules(), "mandate_custom_" + id));
         mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor()),
                 nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong(),
-                new java.util.concurrent.atomic.AtomicReference<>(MandateStatus.ACTIVE)));
+                new java.util.concurrent.atomic.AtomicReference<>(MandateStatus.ACTIVE), new java.util.concurrent.ConcurrentSkipListMap<>()));
         saveMandate(id);
         return id;
     }
@@ -706,6 +715,14 @@ public class Exchange {
                 chain.append(EvidenceChain.Type.refund, EvidenceChain.Signal.Asserted, p);
             }
             returns.put(auctionId, ret);
+            // The partner earns no yield on what came back: the winning mandate's tally and history go down too.
+            Long winnerMandate = r.award().mandateId();
+            MandateState wm = winnerMandate == null ? null : mandates.get(winnerMandate);
+            if (wm != null && yieldBack > 0) {
+                wm.yieldEarnedMinor().addAndGet(-yieldBack);
+                wm.yieldByDay().merge(istDay(), -yieldBack, Long::sum);
+                saveMandate(winnerMandate);
+            }
             saveAuction(auctionId);
             metrics.counter("difme_exchange_returns_total", "pack", r.pack()).increment();
             return ret;
@@ -769,15 +786,16 @@ public class Exchange {
             Risk.Tier tier = tierOf(pack, w.nodeRef());
             long collateral = Risk.requiredCollateral(split.a(), p.collateral().alpha(), p.collateral().gammaRev(),
                     tier, p.collateral().minMinor());
-            award = new Award(w, split, collateral, tier);
             // Draw the card price A from the winner's mandate budget (it was checked against the budget at bid time;
             // a concurrent award on the same mandate can still race, so never let it go negative).
             Long mandateId = bound == null ? null : bound.get(w.nodeRef());
             MandateState ms = mandateId == null ? null : mandates.get(mandateId);
+            award = new Award(w, split, collateral, tier, ms == null ? null : mandateId);
             if (ms != null) {
                 ms.budgetLeftMinor().updateAndGet(left -> Math.max(0, left - split.a()));
                 ms.awards().incrementAndGet();
                 ms.yieldEarnedMinor().addAndGet(split.yield());
+                ms.yieldByDay().merge(istDay(), split.yield(), Long::sum);
                 saveMandate(mandateId);
             }
         }

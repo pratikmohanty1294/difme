@@ -59,6 +59,16 @@ srv.listen(18183, async () => {
       if (istHour >= 6) {
         check('custom rules: bids for an approved merchant', (await intent('Electronics Store A')) === 1);
         check('custom rules: no bid for an unknown merchant', (await intent('Unknown Shop')) === 0);
+        // The approved-merchant order went to this mandate (A ₹8,000, yield at its 5 % floor = ₹400): the command center
+        // shows it from the exchange (the app re-reads mandates every 10 s), as a total and on the 7-day chart.
+        await p.waitForTimeout(11000);
+        await p.goto('http://127.0.0.1:18183/#/investor'); await p.waitForTimeout(12000);
+        const cc = await p.locator('main').innerText();
+        check('command center: yield from the exchange (₹400.00)', cc.includes('₹400.00'));
+        check('command center: chart shown (no "No yield yet")', !cc.includes('No yield yet'));
+        check('agent node: the exchange\'s tier, not demo numbers', cc.includes('cold start') && !cc.includes('ZK proof acceptance'));
+        await p.screenshot({ path: path.join(OUT, 'investor-command-center.png'), fullPage: true });
+        await p.goto('http://127.0.0.1:18183/#/investor/mandates'); await p.waitForTimeout(1200);
       } else console.log('skip  custom-rule bids (00-06 IST night ban in the default rules)');
       await p.getByRole('button', { name: /Pause bidding/ }).first().click(); await p.waitForTimeout(800);
       check('exchange: PAUSED after "Pause bidding"', (await status(id)) === 'PAUSED');

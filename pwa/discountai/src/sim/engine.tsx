@@ -263,6 +263,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         if (!m.exchangeMandateId) continue;
         exchange.mandate(m.exchangeMandateId).then((s) => dispatch({ type: 'patchMandate', id: m.id, patch: {
           utilised: (s.budgetTotalMinor - s.budgetLeftMinor) / 100, yieldEarned: s.yieldEarnedMinor / 100, status: liveStatus(s),
+          yieldByDay: Object.fromEntries(Object.entries(s.yieldByDay ?? {}).map(([d, v]) => [d, v / 100])), exchangeNodeRef: s.nodeRef,
         } }), () => undefined);
       }
     }, 10_000);

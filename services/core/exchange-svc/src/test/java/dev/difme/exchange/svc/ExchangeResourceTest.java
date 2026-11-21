@@ -443,6 +443,7 @@ class ExchangeResourceTest {
                 .body("awards", equalTo(1))
                 .body("budgetLeftMinor", equalTo(0))
                 .body("yieldEarnedMinor", equalTo(64_000))
+                .body("yieldByDay." + Exchange.istDay(), equalTo(64_000))   // the day-by-day history the investor chart shows
                 .body("standing", equalTo(false));
         given().get("/v1/exchange/fr01-buy/mandates/987654321").then().statusCode(404);
     }

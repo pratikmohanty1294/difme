@@ -183,6 +183,10 @@ export interface Mandate {
   limit: number;              // X
   utilised: number;           // settled + reserved
   yieldEarned: number;
+  /** Live builds: net yield per IST day (₹), from the exchange. */
+  yieldByDay?: Record<string, number>;
+  /** Live builds: the exchange's bidder node for this partner. */
+  exchangeNodeRef?: number;
   contract: string;
   version: number;
   status: 'LIVE' | 'Paused' | 'Revoked';

@@ -51,7 +51,11 @@ export interface ReturnResult {
 export interface MandateIn {
   partnerRef: string; limitMinor: number; maxPerOrderMinor: number; minYieldPct: number; depositMinor: number;
   budgetTotalMinor: number; merchantCount: number; goodsCount: number; validityDays: number; cardJurisdiction: string;
+  /** The partner's own rules (same shape as sim/dmn-compile CustomTable); the exchange validates, compiles and runs them. */
+  customRules?: import('../sim/dmn-compile').CustomTable;
 }
+export interface OrderInfo { merchant?: string; category?: string; brand?: string; mcc?: string; quantity?: number; city?: string; pincode?: string }
+export interface CustomCheck { ok: boolean; problems?: string[]; outcome?: { action: 'APPROVE' | 'REJECT' | 'FLAG'; message: string; rule: number } }
 export interface MandateRegistered { mandateId: number; depositRequiredMinor: number; findings: Finding[] }
 export interface MandateState {
   mandateId: number; partnerRef: string; nodeRef: number; standing: boolean; budgetTotalMinor: number; budgetLeftMinor: number;
@@ -60,7 +64,7 @@ export interface MandateState {
 }
 
 export const exchange = {
-  openIntent: (i: { riskScore: number; offerSanctioned: boolean; listMinor: number; discountBps: number; feeMinor: number; maxPriceMinor: number }) =>
+  openIntent: (i: { riskScore: number; offerSanctioned: boolean; listMinor: number; discountBps: number; feeMinor: number; maxPriceMinor: number; order?: OrderInfo }) =>
     call<IntentOpened>('POST', `/${PACK}/intents`, i),
   auction: (id: number) => call<AuctionResult>('GET', `/auctions/${id}`),
   execute: (id: number, merchantId: string) => call<Execution>('POST', `/auctions/${id}/execute`, { merchantId }),
@@ -70,6 +74,9 @@ export const exchange = {
   /** FR-01 return inside the return window: full (10000) or partial (fractionBps of the order). */
   returnOrder: (id: number, fractionBps = 10_000) => call<ReturnResult>('POST', `/auctions/${id}/returns`, { fractionBps }),
   registerMandate: (m: MandateIn) => call<MandateRegistered>('POST', `/${PACK}/mandates`, m),
+  /** Validates a custom rules table and runs it on a sample order (the factory's preview). */
+  checkCustomRules: (table: import('../sim/dmn-compile').CustomTable, order: Record<string, unknown>) =>
+    call<CustomCheck>('POST', '/custom-rules/check', { table, order }),
   mandate: (id: number) => call<MandateState>('GET', `/${PACK}/mandates/${id}`),
   /** Pause (no new bids), resume, or revoke (final). */
   setMandateStatus: (id: number, status: MandateState['status']) => call<MandateState>('POST', `/${PACK}/mandates/${id}/status`, { status }),

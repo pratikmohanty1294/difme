@@ -300,7 +300,9 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const opened = await exchange.openIntent({ riskScore: req.riskScore, offerSanctioned: true, listMinor: P * 100,
-          discountBps: SCENARIO.discountPct * 100, feeMinor: SCENARIO.fee * 100, maxPriceMinor: maxPrice * 100 });
+          discountBps: SCENARIO.discountPct * 100, feeMinor: SCENARIO.fee * 100, maxPriceMinor: maxPrice * 100,
+          // What the buying partners' custom rules can see about the item.
+          order: { merchant: SCENARIO.merchant, category: SCENARIO.category, mcc: SCENARIO.mcc.split(' ')[0], quantity: 1 } });
         dispatch({ type: 'patchRequest', id, patch: { auctionId: `auc_${opened.auctionId}` } });
         step('Buyer Agent', `Intent accepted by the exchange · auction ${opened.auctionId}`, 'POI',
           `${opened.standingBids ?? 0} standing mandate bid(s) · max yield ${inr(opened.maxYieldMinor / 100)}`);
@@ -779,7 +781,8 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       // Register on the exchange; once accepted it bids automatically (a standing order) within its rules.
       exchange.registerMandate({ partnerRef: you.id, limitMinor: m.limit * 100, maxPerOrderMinor: m.maxPerTx * 100, minYieldPct: m.minYieldPct,
         depositMinor: deposit * 100, budgetTotalMinor: (m.budgetTotal ?? m.limit) * 100, merchantCount: Math.max(1, m.merchants?.length ?? 1),
-        goodsCount: Math.max(1, m.goods?.length ?? 1), validityDays: m.validityDays ?? 7, cardJurisdiction: 'IN_DOMESTIC_AFA' })
+        goodsCount: Math.max(1, m.goods?.length ?? 1), validityDays: m.validityDays ?? 7, cardJurisdiction: 'IN_DOMESTIC_AFA',
+        customRules: m.customRules })
         .then((r) => dispatch({ type: 'patchMandate', id: m.id, patch: { exchangeMandateId: r.mandateId, status: 'LIVE' } }))
         .catch((e) => {
           dispatch({ type: 'patchMandate', id: m.id, patch: { status: 'Paused' } });

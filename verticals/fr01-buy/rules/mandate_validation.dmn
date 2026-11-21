@@ -35,7 +35,7 @@
       </rule>
       <rule id="m5">
         <inputEntry id="m5_1"><text>-</text></inputEntry><inputEntry id="m5_2"><text>-</text></inputEntry><inputEntry id="m5_3"><text>-</text></inputEntry><inputEntry id="m5_4"><text>&lt; depositRequired</text></inputEntry><inputEntry id="m5_5"><text>-</text></inputEntry><inputEntry id="m5_6"><text>-</text></inputEntry><inputEntry id="m5_7"><text>-</text></inputEntry><inputEntry id="m5_8"><text>-</text></inputEntry><inputEntry id="m5_9"><text>-</text></inputEntry>
-        <outputEntry id="m5_o1"><text>"DEPOSIT_SHORT"</text></outputEntry><outputEntry id="m5_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m5_o3"><text>"Security deposit is below the exchange's deposit rate on your total budget."</text></outputEntry>
+        <outputEntry id="m5_o1"><text>"DEPOSIT_SHORT"</text></outputEntry><outputEntry id="m5_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="m5_o3"><text>"Security deposit is below what the exchange requires: 5 % of your budget, or the collateral on your largest order at your tier, whichever is higher."</text></outputEntry>
       </rule>
       <rule id="m6">
         <inputEntry id="m6_1"><text>-</text></inputEntry><inputEntry id="m6_2"><text>-</text></inputEntry><inputEntry id="m6_3"><text>-</text></inputEntry><inputEntry id="m6_4"><text>-</text></inputEntry><inputEntry id="m6_5"><text>&lt;= 0</text></inputEntry><inputEntry id="m6_6"><text>-</text></inputEntry><inputEntry id="m6_7"><text>-</text></inputEntry><inputEntry id="m6_8"><text>-</text></inputEntry><inputEntry id="m6_9"><text>-</text></inputEntry>

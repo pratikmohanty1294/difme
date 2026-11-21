@@ -60,7 +60,7 @@ public class Exchange {
     public record Award(Ranked winner, CommerceSplit split, long collateralMinor, Risk.Tier tier) {}
 
     /** What the exchange (not the bidder) knows about an open auction; the facts bid-time rules are checked against. */
-    public record Context(long cardPriceMinor, long yieldRoomMinor) {}
+    public record Context(long cardPriceMinor, long yieldRoomMinor, Map<String, Object> facts) {}
 
     public record Result(long auctionId, String pack, int ranked, List<Ranked> top, Award award) {}
 
@@ -244,6 +244,9 @@ public class Exchange {
                         m.nodeRef(), new java.util.concurrent.atomic.AtomicInteger(m.awards()), new AtomicLong(m.yieldEarnedMinor()),
                         new java.util.concurrent.atomic.AtomicReference<>(m.status())));
                 partnerNodes.put(m.terms().partnerRef(), m.nodeRef());
+                if (m.terms().customRules() != null) {
+                    customRules.put(m.id(), dev.difme.exchange.rules.CustomRules.compile(m.terms().customRules(), "mandate_custom_" + m.id()));
+                }
                 nextPartnerNode.accumulateAndGet(m.nodeRef(), Math::max);
                 maxMandate = Math.max(maxMandate, m.id());
             }
@@ -302,6 +305,10 @@ public class Exchange {
 
     /** Opens an auction; returns its id, or -1 when the pack's ring is full (backpressure). */
     public long open(String pack, long maxAcceptableMinor, Terms t, Map<String, Object> intentEvidence) {
+        return open(pack, maxAcceptableMinor, t, intentEvidence, Map.of());
+    }
+
+    public long open(String pack, long maxAcceptableMinor, Terms t, Map<String, Object> intentEvidence, Map<String, Object> facts) {
         long id = ids.incrementAndGet();
         VerticalPack p = packs.get(pack);
         EvidenceChain chain = new EvidenceChain("auction-" + id, EvidenceChain.Kind.B);
@@ -312,7 +319,7 @@ public class Exchange {
         chain.append(EvidenceChain.Type.intent, EvidenceChain.Signal.Deterministic, intent);
         chains.put(id, chain);
         long cardPrice = t.listMinor() - Math.round(t.listMinor() * (t.discountBps() / 10_000.0));
-        contexts.put(id, new Context(cardPrice, maxAcceptableMinor));
+        contexts.put(id, new Context(cardPrice, maxAcceptableMinor, facts));
         openAuctions.put(id, pack);
         terms.put(id, t);
         long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
@@ -375,12 +382,44 @@ public class Exchange {
     }
 
     private final Map<Long, MandateState> mandates = new ConcurrentHashMap<>();
+    /** Compiled custom rules per mandate (from the mandate's terms; recompiled on restore). */
+    private final Map<Long, dev.difme.exchange.rules.CustomRules> customRules = new ConcurrentHashMap<>();
+
+    /**
+     * What a mandate's custom rules decide for this auction's order at this ask; null when the mandate has none.
+     * amount = A, yieldPct = the ask as % of A, hour/weekday in IST at bid time.
+     */
+    public dev.difme.exchange.rules.CustomRules.Outcome customOutcome(long auctionId, long mandateId, long askMinor) {
+        dev.difme.exchange.rules.CustomRules r = customRules.get(mandateId);
+        Context ctx = contexts.get(auctionId);
+        if (r == null || ctx == null) return null;
+        Map<String, Object> order = new java.util.HashMap<>(ctx.facts());
+        order.put("amount", ctx.cardPriceMinor() / 100.0);
+        order.put("yieldPct", ctx.cardPriceMinor() == 0 ? 0.0 : askMinor * 100.0 / ctx.cardPriceMinor());
+        var ist = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));
+        order.put("hour", ist.getHour());
+        order.put("weekday", ist.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH));
+        return r.evaluate(order);
+    }
+
+    /** A FLAG outcome: the mandate bids, and the flag is recorded in the auction's evidence for the partner's review. */
+    public void noteFlag(long auctionId, long mandateId, dev.difme.exchange.rules.CustomRules.Outcome o) {
+        EvidenceChain chain = chains.get(auctionId);
+        if (chain == null) return;
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("mandateId", mandateId);
+        p.put("customRule", o.rule());
+        p.put("outcome", "FLAG");
+        p.put("message", o.message());
+        chain.append(EvidenceChain.Type.policy, EvidenceChain.Signal.Deterministic, p);
+    }
     private final AtomicLong mandateIds = new AtomicLong(System.currentTimeMillis() * 1000L);
     /** auction id -> (bidder nodeRef -> mandate id), so the award can draw down the winner's budget. */
     private final Map<Long, Map<Integer, Long>> bidMandates = new ConcurrentHashMap<>();
 
     public long registerMandate(String pack, ExchangeResource.Mandate m) {
         long id = mandateIds.incrementAndGet();
+        if (m.customRules() != null) customRules.put(id, dev.difme.exchange.rules.CustomRules.compile(m.customRules(), "mandate_custom_" + id));
         mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor()),
                 nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong(),
                 new java.util.concurrent.atomic.AtomicReference<>(MandateStatus.ACTIVE)));

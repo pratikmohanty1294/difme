@@ -1,3 +1,5 @@
+import { LIVE, exchange, ExchangeError } from '../api/exchange';
+import { compileDmn, customDecisionId } from './dmn-compile';
 // Rule engine client for intent creation. The rules live in rules/*.dmn and run server-side in our /api/rules
 // edge function (DMN tables evaluated with FEEL; an external Fluxnova engine can be plugged in there).
 // If the function can't be reached, the same rules run here locally so the demo never blocks; every answer
@@ -26,7 +28,7 @@ const LOCAL: Record<Decision, (v: Vars) => RuleHit[]> = {
     if (n('minYieldPct') < 2) h.push({ code: 'YIELD_FLOOR_TOO_LOW', severity: 'BLOCK', message: "Minimum yield below 2% isn't allowed." });
     if (n('minYieldPct') > 15) h.push({ code: 'YIELD_FLOOR_HIGH', severity: 'WARN', message: 'A minimum yield above 15% will rarely win an auction.' });
     // depositRequired = the exchange's deposit rate × the total budget, worked out by the caller.
-    if (n('deposit') < n('depositRequired')) h.push({ code: 'DEPOSIT_SHORT', severity: 'BLOCK', message: "Security deposit is below the exchange's deposit rate on your total budget." });
+    if (n('deposit') < n('depositRequired')) h.push({ code: 'DEPOSIT_SHORT', severity: 'BLOCK', message: "Security deposit is below what the exchange requires: 5 % of your budget, or the collateral on your largest order at your tier, whichever is higher." });
     // Delegated purchase intent: budget, approved merchants, goods and a validity period (card-network agent pay; Agent credential instruction).
     if (n('budgetTotal') <= 0) h.push({ code: 'NO_BUDGET', severity: 'BLOCK', message: 'Set a total budget. Card-network rules requires a budget before an agent may buy without you present.' });
     if (n('budgetTotal') > n('limit')) h.push({ code: 'BUDGET_ABOVE_LIMIT', severity: 'BLOCK', message: 'Total budget is above your mandate limit.' });
@@ -72,7 +74,7 @@ export function evaluateLocal(decision: Decision, vars: Vars, note?: string): Ru
 
 export interface CustomResult {
   ok: boolean;                 // engine answered and no REJECT
-  source: 'edge' | 'fluxnova' | 'unavailable';
+  source: 'edge' | 'fluxnova' | 'exchange' | 'unavailable';
   engine?: string;
   action?: 'APPROVE' | 'REJECT' | 'FLAG';
   message?: string;
@@ -88,6 +90,19 @@ export interface CustomResult {
  */
 export async function evaluateCustom(table: import('./dmn-compile').CustomTable, mandateId: string, variables: Vars, opts: { showDmn?: boolean; timeoutMs?: number } = {}): Promise<CustomResult> {
   const t = performance.now();
+  if (LIVE) {
+    // Live: the exchange is the engine that will run these rules at every auction, so it checks them too.
+    try {
+      const r = await exchange.checkCustomRules(table, variables);
+      const ms = Math.round(performance.now() - t);
+      const dmn = opts.showDmn ? compileDmn(table, customDecisionId(mandateId)) : undefined;
+      if (!r.ok) return { ok: false, source: 'exchange', error: (r.problems ?? ['The exchange did not accept the rules.']).join(' '), dmn, ms };
+      const o = r.outcome;
+      return { ok: o?.action !== 'REJECT', source: 'exchange', engine: 'Fluxnova DMN in the exchange', action: o?.action, message: o?.message, dmn, ms };
+    } catch (e) {
+      return { ok: false, source: 'unavailable', error: e instanceof ExchangeError && e.status !== 0 ? e.message : 'The exchange is unreachable, so the custom rules could not be checked.', ms: Math.round(performance.now() - t) };
+    }
+  }
   try {
     const r = await fetch('/api/rules', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

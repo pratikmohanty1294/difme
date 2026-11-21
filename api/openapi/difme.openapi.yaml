@@ -80,6 +80,18 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { $ref: "#/components/responses/ExchangeError" }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/custom-rules/check:
+    post:
+      operationId: checkCustomRules
+      summary: Validate a custom rules table and, with a sample order, show what it would decide (the mandate factory's preview)
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [table], properties: { table: { $ref: "#/components/schemas/CustomRules" }, order: { type: object } } } } }
+      responses:
+        "200": { description: "ok with the outcome, or the problems", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/{pack}/mandates/{mandateId}/status:
     post:
       operationId: setMandateStatus
@@ -330,6 +342,17 @@ components:
         discountBps: { type: integer, minimum: 1, maximum: 9999 }
         feeMinor: { type: integer, format: int64, minimum: 0 }
         maxPriceMinor: { type: integer, format: int64, minimum: 1 }
+        order:
+          description: What the buyer's agent knows about the item, for buying partners' custom rules (all optional)
+          type: object
+          properties:
+            merchant: { type: string }
+            category: { type: string }
+            brand: { type: string }
+            mcc: { type: string }
+            quantity: { type: integer }
+            city: { type: string }
+            pincode: { type: string }
         fraudFeatures:
           description: "PDF §11.1 FAIL path: edge attestation failed, so the exchange scores these server-side (services/fraud-scorer) and that score replaces riskScore. When the scorer can't answer, 422 with finding RISK_UNSCORED (fails closed)."
           type: object
@@ -381,6 +404,21 @@ components:
         goodsCount: { type: integer }
         validityDays: { type: integer }
         cardJurisdiction: { type: string }
+        customRules: { $ref: "#/components/schemas/CustomRules" }
+    CustomRules:
+      description: "A buying partner's own rules on top of the mandate's limits. FEEL expressions over the order attributes (amount, listPrice, discountPct, yieldPct, quantity, hour, buyerRiskScore, merchant, category, brand, mcc, city, pincode, weekday); hit policy FIRST. Functions, loops and Java calls are refused."
+      type: object
+      required: [fields, rules, defaultAction]
+      properties:
+        fields:
+          type: array
+          maxItems: 12
+          items: { type: object, required: [key, type, expr], properties: { key: { type: string }, label: { type: string }, type: { type: string, enum: [number, string, boolean] }, expr: { type: string, maxLength: 200 } } }
+        rules:
+          type: array
+          maxItems: 40
+          items: { type: object, required: [action], properties: { tests: { type: object, additionalProperties: { type: string } }, action: { type: string, enum: [APPROVE, REJECT, FLAG] }, message: { type: string } } }
+        defaultAction: { type: string, enum: [APPROVE, REJECT, FLAG] }
     MandateRegistered:
       type: object
       properties:

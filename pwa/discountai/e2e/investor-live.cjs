@@ -49,6 +49,17 @@ srv.listen(18183, async () => {
     check('app reads the mandate back from the exchange', !!id);
     if (id) {
       check('exchange: ACTIVE after deploy', (await status(id)) === 'ACTIVE');
+      // The factory's default custom rules (dmn-compile DEFAULT_CUSTOM) allow only listed merchants: the exchange
+      // enforces them, so the mandate bids for an approved merchant and not for an unknown one. Needs a fresh exchange
+      // (no other mandates) and an hour outside the rules' 00-06 IST night ban.
+      const intent = async (merchant) => (await (await fetch(`${REAL}/v1/exchange/fr01-buy/intents`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ riskScore: 900, offerSanctioned: true, listMinor: 1000000,
+          discountBps: 2000, feeMinor: 20000, maxPriceMinor: 950000, order: { merchant } }) })).json()).standingBids;
+      const istHour = (new Date().getUTCHours() + 5 + (new Date().getUTCMinutes() >= 30 ? 1 : 0)) % 24;
+      if (istHour >= 6) {
+        check('custom rules: bids for an approved merchant', (await intent('Electronics Store A')) === 1);
+        check('custom rules: no bid for an unknown merchant', (await intent('Unknown Shop')) === 0);
+      } else console.log('skip  custom-rule bids (00-06 IST night ban in the default rules)');
       await p.getByRole('button', { name: /Pause bidding/ }).first().click(); await p.waitForTimeout(800);
       check('exchange: PAUSED after "Pause bidding"', (await status(id)) === 'PAUSED');
       await p.getByRole('button', { name: /Resume/ }).first().click(); await p.waitForTimeout(800);

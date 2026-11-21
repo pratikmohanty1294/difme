@@ -132,7 +132,7 @@ export function CustomRulesEditor({ value, onChange, sample, onSample, mandateId
                 <div className={cx('rounded-lg border p-3 text-[13px]', result.action === 'REJECT' ? 'border-red-200 bg-red-50/60' : 'border-exchange-100 bg-exchange-50/50')}>
                   <p className="flex flex-wrap items-center gap-2 font-medium text-ink-900">
                     <Cpu size={14} className="text-ink-500" /> {result.engine}
-                    <Badge tone={result.source === 'fluxnova' ? 'purple' : 'blue'}>{result.source === 'fluxnova' ? 'FINOS Fluxnova' : 'edge function'}</Badge>
+                    <Badge tone={result.source === 'edge' ? 'blue' : 'purple'}>{result.source === 'exchange' ? 'exchange · Fluxnova DMN' : result.source === 'fluxnova' ? 'FINOS Fluxnova' : 'edge function'}</Badge>
                     <Badge tone={result.action === 'REJECT' ? 'red' : result.action === 'FLAG' ? 'amber' : 'green'}>{ACTION_LABEL[result.action ?? 'APPROVE']}</Badge>
                     <span className="text-xs text-ink-500 tabular">{result.ms} ms</span>
                   </p>

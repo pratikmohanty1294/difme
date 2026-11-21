@@ -24,7 +24,10 @@ public class ExchangeResource {
      * Y_max = d·P − F − 1, so the buyer always pays less than list (vertical.yaml price_basis).
      */
     public record Intent(double riskScore, boolean offerSanctioned, long listMinor, int discountBps, long feeMinor,
-                         long maxPriceMinor, FraudScorer.Features fraudFeatures) {}
+                         long maxPriceMinor, FraudScorer.Features fraudFeatures, Order order) {}
+
+    /** What the buyer's agent knows about the item, for buying partners' custom rules (all optional). */
+    public record Order(String merchant, String category, String brand, String mcc, Integer quantity, String city, String pincode) {}
 
     /**
      * The buying partner's facts for bid-time eligibility (FR-01 investor_eligibility). Minor units; the rule tables
@@ -37,7 +40,8 @@ public class ExchangeResource {
 
     /** A buying partner's standing mandate (FR-01 v4.1): minor units except the yield floor (percent) and counts. */
     public record Mandate(String partnerRef, long limitMinor, long maxPerOrderMinor, double minYieldPct, long depositMinor,
-                          long budgetTotalMinor, int merchantCount, int goodsCount, int validityDays, String cardJurisdiction) {}
+                          long budgetTotalMinor, int merchantCount, int goodsCount, int validityDays, String cardJurisdiction,
+                          dev.difme.exchange.rules.CustomRules.Table customRules) {}
 
     @Inject Exchange exchange;
     @Inject FraudScorer fraudScorer;
@@ -57,7 +61,15 @@ public class ExchangeResource {
         if (!pack.rules().decisionIds().contains("mandate_validation")) {
             return Response.status(400).entity(Map.of("error", "this vertical takes no mandates")).build();
         }
-        long depositRequired = Math.round(m.budgetTotalMinor() * (pack.collateral().mandateDepositBps() / 10_000.0));
+        // Decided 2026-11-21: the deposit must cover both the v4.1 rate on the budget and the FR-14 collateral on the
+        // mandate's largest allowed order at the partner's current tier. With the budget rate alone (5 %), a new
+        // partner's mandate registered fine but could never win: every bid failed DEPOSIT_SHORT on that collateral.
+        var c = pack.collateral();
+        long onBudget = Math.round(m.budgetTotalMinor() * (c.mandateDepositBps() / 10_000.0));
+        dev.difme.exchange.kernel.Risk.Tier tier = exchange.tierOf(packId, exchange.nodeRefOf(m.partnerRef() == null ? "" : m.partnerRef()));
+        long onLargestOrder = m.maxPerOrderMinor() <= 0 ? 0
+                : dev.difme.exchange.kernel.Risk.requiredCollateral(m.maxPerOrderMinor(), c.alpha(), c.gammaRev(), tier, c.minMinor());
+        long depositRequired = Math.max(onBudget, onLargestOrder);
         Map<String, Object> in = new java.util.HashMap<>();
         in.put("maxPerOrder", m.maxPerOrderMinor() / 100.0);
         in.put("limit", m.limitMinor() / 100.0);
@@ -73,7 +85,16 @@ public class ExchangeResource {
         if (!PackRules.allowed(findings)) {
             return Response.status(422).entity(Map.of("findings", findings, "depositRequiredMinor", depositRequired)).build();
         }
-        long id = exchange.registerMandate(packId, m);
+        if (m.customRules() != null) {
+            List<String> problems = dev.difme.exchange.rules.CustomRules.check(m.customRules());
+            if (!problems.isEmpty()) return Response.status(422).entity(Map.of("error", "custom rules not accepted", "problems", problems)).build();
+        }
+        long id;
+        try {
+            id = exchange.registerMandate(packId, m);
+        } catch (IllegalArgumentException e) {   // custom rules that pass the checks but don't compile
+            return Response.status(422).entity(Map.of("error", "custom rules not accepted", "problems", List.of(e.getMessage()))).build();
+        }
         return Response.status(201).entity(Map.of("mandateId", id, "depositRequiredMinor", depositRequired, "findings", findings)).build();
     }
 
@@ -117,7 +138,22 @@ public class ExchangeResource {
         evidence.put("feeMinor", in.feeMinor());
         evidence.put("maxPriceMinor", in.maxPriceMinor());
         evidence.put("findings", findings.stream().map(Finding::code).toList());
-        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor()), evidence);
+        Map<String, Object> facts = new java.util.HashMap<>();     // the order as custom rules see it (major units)
+        facts.put("listPrice", in.listMinor() / 100.0);
+        facts.put("discountPct", in.discountBps() / 100.0);
+        facts.put("buyerRiskScore", riskScore);
+        if (in.order() != null) {
+            Order o = in.order();
+            facts.put("merchant", o.merchant());
+            facts.put("category", o.category());
+            facts.put("brand", o.brand());
+            facts.put("mcc", o.mcc());
+            facts.put("quantity", o.quantity());
+            facts.put("city", o.city());
+            facts.put("pincode", o.pincode());
+            if (o.merchant() != null) evidence.put("merchant", o.merchant());
+        }
+        long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor()), evidence, facts);
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         int standing = standingBids(auction);
         return Response.accepted(Map.of("auctionId", auction, "maxYieldMinor", maxYield, "findings", findings, "standingBids", standing,
@@ -149,6 +185,24 @@ public class ExchangeResource {
     }
 
     /** What a buying partner sees about one mandate: what is left, what it won and earned, and its tier. */
+    public record CustomCheck(dev.difme.exchange.rules.CustomRules.Table table, Map<String, Object> order) {}
+
+    /** Validates a custom rules table and, given a sample order, shows what it would decide (the factory's preview). */
+    @POST
+    @Path("/custom-rules/check")
+    public Response checkCustom(CustomCheck c) {
+        if (c == null || c.table() == null) return Response.status(400).entity(Map.of("error", "table is required")).build();
+        List<String> problems = dev.difme.exchange.rules.CustomRules.check(c.table());
+        if (!problems.isEmpty()) return Response.ok(Map.of("ok", false, "problems", problems)).build();
+        try {
+            var rules = dev.difme.exchange.rules.CustomRules.compile(c.table(), "custom_check");
+            if (c.order() == null) return Response.ok(Map.of("ok", true)).build();
+            return Response.ok(Map.of("ok", true, "outcome", rules.evaluate(c.order()))).build();
+        } catch (IllegalArgumentException e) {
+            return Response.ok(Map.of("ok", false, "problems", List.of(e.getMessage()))).build();
+        }
+    }
+
     public record MandateStatusChange(String status) {}
 
     /** Pause (stops new bids), resume, or revoke (terminate; final) a mandate. Awards already made are unaffected. */
@@ -225,6 +279,17 @@ public class ExchangeResource {
             in.put("yieldRoom", ctx.yieldRoomMinor() / 100.0);
             List<Finding> findings = pack.rules().evaluate("investor_eligibility", in);
             if (!PackRules.allowed(findings)) return Response.status(422).entity(Map.of("findings", findings)).build();
+        }
+        // The partner's own rules, on top of the standard limits: REJECT means no bid, FLAG bids and notes it in evidence.
+        if (b.partner() != null && b.partner().mandateId() != null) {
+            var outcome = exchange.customOutcome(auctionId, b.partner().mandateId(), b.askMinor());
+            if (outcome != null && outcome.action() == dev.difme.exchange.rules.CustomRules.Action.REJECT) {
+                return Response.status(422).entity(Map.of("findings", List.of(new Finding("CUSTOM_RULE_REJECT", Finding.Severity.BLOCK,
+                        outcome.message())))).build();
+            }
+            if (outcome != null && outcome.action() == dev.difme.exchange.rules.CustomRules.Action.FLAG) {
+                exchange.noteFlag(auctionId, b.partner().mandateId(), outcome);
+            }
         }
         if (b.partner() != null && b.partner().mandateId() != null) exchange.bindBidMandate(auctionId, b.nodeRef(), b.partner().mandateId());
         double rep = exchange.reputationOf(exchange.packOf(auctionId), b.nodeRef(), b.reputation());   // FR-16: tracked once known

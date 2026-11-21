@@ -47,10 +47,11 @@ class ExchangeResourceTest {
 
     @Test
     void mandateIsValidatedWithTheExchangesOwnDepositRequirement() {
-        // depositRequired = 5 % of the 40,000 budget = 2,000 (200,000 paise), computed by the exchange
-        given().contentType(ContentType.JSON).body(mandate(200_000, 5))
+        // depositRequired = max(5 % of the 40,000 budget = 2,000; collateral on the 20,000 largest order = 14,400), by the exchange
+        given().contentType(ContentType.JSON).body(mandate(1_440_000, 5))
                 .post("/v1/exchange/fr01-buy/mandates")
-                .then().statusCode(201).body("depositRequiredMinor", equalTo(200_000))
+                .then().statusCode(201).body("depositRequiredMinor", equalTo(1_440_000))   // collateral on the ₹20,000 largest order, new partner: 2,000,000 × 0.2 × 1.8 × 2.0
+                .body("mandateId", org.hamcrest.Matchers.notNullValue())
                 .body("findings.code", hasItem("INDIA_PREAUTH_MANDATE"));
         given().contentType(ContentType.JSON).body(mandate(100_000, 10))
                 .post("/v1/exchange/fr01-buy/mandates")
@@ -81,11 +82,12 @@ class ExchangeResourceTest {
 
     @Test
     void mandateBudgetIsTheExchangesToTrackAndIsDrawnDownByAwards() throws InterruptedException {
-        // Budget ₹40,000, deposit ₹12,000 (covers the COLD_START FR-14 collateral for A = ₹16,000: 11,520); limits from the mandate,
+        // Budget ₹40,000, deposit ₹14,400 (the COLD_START FR-14 collateral on its ₹20,000 largest order, required at
+        // registration since 2026-11-21; ₹12,000 used to pass and only covered A = ₹16,000); limits from the mandate,
         // not from the bid (the bid claims a huge budget and zero limits, which the exchange ignores).
         long mandateId = given().contentType(ContentType.JSON).body("""
                 {"partnerRef": "bp-9", "limitMinor": 5000000, "maxPerOrderMinor": 2000000, "minYieldPct": 4,
-                 "depositMinor": 1200000, "budgetTotalMinor": 4000000, "merchantCount": 2, "goodsCount": 5,
+                 "depositMinor": 1440000, "budgetTotalMinor": 4000000, "merchantCount": 2, "goodsCount": 5,
                  "validityDays": 5, "cardJurisdiction": "IN_DOMESTIC_AFA"}""")
                 .post("/v1/exchange/fr01-buy/mandates").then().statusCode(201).extract().jsonPath().getLong("mandateId");
         org.junit.jupiter.api.Assertions.assertEquals(202, auctionWithMandate(mandateId));   // budget 40,000 -> 24,000
@@ -325,7 +327,7 @@ class ExchangeResourceTest {
     /** A paused mandate stops standing and its bids are refused; resume restores it; revoke is final. */
     @Test
     void mandateCanBePausedResumedAndRevoked() {
-        long m = given().contentType(ContentType.JSON).body(mandate(200_000, 5))
+        long m = given().contentType(ContentType.JSON).body(mandate(1_440_000, 5))
                 .post("/v1/exchange/fr01-buy/mandates").then().statusCode(201).extract().jsonPath().getLong("mandateId");
         String path = "/v1/exchange/fr01-buy/mandates/" + m;
         given().get(path).then().statusCode(200).body("status", equalTo("ACTIVE"));
@@ -344,6 +346,43 @@ class ExchangeResourceTest {
         given().contentType(ContentType.JSON).body("{\"status\":\"ACTIVE\"}").post(path + "/status").then().statusCode(409);
         given().contentType(ContentType.JSON).body("{\"status\":\"SOMETHING\"}").post(path + "/status").then().statusCode(400);
         given().contentType(ContentType.JSON).body("{\"status\":\"PAUSED\"}").post("/v1/exchange/fr01-buy/mandates/1/status").then().statusCode(404);
+    }
+
+    /** A partner's custom rules run at bid time: REJECT means no bid, FLAG bids and is recorded in the evidence. */
+    @Test
+    void customRulesDecideWhetherAMandateBids() {
+        String rules = """
+                {"fields": [{"key": "shop", "label": "Merchant", "type": "string", "expr": "merchant"},
+                            {"key": "amount", "label": "Card amount", "type": "number", "expr": "amount"}],
+                 "rules": [{"tests": {"shop": "not(\\"Shop A\\")"}, "action": "REJECT", "message": "Only Shop A."},
+                           {"tests": {"amount": "> 15000"}, "action": "FLAG", "message": "Big order."}],
+                 "defaultAction": "APPROVE"}""";
+        String m = mandate(1_440_000, 5).replace("\"cardJurisdiction\": \"IN_DOMESTIC_AFA\"}", "\"cardJurisdiction\": \"IN_DOMESTIC_AFA\", \"customRules\": " + rules + "}");
+        long mid = given().contentType(ContentType.JSON).body(m).post("/v1/exchange/fr01-buy/mandates").then().statusCode(201)
+                .extract().jsonPath().getLong("mandateId");
+        String intentAt = """
+                {"riskScore": 900, "offerSanctioned": true, "listMinor": 2000000, "discountBps": 2000, "feeMinor": 20000,
+                 "maxPriceMinor": 1900000, "order": {"merchant": "%s"}}""";
+        String bidWith = bid(81, 64_000, 90, 5_000, 6_000_000).replace("\"validityDays\": 30}", "\"validityDays\": 30, \"mandateId\": " + mid + "}");
+        long shopB = given().contentType(ContentType.JSON).body(intentAt.formatted("Shop B")).post("/v1/exchange/fr01-buy/intents")
+                .then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body(bidWith).post("/v1/exchange/auctions/" + shopB + "/bids").then().statusCode(422)
+                .body("findings[0].code", equalTo("CUSTOM_RULE_REJECT")).body("findings[0].message", equalTo("Only Shop A."));
+        long shopA = given().contentType(ContentType.JSON).body(intentAt.formatted("Shop A")).post("/v1/exchange/fr01-buy/intents")
+                .then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body(bidWith).post("/v1/exchange/auctions/" + shopA + "/bids").then().statusCode(202);
+        // A = 16,000 > 15,000: the FLAG rule matched; the bid went in and the flag is in the auction's evidence.
+        given().get("/v1/exchange/auctions/" + shopA + "/evidence").then().statusCode(200)
+                .body("artifacts.find { it.type == 'policy' }.payload.message", equalTo("Big order."));
+        // Unsafe or malformed rules are refused at registration, with the reason.
+        String bad = mandate(1_440_000, 5).replace("\"cardJurisdiction\": \"IN_DOMESTIC_AFA\"}", "\"cardJurisdiction\": \"IN_DOMESTIC_AFA\", \"customRules\": "
+                + "{\"fields\": [{\"key\": \"x\", \"label\": \"x\", \"type\": \"number\", \"expr\": \"count(for i in 1..999999999 return i)\"}], \"rules\": [], \"defaultAction\": \"APPROVE\"}}");
+        given().contentType(ContentType.JSON).body(bad).post("/v1/exchange/fr01-buy/mandates").then().statusCode(422)
+                .body("error", equalTo("custom rules not accepted"));
+        // The factory's preview.
+        given().contentType(ContentType.JSON).body("{\"table\": " + rules + ", \"order\": {\"merchant\": \"Shop B\", \"amount\": 100}}")
+                .post("/v1/exchange/custom-rules/check").then().statusCode(200)
+                .body("ok", equalTo(true)).body("outcome.action", equalTo("REJECT"));
     }
 
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,

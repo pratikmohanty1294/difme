@@ -33,15 +33,19 @@ export default function MandateFactory() {
   const validUntil = new Date(Date.now() + rules.validityDays * 864e5).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   // Security deposit: the exchange's deposit rate (Exchange OME › Auction config) applied to this mandate's total budget.
   const depositPct = state.config.depositPct;
-  const deposit = Math.ceil((rules.budgetTotal * depositPct) / 100);
+  // As the exchange requires (decided 2026-11-21): the larger of the budget rate and the FR-14 collateral on the largest
+  // allowed order for a new partner, max(₹500, A · α 0.20 · γ 1.8 · φ 2.0) (verticals/fr01-buy/vertical.yaml).
+  const onBudget = Math.ceil((rules.budgetTotal * depositPct) / 100);
+  const onLargestOrder = rules.maxPerTx > 0 ? Math.max(500, Math.ceil(rules.maxPerTx * 0.2 * 1.8 * 2.0)) : 0;
+  const deposit = Math.max(onBudget, onLargestOrder);
+  const depositBasis = deposit === onBudget ? `${depositPct}% of budget` : `covers your largest order (${inr(rules.maxPerTx)}) as a new partner`;
   const slashNote = `${state.config.slashPct51}% of the order amount`;
   const toggle = (list: string[], v: string, on: boolean) => (on ? [...list, v] : list.filter((x) => x !== v));
   const [tab, setTab] = useState<'standard' | 'custom'>('standard');
   // Custom fields and rules: compiled to a DMN decision and run in the rule engine at every auction.
   const [draftId] = useState(() => `M-2026-${8830 + Math.floor(Math.random() * 160)}`);
   const [custom, setCustom] = useState<CustomTable>(DEFAULT_CUSTOM);
-  // Live: the exchange doesn't enforce partner custom rules yet, so they can't be switched on (they'd be shown, not applied).
-  const [useCustom, setUseCustom] = useState(!LIVE);
+  const [useCustom, setUseCustom] = useState(true);
   const [sample, setSample] = useState<Record<string, string | number>>(sampleOrder);
   const [customCheck, setCustomCheck] = useState<CustomResult>();
   const [deploy, setDeploy] = useState(0);
@@ -180,7 +184,7 @@ export default function MandateFactory() {
                   <label htmlFor="budget" className="font-medium">Total budget</label>
                   <div className="mt-1.5 flex items-center gap-2"><span className="text-ink-500">₹</span><input id="budget" className="input w-40 tabular" inputMode="numeric" value={rules.budgetTotal} onChange={(e) => setRules({ ...rules, budgetTotal: Number(e.target.value.replace(/\D/g, '')) })} /></div>
                   <p className="mt-1 text-xs text-ink-500">Most the agent may spend while the instruction is valid.</p>
-                  <p className="mt-2 inline-flex flex-wrap gap-x-1 rounded-md bg-white px-2 py-1 text-xs text-ink-600 ring-1 ring-investor-100">Security deposit <b className="tabular text-ink-900">{inr(deposit)}</b> · {depositPct}% of budget · refundable</p>
+                  <p className="mt-2 inline-flex flex-wrap gap-x-1 rounded-md bg-white px-2 py-1 text-xs text-ink-600 ring-1 ring-investor-100">Security deposit <b className="tabular text-ink-900">{inr(deposit)}</b> · {depositBasis} · refundable</p>
                 </div>
                 <div>
                   <label htmlFor="validity" className="font-medium">Valid for</label>
@@ -245,10 +249,9 @@ export default function MandateFactory() {
           ) : (
             <div className="flex flex-col gap-4">
               <label className="flex items-start gap-2.5 text-sm">
-                <input type="checkbox" className="mt-0.5 accent-investor-600" checked={useCustom} disabled={LIVE} onChange={(e) => setUseCustom(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5 accent-investor-600" checked={useCustom} onChange={(e) => setUseCustom(e.target.checked)} />
                 <span><b>Apply these custom rules to every order</b>, on top of the standard limits. They run in the rule engine at each auction; a Reject stops your agent bidding, a Flag lets it bid and notes it.</span>
               </label>
-              {LIVE && <Callout tone="info" title="Custom rules aren't available on the live exchange yet">Your mandate uses the standard limits above, which the exchange enforces on every bid. Custom rules can be drafted here but aren't applied to live orders.</Callout>}
               <CustomRulesEditor value={custom} onChange={setCustom} sample={sample} onSample={setSample} mandateId={draftId} />
             </div>
           )}
@@ -266,7 +269,7 @@ export default function MandateFactory() {
               ['Asset path', path === 'card' ? 'Flow A · Bank X Premium card (V1)' : path === 'upi' ? 'Flow C · UPI block fund' : 'Flow B · USDC on Base'],
               ['Instruction', 'Delegated budget · no human in the loop at purchase'],
               ['budget_total', inr(rules.budgetTotal)],
-              ['security_deposit', `${inr(deposit)} · ${depositPct}% of the budget, refundable`],
+              ['security_deposit', `${inr(deposit)} · ${depositBasis}, refundable`],
               ['approved_merchants', rules.merchants.join(', ') || '—'],
               ['goods', rules.goods.join(', ') || '—'],
               ['valid_until', `${validUntil} (${rules.validityDays} days)`],
@@ -287,7 +290,7 @@ export default function MandateFactory() {
             <ol className="flex flex-col gap-3">
               {[
                 ['Validate the intent in the rule engine', check ? `${SOURCE[check.source]} · mandate_validation passed` : 'mandate_validation.dmn'],
-                ['₹0 card check and security deposit to escrow', `Deposit ${inr(deposit)} posted (${depositPct}% of your ${inr(rules.budgetTotal)} budget)`],
+                ['₹0 card check and security deposit to escrow', `Deposit ${inr(deposit)} posted (${depositBasis})`],
                 ['Approve the instruction once with your passkey', `the card network purchase instruction ${mandate?.vicInstructionId ?? vicCalls.find((c) => c.r.action === 'instruction.create')?.r.response?.instructionId ?? ''} · the agent buys without asking until ${validUntil}`],
                 ['Register as liquidity at the OME', mandate ? `Mandate ID ${mandate.id}` : 'Mandate ID issued'],
                 ['Agent status', 'ACTIVE · listening for auctions'],
@@ -302,7 +305,7 @@ export default function MandateFactory() {
             </ol>
             <div className="mt-4">
               <Callout tone="info" title={`About the ${inr(deposit)} security deposit`}>
-                It is {depositPct}% of your {inr(rules.budgetTotal)} budget, the rate set by the exchange. It stays yours: the payment partner holds it in escrow, not DiscountAI, and your card is never pre-authorised instead. It is used only if your card declines an order your agent won ({slashNote} goes to the Guarantee Fund) or to recover a refund after you have been paid. When the mandate ends, whatever is left comes back to you.
+                It is the larger of {depositPct}% of your {inr(rules.budgetTotal)} budget and the collateral on your largest order ({inr(rules.maxPerTx)}) as a new partner, as the exchange requires. It stays yours: the payment partner holds it in escrow, not DiscountAI, and your card is never pre-authorised instead. It is used only if your card declines an order your agent won ({slashNote} goes to the Guarantee Fund) or to recover a refund after you have been paid. When the mandate ends, whatever is left comes back to you.
               </Callout>
             </div>
             {check && <div className="mt-4"><RuleResultView r={check} /></div>}
@@ -310,7 +313,7 @@ export default function MandateFactory() {
               <div className="mt-3">
                 {customCheck.error
                   ? <Callout tone="warn" title="Custom rules not accepted">{customCheck.error} Fix them in step 3.</Callout>
-                  : <Callout tone="good" title={`Custom rules compiled and run on ${customCheck.source === 'fluxnova' ? 'FINOS Fluxnova' : 'the edge DMN engine'}`}>
+                  : <Callout tone="good" title={`Custom rules compiled and run on ${customCheck.source === 'exchange' ? 'the exchange (FINOS Fluxnova DMN)' : customCheck.source === 'fluxnova' ? 'FINOS Fluxnova' : 'the edge DMN engine'}`}>
                       {custom.fields.length} fields · {custom.rules.length} rules · sample order: {customCheck.action?.toLowerCase()} ({customCheck.message}). They will run on every order in the auction.
                     </Callout>}
               </div>

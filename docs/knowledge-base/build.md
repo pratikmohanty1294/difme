@@ -97,3 +97,17 @@ api.adoptium.net and GitHub release downloads are blocked by the session proxy, 
 `curl -fsSLO https://conda.anaconda.org/conda-forge/linux-64/openjdk-25.0.5.1-h1602c4f_1.conda`, unzip it, then
 decompress `pkg-*.tar.zst` with the Python `zstandard` package (no `zstd` binary here) and untar; `JAVA_HOME` is
 `<dir>/lib/jvm`. Runs `mvn test` for services/core (46 exchange tests) and the packaged exchange-svc locally.
+### Payment-rail builds: vendored Fineract, Hyperswitch (2026-11-21)
+- **Fineract** derives its version from git tags; inside DIFME's repo there are none ("couldn't find matching tag in
+  shallow git repository" at build.gradle:147). Build with `VERSIONING_DISABLE=true`; the jar is
+  `fineract-provider/build/libs/fineract-provider.jar` (no version suffix). Maven Central answered 429: a Gradle init
+  script puts Google's Central mirror first and adds the plugin portal back (`deploy/images/fineract/maven-mirror.gradle`).
+  First start on an empty database runs Liquibase for ~2.5 min; 866 MiB RSS under load with `-Xmx512m`.
+- **Hyperswitch** needs `libprotobuf-dev` next to `protobuf-compiler` (well-known protos such as
+  `google/protobuf/empty.proto`; Debian only pulls them in as a *recommended* package, so `--no-install-recommends`
+  breaks the build in `grpc-api-types`). Its 555 v1 migrations run with plain psql (`deploy/images/hyperswitch/migrate.sh`,
+  diesel-compatible bookkeeping) in ~40 s.
+- **Temporal workflow ids** are not idempotent by default: once a workflow finishes, the same id can start again. The
+  payment hub sets `WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE` and answers repeats from the first run.
+- **Fineract** `Idempotency-Key` header: a repeated command is answered from cache (`x-served-from-cache: true`), not
+  booked twice. Savings accounts and clients can be found by `external-id`, so callers need no id mapping.

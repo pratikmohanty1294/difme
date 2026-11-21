@@ -19,7 +19,7 @@ DIFME follows Financial Platform Architecture v1.2. These records log every devi
 | PDF item | Issue | Replacement |
 |---|---|---|
 | OpenAPI 4.0 | Not released (the "Moonwalk" draft) | OpenAPI 3.1, with a CI gate (oasdiff) that blocks breaking changes |
-| Financial message / scenario simulators | Not publicly available | jPOS (AGPL-3.0, OSI) ISO 8583 host + client simulator, plus a Python scenario runner |
+| Financial message / scenario simulators | Not publicly available | Card-scheme simulator on moov-io/iso8583 (Apache-2.0) plus PSP, CBS and payment hub simulators (ADR-022; replaced the jPOS plan) |
 | Hosted load-test execution | Paid SaaS | k6-operator (Apache-2.0) runs distributed tests in-cluster; results go via remote-write to VictoriaMetrics |
 | Hardware TEE | Hardware needed | The Android emulator has no hardware-backed keystore, so a software-simulated TEE signs EAT tokens; the RATS verifier is Veraison (Apache-2.0) |
 | Three active regions | Paid cloud | Three k3d clusters (or three namespaces with zone labels) simulate the regions; provider-neutral Terraform modules are in `infra/terraform/` |
@@ -132,7 +132,7 @@ PDF §4.5 lists nine overlapping tools. Each capability is covered once:
 | UI cross-browser E2E, visual regression, API functional | **Playwright** | Cypress, TestCafe, Karate, Newman |
 | Load / performance (in-cluster via k6-operator, results to VictoriaMetrics) | **k6** | Gatling, Locust |
 | Contract + generated tests from OpenAPI / GraphQL specs | **Schemathesis** | LLM-based test generation (paid API; non-deterministic) |
-| ISO 8583 / financial message simulation | **jPOS** | MSGSIM / FINSIM |
+| ISO 8583 / financial message simulation | **scheme simulator on moov-io/iso8583** (ADR-022; was jPOS) | MSGSIM / FINSIM |
 Unit tests stay in each stack's native runner (JUnit 5, Vitest, Rust `cargo test`). Fewer tools mean less CI time, fewer images and less RAM (ADR-012).
 
 ## ADR-015 — Remove redundant components (owner-approved 2026-11-17)
@@ -202,7 +202,7 @@ Kept on purpose:
 ## ADR-018 — DIFME product scope and DiscountAI integration choices (owner-approved 2026-11-18)
 Source documents: DIFME PRD/FRD v1.0 and DiscountAI E2E Architecture v4.1. The financial platform built so far is the substrate.
 - **Order of work:** platform items first (section B: hub, edge app, ML), then the DiscountAI vertical slice (FR-01).
-- **External rails:** a port (interface) per rail, with an open-source simulator behind it. Covered rails: card-network agentic credentials (two networks), network tokenization services, RBI-licensed PA escrow, merchant PSP checkout (UCP/ACP), UPI. ISO 8583 0100/0110 runs through jPOS. Real providers plug in later without changes elsewhere.
+- **External rails:** a port (interface) per rail, with an open-source simulator behind it. Covered rails: card-network agentic credentials (two networks), network tokenization services, RBI-licensed PA escrow, merchant PSP checkout (UCP/ACP), UPI. ISO 8583 0100/0110 runs through the card-scheme simulator (ADR-022). Real providers plug in later without changes elsewhere.
 - **Matching engine** (SBBA auction, CLOB, 50 ms window, < 5 ms p99): Java 25 with Aeron + SBE + Agrona (zero-GC hot path). Aeron Cluster provides a Raft-replicated, deterministic order book. This replaces the documents' Rust choice, because Aeron's first-class clients are Java and C.
 - **Licence swaps** (hard rule, see ADR-009): the documents name CockroachDB (source-available since 2024), DragonflyDB (BSL 1.1) and Redpanda (BSL). They map to **YugabyteDB**, **Valkey** and **Apache Kafka**, all already in the platform.
 
@@ -254,3 +254,18 @@ alternative and ask. Decisions from that review:
 Also: third-party tools with their own schema migrations run on the shared Postgres, not YugabyteDB (Temporal,
 RisingWave, Harbor, MLflow and Polaris all broke on YugabyteDB DDL); YugabyteDB keeps DIFME's own data.
 
+
+## ADR-022 — Payment-rail simulators from open-source systems (owner-approved 2026-11-21)
+Owner request: connect DIFME to real payment systems by copying open-source projects onto our infrastructure. Each one
+is vendored as pinned source in `vendor/` (`ci/vendor-sync.sh`, `vendor/VENDORED.json`) and built from there.
+
+| Role | Chosen | Licence | Why / instead of |
+|---|---|---|---|
+| PSP (payment aggregator / gateway) for merchants and agents | **Juspay Hyperswitch** v1.129.0, test processor | Apache-2.0 | As requested. Its test processor's base URL points at DIFME's acquirer, so card payments reach the scheme (no change to Hyperswitch). |
+| Core banking (CBS) | **Apache Fineract** 1.16.1 | Apache-2.0 | As requested. Escrow, merchant, partner and buyer accounts; transfers idempotent by `Idempotency-Key`. |
+| Payment hub | **DIFME payment-hub on Temporal** (`services/core/payment-hub`) | ours | Owner choice over Mifos Payment Hub EE, which needs Zeebe (Camunda License 1.0, not OSI) and Elasticsearch. |
+| ISO 8583 + card network | **moov-io/iso8583** v0.26.4 in `services/scheme-sim` (scheme + issuers, ISO adapter, acquirer) | Apache-2.0 | Owner choice over jPOS (AGPL-3.0): a small Go library and a lighter service. |
+
+Flow: exchange → payment hub → Hyperswitch → acquirer → ISO 8583 → scheme/issuer; money is booked in Fineract (card
+settlement to merchants, escrow hold/release/refund). Test cards only. Profile `rails`; the exchange uses these rails
+when the profile's `exchange-rails` ConfigMap is present, otherwise its in-process simulators.

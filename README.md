@@ -33,6 +33,7 @@ A free Codespace has up to 4 cores and 16 GB of RAM, so run 1–2 profiles at a 
 | — | AI / ML plane | `ml` | `deploy/platform/ml-platform/`, `ml/` |
 | — | Back-Office UI | `backoffice` | `backoffice/` |
 | — | Forms + business processes (ADR-008) | `process` | `vendor/formio/`, `processes/`, `forms/`, `services/core/process-gateway/` |
+| — | Payment rails: PSP, CBS, payment hub, card scheme (ADR-022) | `rails` | `deploy/platform/rails/`, `services/scheme-sim/`, `services/core/payment-hub/`, `vendor/` |
 
 ## Coverage matrix — every component in the PDF
 
@@ -45,8 +46,8 @@ Strict OSI licensing applies. Where the PDF names a non-OSI or paid component, t
 | 4.2 | ingress-system: nginx-ingress, cert-manager, external-dns, metallb | **Envoy Gateway** replaces nginx-ingress (ADR-005); others same | `deploy/platform/ingress-system/` |
 | 4.3 | NLB / ALB / QUIC paths, WAF OWASP CRS 4.0 | MetalLB + Envoy Gateway (TLS 1.3) + **Coraza** CRS 4 · UDP 4443 → Quinn via UDPRoute | `deploy/platform/ingress-system/` |
 | 4.4 | Istio mTLS STRICT, VirtualService canary, circuit breaker, retries, egress allowlist | **Istio Ambient** (ztunnel + waypoints, ADR-005) with the same policies | `deploy/platform/istio/` |
-| 4.5 | Semgrep, Trivy, TLA+/TLC, Sigstore/cosign, SLSA L3, Karate, Newman, k6, Gatling, Locust, Playwright, Cypress, TestCafe, LLM test gen, Argo CD rollback, canary SLO gate, Pyroscope CI gate | Same gates in GitHub Actions + Argo Rollouts; testing consolidated to **Playwright, k6, Schemathesis, jPOS** (ADR-014) | `.github/workflows/`, `tests/` |
-| 4.5 | Financial message / scenario simulators | **jPOS** ISO 8583 simulator + scenario runner | `tests/simulator/` |
+| 4.5 | Semgrep, Trivy, TLA+/TLC, Sigstore/cosign, SLSA L3, Karate, Newman, k6, Gatling, Locust, Playwright, Cypress, TestCafe, LLM test gen, Argo CD rollback, canary SLO gate, Pyroscope CI gate | Same gates in GitHub Actions + Argo Rollouts; testing consolidated to **Playwright, k6, Schemathesis** and the scheme simulator (ADR-014, ADR-022) | `.github/workflows/`, `tests/` |
+| 4.5 | Financial message / scenario simulators | Card scheme + ISO 8583 adapter + acquirer on **moov-io/iso8583**; PSP **Hyperswitch**; CBS **Fineract**; payment hub on Temporal (ADR-022) | `services/scheme-sim/`, `services/core/payment-hub/`, `deploy/platform/rails/` |
 | 4.5 | Tekton | Tekton pipelines (on-cluster mirror of GitHub Actions) | `deploy/platform/tekton/` |
 | 4.6 | Cilium eBPF kube-proxy replacement, Hubble | Same (k3d with flannel disabled) | `deploy/platform/cilium/` |
 | 5.1 | Vue 3 + Rust (uniffi) app → **Tauri 2 mobile** (ADR-005), **Wasmtime** WASI P2 components (ADR-016) + ONNX, automerge-rs CRDT, StrongBox/KeyMint/Blake3, HCE HostApduService, WorkManager | Same | `edge/` |
@@ -102,5 +103,6 @@ ml/              Fraud model training → ONNX, Feast definitions
 policies/        Kyverno, OPA Rego, Semgrep rules
 services/        core (Quarkus), hub (Rust), attestation
 specs/tla/       TLA+ specifications, checked in CI
-tests/           Playwright (UI + API), k6 (load), Schemathesis (contract), jPOS simulator
+tests/           Playwright (UI + API), k6 (load), Schemathesis (contract)
+vendor/          Pinned upstream sources built here (Form.io, Hyperswitch, Fineract, moov-io/iso8583)
 ```

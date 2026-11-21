@@ -132,6 +132,49 @@ paths:
       responses:
         "200": { description: Partners, content: { application/json: { schema: { type: object } } } }
         "404": { description: Unknown vertical }
+  /v1/exchange/{pack}/settings:
+    get:
+      operationId: getSettings
+      summary: The settings the exchange applies for a vertical (scoring weights, batch window, latency cap, backups, risk gate, slashing, deposit, return window), with defaults and change log
+      security: [{ oauth2: [exchange:read] }]
+      parameters: [{ name: pack, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Settings, content: { application/json: { schema: { type: object } } } }
+        "404": { description: Unknown vertical }
+    put:
+      operationId: updateSettings
+      summary: Replace the vertical's settings (operator); applied from the next auction, logged, recorded per auction as settingsVersion in the evidence
+      security: [{ oauth2: [exchange:admin] }]
+      parameters: [{ name: pack, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                by: { type: string, maxLength: 60 }
+                settings:
+                  type: object
+                  required: [priceWeight, reputationWeight, latencyWeight, windowMs, latencyMaxMs, backups, minRiskScore, slashIso51Bps, slashOtherBps, mandateDepositBps, returnWindowDays]
+                  properties:
+                    priceWeight: { type: number, minimum: 0, maximum: 1 }
+                    reputationWeight: { type: number, minimum: 0, maximum: 1 }
+                    latencyWeight: { type: number, minimum: 0, maximum: 1 }
+                    windowMs: { type: integer, minimum: 5, maximum: 1000 }
+                    latencyMaxMs: { type: integer, minimum: 1, maximum: 1000 }
+                    backups: { type: integer, minimum: 0, maximum: 5 }
+                    minRiskScore: { type: integer, minimum: 0, maximum: 1000 }
+                    slashIso51Bps: { type: integer, minimum: 0, maximum: 2000 }
+                    slashOtherBps: { type: integer, minimum: 0, maximum: 2000 }
+                    mandateDepositBps: { type: integer, minimum: 0, maximum: 5000 }
+                    returnWindowDays: { type: integer, minimum: 0, maximum: 60 }
+      responses:
+        "200": { description: The new settings, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { description: Unknown vertical }
+        "422": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/custom-rules/check:
     post:
       operationId: checkCustomRules

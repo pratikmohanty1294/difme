@@ -44,7 +44,7 @@ const LOCAL: Record<Decision, (v: Vars) => RuleHit[]> = {
   buyer_intent_eligibility: (v) => {
     const n = (k: string) => Number(v[k]);
     const h: RuleHit[] = [];
-    if (n('riskScore') < 850) h.push({ code: 'RISK_TOO_LOW', severity: 'BLOCK', message: "L3 risk score is below 850, so the request can't be broadcast." });
+    if (n('riskScore') < (v.minRiskScore === undefined ? 850 : n('minRiskScore'))) h.push({ code: 'RISK_TOO_LOW', severity: 'BLOCK', message: "L3 risk score is below the exchange's minimum, so the request can't be broadcast." });
     if (n('maxPrice') < n('minViable')) h.push({ code: 'MAX_PRICE_TOO_LOW', severity: 'BLOCK', message: 'Max price is below the card price plus the platform fee, so no buying partner can match.' });
     if (n('maxPrice') > n('listPrice')) h.push({ code: 'ABOVE_LIST_PRICE', severity: 'WARN', message: 'Max price is above the list price; buying direct would be cheaper.' });
     if (v.offerSanctioned === false) h.push({ code: 'OFFER_NOT_SANCTIONED', severity: 'BLOCK', message: "This Bank X offer isn't sanctioned for third-party purchase (V4, restricted)." });

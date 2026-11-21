@@ -13,8 +13,8 @@
       <output id="out_severity" name="severity" typeRef="string" />
       <output id="out_message" name="message" typeRef="string" />
       <rule id="b1">
-        <inputEntry id="b1_1"><text>&lt; 850</text></inputEntry><inputEntry id="b1_2"><text>-</text></inputEntry><inputEntry id="b1_3"><text>-</text></inputEntry><inputEntry id="b1_4"><text>-</text></inputEntry><inputEntry id="b1_5"><text>-</text></inputEntry>
-        <outputEntry id="b1_o1"><text>"RISK_TOO_LOW"</text></outputEntry><outputEntry id="b1_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="b1_o3"><text>"L3 risk score is below 850, so the request can't be broadcast."</text></outputEntry>
+        <inputEntry id="b1_1"><text>&lt; minRiskScore</text></inputEntry><inputEntry id="b1_2"><text>-</text></inputEntry><inputEntry id="b1_3"><text>-</text></inputEntry><inputEntry id="b1_4"><text>-</text></inputEntry><inputEntry id="b1_5"><text>-</text></inputEntry>
+        <outputEntry id="b1_o1"><text>"RISK_TOO_LOW"</text></outputEntry><outputEntry id="b1_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="b1_o3"><text>"L3 risk score is below the exchange's minimum, so the request can't be broadcast."</text></outputEntry>
       </rule>
       <rule id="b2">
         <inputEntry id="b2_1"><text>-</text></inputEntry><inputEntry id="b2_2"><text>&lt; minViable</text></inputEntry><inputEntry id="b2_3"><text>-</text></inputEntry><inputEntry id="b2_4"><text>-</text></inputEntry><inputEntry id="b2_5"><text>-</text></inputEntry>
@@ -29,7 +29,7 @@
         <outputEntry id="b4_o1"><text>"OFFER_NOT_SANCTIONED"</text></outputEntry><outputEntry id="b4_o2"><text>"BLOCK"</text></outputEntry><outputEntry id="b4_o3"><text>"This Bank X offer isn't sanctioned for third-party purchase (V4, restricted)."</text></outputEntry>
       </rule>
       <rule id="b5">
-        <inputEntry id="b5_1"><text>&gt;= 850</text></inputEntry><inputEntry id="b5_2"><text>&gt;= minViable</text></inputEntry><inputEntry id="b5_3"><text>-</text></inputEntry><inputEntry id="b5_4"><text>-</text></inputEntry><inputEntry id="b5_5"><text>true</text></inputEntry>
+        <inputEntry id="b5_1"><text>&gt;= minRiskScore</text></inputEntry><inputEntry id="b5_2"><text>&gt;= minViable</text></inputEntry><inputEntry id="b5_3"><text>-</text></inputEntry><inputEntry id="b5_4"><text>-</text></inputEntry><inputEntry id="b5_5"><text>true</text></inputEntry>
         <outputEntry id="b5_o1"><text>"ELIGIBLE"</text></outputEntry><outputEntry id="b5_o2"><text>"INFO"</text></outputEntry><outputEntry id="b5_o3"><text>"Intent is eligible for the exchange."</text></outputEntry>
       </rule>
     </decisionTable>

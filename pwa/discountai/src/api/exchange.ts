@@ -56,6 +56,14 @@ export interface MandateIn {
 }
 export interface CatalogAttribute { key: string; type: 'number' | 'string' | 'boolean'; label?: string | null; example?: string | null }
 export interface AttributeCatalog { pack: string; builtIn: { key: string; type: string }[]; attributes: CatalogAttribute[] }
+export interface ExchangeSettings {
+  priceWeight: number; reputationWeight: number; latencyWeight: number; windowMs: number; latencyMaxMs: number; backups: number;
+  minRiskScore: number; slashIso51Bps: number; slashOtherBps: number; mandateDepositBps: number; returnWindowDays: number;
+}
+export interface SettingsView {
+  pack: string; settings: ExchangeSettings; defaults: ExchangeSettings; version: number;
+  log: { atMs: number; by: string; field: string; from: string; to: string; version: number }[];
+}
 export interface OrderRow {
   auctionId: number; pack: string; closedAtMs: number; state: string; ranked: number; merchant?: string;
   winnerNode?: number; mandateId?: number; tier?: string; aMinor?: number; yieldMinor?: number; feeMinor?: number; bMinor?: number;
@@ -109,6 +117,9 @@ export const exchange = {
   orders: (state?: string, limit = 200) => call<OrdersView>('GET', `/orders?limit=${limit}${state ? `&state=${encodeURIComponent(state)}` : ''}`),
   /** Operator: buying partners the exchange knows through their mandates. */
   partnerList: () => call<{ pack: string; partners: PartnerRow[] }>('GET', `/${PACK}/partners`),
+  /** Operator: the settings the exchange applies (with defaults and change log). */
+  settings: () => call<SettingsView>('GET', `/${PACK}/settings`),
+  updateSettings: (settings: ExchangeSettings, by?: string) => call<SettingsView>('PUT', `/${PACK}/settings`, { settings, by }),
   /** Cheap reachability probe (the public verification keys). */
   ping: () => call<Record<string, string>>('GET', '/keys', undefined, 3000).then(() => true, () => false),
 };

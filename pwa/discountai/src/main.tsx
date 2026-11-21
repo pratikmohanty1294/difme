@@ -30,6 +30,7 @@ const RuleAttributes: Page = OME ? lazy(() => import('./pages/exchange/RuleAttri
 const Network: Page = OME ? lazy(() => import('./pages/exchange/Network')) : none;
 // Live builds: the operator's real views (orders, partners) replace the simulated auction, order book and network pages.
 const Orders: Page = OME ? lazy(() => import('./pages/exchange/Orders')) : none;
+const LiveAuctionConfig: Page = OME ? lazy(() => import('./pages/exchange/LiveAuctionConfig')) : none;
 const Partners: Page = OME ? lazy(() => import('./pages/exchange/Partners')) : none;
 const ProofChain: Page = OME ? lazy(() => import('./pages/audit/ProofChain')) : none;
 const Compliance: Page = OME ? lazy(() => import('./pages/audit/Compliance')) : none;
@@ -46,7 +47,7 @@ function App() {
       case 'investor/mandates': return <Mandates key={param} focus={param} />;
       case 'exchange': return LIVE ? <Orders /> : <LiveAuction key={param} focus={param} />;
       case 'exchange/orderbook': return LIVE ? <Orders /> : <OrderBook />;
-      case 'exchange/config': return <AuctionConfig />;
+      case 'exchange/config': return LIVE ? <LiveAuctionConfig /> : <AuctionConfig />;
       case 'exchange/attributes': return <RuleAttributes />;
       case 'exchange/network': return LIVE ? <Partners /> : <Network />;
       case 'audit': return <ProofChain key={param} focus={param} />;

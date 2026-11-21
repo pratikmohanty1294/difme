@@ -26,8 +26,9 @@ public final class MatchingEngine implements Agent {
         void onClosed(long auctionId, BidBook book, int ranked);
     }
 
-    private final Weights weights;
-    private final long latencyMaxMicros;
+    // Volatile: the operator can retune them while the engine runs; each auction close reads one consistent pair.
+    private volatile Weights weights;
+    private volatile long latencyMaxMicros;
     private final RingBuffer intake;
     private final ResultSink sink;
     private final NanoClock clock;
@@ -44,6 +45,13 @@ public final class MatchingEngine implements Agent {
 
     private long dropped, rejected;
     private final MessageHandler handler = this::onMessage;
+
+    /** New scoring weights and latency cap, used from the next auction close on (operator settings). */
+    public void retune(Weights w, long latencyMaxMicros) {
+        if (w == null || latencyMaxMicros <= 0) throw new IllegalArgumentException("weights and a positive latency cap are required");
+        this.weights = w;
+        this.latencyMaxMicros = latencyMaxMicros;
+    }
 
     public MatchingEngine(Weights weights, long latencyMaxMicros, int maxAuctions, int bidsPerAuction,
                           RingBuffer intake, ResultSink sink, NanoClock clock, int readLimit) {

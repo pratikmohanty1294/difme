@@ -146,6 +146,86 @@ public class Exchange {
                          int nodeRef, int awards, long yieldEarnedMinor, MandateStatus status, Map<String, Long> yieldByDay) {}
     record ChainRecord(long auctionId, String id, EvidenceChain.Kind kind, List<EvidenceChain.Artifact> artifacts, EvidenceChain.Seal seal) {}
     record KeyRecord(String name, String x509) {}
+    record SettingsRecord(String pack, Settings settings, int version, List<SettingsChange> log) {}
+
+    /**
+     * The settings the exchange applies per vertical, editable by the operator at runtime (Auction config). Defaults
+     * come from the pack's vertical.yaml (and the eligibility table's former literal 850).
+     */
+    public record Settings(double priceWeight, double reputationWeight, double latencyWeight, int windowMs, int latencyMaxMs,
+                           int backups, int minRiskScore, int slashIso51Bps, int slashOtherBps, int mandateDepositBps,
+                           int returnWindowDays) {
+        /** Problems in plain words; empty means valid. */
+        public List<String> problems() {
+            List<String> p = new ArrayList<>();
+            for (double w : new double[] {priceWeight, reputationWeight, latencyWeight}) if (w < 0 || w > 1) { p.add("Each weight must be between 0 and 1."); break; }
+            if (Math.abs(priceWeight + reputationWeight + latencyWeight - 1.0) > 0.001) p.add("The three weights must add up to 1.");
+            if (windowMs < 5 || windowMs > 1000) p.add("The batch window must be 5–1000 ms.");
+            if (latencyMaxMs < 1 || latencyMaxMs > 1000) p.add("The latency cap must be 1–1000 ms.");
+            if (backups < 0 || backups > 5) p.add("Hot backups must be 0–5.");
+            if (minRiskScore < 0 || minRiskScore > 1000) p.add("The minimum risk score must be 0–1000.");
+            if (slashIso51Bps < 0 || slashIso51Bps > 2000 || slashOtherBps < 0 || slashOtherBps > 2000) p.add("Slashing rates must be 0–20 % (0–2000 bps).");
+            if (mandateDepositBps < 0 || mandateDepositBps > 5000) p.add("The deposit rate must be 0–50 % (0–5000 bps).");
+            if (returnWindowDays < 0 || returnWindowDays > 60) p.add("The return window must be 0–60 days.");
+            return p;
+        }
+    }
+
+    public record SettingsChange(long atMs, String by, String field, String from, String to, int version) {}
+
+    private record PackSettings(Settings settings, int version, List<SettingsChange> log) {}
+    private final Map<String, PackSettings> settings = new ConcurrentHashMap<>();
+    private final Map<String, MatchingEngine> engines = new ConcurrentHashMap<>();
+
+    static Settings defaultsOf(VerticalPack p) {
+        return new Settings(p.weights().price(), p.weights().reputation(), p.weights().latency(), (int) (p.windowNanos() / 1_000_000L),
+                (int) Math.max(1, p.latencyMaxMicros() / 1000), p.backups(), 850, p.slashing().fundsBps(), p.slashing().otherDeclineBps(),
+                p.collateral().mandateDepositBps(), p.returnWindowDays());
+    }
+
+    public Settings settings(String pack) {
+        PackSettings s = settings.get(pack);
+        return s != null ? s.settings() : defaultsOf(packs.get(pack));
+    }
+
+    public int settingsVersion(String pack) {
+        PackSettings s = settings.get(pack);
+        return s == null ? 0 : s.version();
+    }
+
+    public List<SettingsChange> settingsLog(String pack) {
+        PackSettings s = settings.get(pack);
+        return s == null ? List.of() : s.log();
+    }
+
+    /** Applies new settings (validated by the caller): engine retuned now, the rest read per request. Returns changes. */
+    public synchronized List<SettingsChange> applySettings(String pack, Settings next, String by) {
+        Settings cur = settings(pack);
+        int version = settingsVersion(pack) + 1;
+        List<SettingsChange> changes = new ArrayList<>();
+        var a = cur.getClass().getRecordComponents();
+        for (var c : a) {
+            try {
+                Object from = c.getAccessor().invoke(cur), to = c.getAccessor().invoke(next);
+                if (!from.equals(to)) changes.add(new SettingsChange(System.currentTimeMillis(), by, c.getName(), String.valueOf(from), String.valueOf(to), version));
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        if (changes.isEmpty()) return changes;
+        List<SettingsChange> log = new ArrayList<>(settingsLog(pack));
+        log.addAll(changes);
+        if (log.size() > 500) log = new ArrayList<>(log.subList(log.size() - 500, log.size()));
+        settings.put(pack, new PackSettings(next, version, List.copyOf(log)));
+        retune(pack, next);
+        store.put("settings", pack, new SettingsRecord(pack, next, version, List.copyOf(log)));
+        return changes;
+    }
+
+    private void retune(String pack, Settings s) {
+        MatchingEngine e = engines.get(pack);
+        if (e != null) e.retune(new dev.difme.exchange.kernel.Weights(s.priceWeight(), s.reputationWeight(), s.latencyWeight()), s.latencyMaxMs() * 1000L);
+    }
     record AttributesRecord(String pack, List<dev.difme.exchange.rules.CustomRules.Attribute> attributes) {}
     record ScoreRecord(String key, double value) {}
     record CountRecord(String key, int count) {}
@@ -218,13 +298,15 @@ public class Exchange {
             rails.registry.requireAll(id, pack.rails());   // a pack can't go live with a rail nobody implements
             ManyToOneRingBuffer ring = MatchingIntake.newRing(ringBytes);
             MatchingEngine engine = new MatchingEngine(pack.weights(), pack.latencyMaxMicros(), maxAuctions,
-                    bidsPerAuction, ring, (auction, book, ranked) -> onClosed(id, pack.backups(), auction, book, ranked),
+                    bidsPerAuction, ring, (auction, book, ranked) -> onClosed(id, settings(id).backups(), auction, book, ranked),
                     new SystemNanoClock(), 4096);
             AgentRunner runner = new AgentRunner(new BackoffIdleStrategy(100, 10, 1_000, 1_000_000),
                     e -> metrics.counter("difme_exchange_engine_errors_total", "pack", id).increment(), null, engine);
             AgentRunner.startOnThread(runner);
             runners.add(runner);
             packs.put(id, pack);
+            engines.put(id, engine);
+            if (settings.containsKey(id)) retune(id, settings.get(id).settings());   // restored operator settings
             intakes.put(id, new MatchingIntake(ring));
         }
     }
@@ -237,6 +319,10 @@ public class Exchange {
                 KeyRecord k = json.treeToValue(n, KeyRecord.class);
                 partyKeys.put(k.name(), java.security.KeyFactory.getInstance("Ed25519")
                         .generatePublic(new java.security.spec.X509EncodedKeySpec(java.util.Base64.getDecoder().decode(k.x509()))));
+            }
+            for (var n : store.load("settings")) {
+                SettingsRecord r = json.treeToValue(n, SettingsRecord.class);
+                settings.put(r.pack(), new PackSettings(r.settings(), r.version(), r.log() == null ? List.of() : r.log()));
             }
             for (var n : store.load("attributes")) { AttributesRecord a = json.treeToValue(n, AttributesRecord.class); attributeCatalogs.put(a.pack(), a.attributes()); }
             for (var n : store.load("reputation")) { ScoreRecord r = json.treeToValue(n, ScoreRecord.class); reputation.put(r.key(), r.value()); }
@@ -332,7 +418,7 @@ public class Exchange {
         contexts.put(id, new Context(cardPrice, maxAcceptableMinor, facts));
         openAuctions.put(id, pack);
         terms.put(id, t);
-        long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : p.windowNanos();
+        long window = windowOverrideMs > 0 ? windowOverrideMs * 1_000_000L : settings(pack).windowMs() * 1_000_000L;
         if (!intakes.get(pack).open(id, maxAcceptableMinor, window)) {
             openAuctions.remove(id);
             terms.remove(id);
@@ -621,7 +707,7 @@ public class Exchange {
             List<Failover.Candidate> ranked = r.top().stream()
                     .map(t -> new Failover.Candidate(t.nodeRef(), r.award().collateralMinor())).toList();
             Failover.Result f = Failover.run(ranked, s.a(),
-                    new Failover.SlashingBps(p.slashing().fundsBps(), p.slashing().otherDeclineBps()), partner -> {
+                    new Failover.SlashingBps(settings(r.pack()).slashIso51Bps(), settings(r.pack()).slashOtherBps()), partner -> {
                         var token = rails.credentials.issue(
                                 new AgentCredentialPort.Instruction(instruction, partner, merchantId, s.a(), "INR"), now);
                         String field11 = String.format("%06d", stan.incrementAndGet() % 1_000_000);
@@ -698,7 +784,7 @@ public class Exchange {
             List<String> problems = ProofOfDelivery.check(proof, auctionId, e.merchantId(), s.a(), partyKeys);
             if (!problems.isEmpty()) return new Fulfilment(auctionId, false, problems, rails.escrow.get(holdId), 0);
             EscrowPort.Hold hold = s.fee() > 0 ? rails.escrow.release(holdId, "fee", "exchange", s.fee()) : rails.escrow.get(holdId);
-            long window = returnWindowOverrideMs >= 0 ? returnWindowOverrideMs : packs.get(r.pack()).returnWindowDays() * 86_400_000L;
+            long window = returnWindowOverrideMs >= 0 ? returnWindowOverrideMs : settings(r.pack()).returnWindowDays() * 86_400_000L;
             long yieldAt = proof.delivery().deliveredAtMs() + window;
             EvidenceChain chain = chains.get(auctionId);
             if (chain != null) {

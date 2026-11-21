@@ -85,6 +85,10 @@ check("the half return took half the yield off the winning mandate (64000 -> 320
 check("the day-by-day history shows the same net yield", sum(before["mandate"].get("yieldByDay", {}).values()) == 32000)
 s, cat = call("PUT", "/fr01-buy/attributes", {"attributes": [{"key": "merchant", "type": "string"}, {"key": "warrantyYears", "type": "number", "label": "Warranty (years)"}]})
 check("attribute master list replaced", s == 200)
+s, st = call("GET", "/fr01-buy/settings")
+new_settings = dict(st["settings"], minRiskScore=870, windowMs=60)
+s, st2 = call("PUT", "/fr01-buy/settings", {"settings": new_settings, "by": "restart-check"})
+check("operator settings changed (minRiskScore 870, window 60 ms)", s == 200 and st2["version"] == 1)
 call("POST", f"/fr01-buy/mandates/{mid}/status", {"status": "PAUSED"})
 out = stop(p)
 check("clean shutdown flushed everything", "records not written" not in out)
@@ -98,6 +102,12 @@ try:
     check("mandate status change made just before the stop is kept (PAUSED)", mm.get("status") == "PAUSED")
     s, cat2 = call("GET", "/fr01-buy/attributes")
     check("attribute master list survived the restart", [a["key"] for a in cat2.get("attributes", [])] == ["merchant", "warrantyYears"])
+    s, st3 = call("GET", "/fr01-buy/settings")
+    check("operator settings and their log survived the restart", st3["settings"]["minRiskScore"] == 870 and st3["settings"]["windowMs"] == 60
+          and st3["version"] == 1 and any(c["by"] == "restart-check" for c in st3["log"]))
+    s, low = call("POST", "/fr01-buy/intents", {"riskScore": 860, "offerSanctioned": True, "listMinor": 2000000, "discountBps": 2000,
+                  "feeMinor": 20000, "maxPriceMinor": 1900000})
+    check("restored risk gate is applied (860 < 870 refused)", s == 422)
     s, rr = call("GET", f"/auctions/{aid}")
     check("auction result is back with the same award", s == 200 and rr.get("award") == before["result"]["award"])
     s, ev = call("GET", f"/auctions/{aid}/evidence")

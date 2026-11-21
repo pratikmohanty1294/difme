@@ -70,6 +70,21 @@ srv.listen(18187, async () => {
     t = await p.locator('main').innerText();
     check('partners page lists the partner with its win and tier', t.includes(ref) && t.includes('cold start') && !t.includes('Aeron'));
     await p.screenshot({ path: path.join(OUT, 'operator-partners.png'), fullPage: true });
+    // Auction config: the exchange's real settings. Raise the risk gate, see it refuse an intent, then reset.
+    await p.goto('http://127.0.0.1:18187/#/exchange/config'); await p.waitForTimeout(1500);
+    await p.getByLabel('Minimum buyer risk score').fill('950');
+    await p.getByLabel('Changed by').fill('e2e-operator');
+    await p.getByRole('button', { name: /^Save 1 change/ }).click(); await p.waitForTimeout(800);
+    const st = (await api('GET', '/fr01-buy/settings')).json;
+    check('config saved to the exchange (minRiskScore 950, logged with the name)', st.settings.minRiskScore === 950 && st.log.some((c) => c.by === 'e2e-operator' && c.field === 'minRiskScore'));
+    const refused = await api('POST', '/fr01-buy/intents', { riskScore: 900, offerSanctioned: true, listMinor: 1000000, discountBps: 2000, feeMinor: 20000, maxPriceMinor: 950000 });
+    check('a 900-risk intent is now refused (RISK_TOO_LOW)', refused.status === 422 && JSON.stringify(refused.json).includes('RISK_TOO_LOW'));
+    t = await p.locator('main').innerText();
+    check('change log row shown on the page', t.includes('e2e-operator') && t.includes('850 → 950'));
+    await p.getByRole('button', { name: /Reset to defaults/ }).click();
+    await p.getByRole('button', { name: /^Save 1 change/ }).click(); await p.waitForTimeout(800);
+    check('reset to defaults (850)', (await api('GET', '/fr01-buy/settings')).json.settings.minRiskScore === 850);
+    await p.screenshot({ path: path.join(OUT, 'operator-config.png'), fullPage: true });
     check('no page errors', errors.length === 0);
   } catch (e) {
     console.log('FAIL step:', e.message.split('\n')[0]); checks.push(false);

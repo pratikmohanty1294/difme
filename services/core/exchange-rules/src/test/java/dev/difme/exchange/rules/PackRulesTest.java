@@ -25,6 +25,7 @@ class PackRulesTest {
         in.put("minViable", minViable);
         in.put("listPrice", listPrice);
         in.put("offerSanctioned", sanctioned);
+        in.put("minRiskScore", 850);   // the exchange's setting (operator-editable since 2026-11-21)
         return in;
     }
 
@@ -71,6 +72,15 @@ class PackRulesTest {
     void collectReturnsEveryMatchedRow() {
         List<Finding> f = fr01.evaluate("buyer_intent_eligibility", intent(700, 85_000, 90_000, 100_000, false));
         assertEquals(List.of("MAX_PRICE_TOO_LOW", "OFFER_NOT_SANCTIONED", "RISK_TOO_LOW"), codes(f));
+    }
+
+    @Test
+    void aMissingCellInputIsAnErrorNotASilentNoMatch() {
+        // Without minRiskScore the risk rows would compare with null and match nothing: the risk gate would vanish.
+        Map<String, Object> in = intent(700, 95_000, 90_000, 100_000, true);
+        in.remove("minRiskScore");
+        var e = assertThrows(IllegalArgumentException.class, () -> fr01.evaluate("buyer_intent_eligibility", in));
+        assertTrue(e.getMessage().contains("minRiskScore"), e.getMessage());
     }
 
     @Test

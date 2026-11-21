@@ -66,7 +66,7 @@ public class ExchangeResource {
         // mandate's largest allowed order at the partner's current tier. With the budget rate alone (5 %), a new
         // partner's mandate registered fine but could never win: every bid failed DEPOSIT_SHORT on that collateral.
         var c = pack.collateral();
-        long onBudget = Math.round(m.budgetTotalMinor() * (c.mandateDepositBps() / 10_000.0));
+        long onBudget = Math.round(m.budgetTotalMinor() * (exchange.settings(packId).mandateDepositBps() / 10_000.0));
         dev.difme.exchange.kernel.Risk.Tier tier = exchange.tierOf(packId, exchange.nodeRefOf(m.partnerRef() == null ? "" : m.partnerRef()));
         long onLargestOrder = m.maxPerOrderMinor() <= 0 ? 0
                 : dev.difme.exchange.kernel.Risk.requiredCollateral(m.maxPerOrderMinor(), c.alpha(), c.gammaRev(), tier, c.minMinor());
@@ -122,6 +122,7 @@ public class ExchangeResource {
         long cardPrice = in.listMinor() - discount;
         List<Finding> findings = pack.rules().evaluate("buyer_intent_eligibility", Map.of(
                 "riskScore", riskScore,
+                "minRiskScore", exchange.settings(packId).minRiskScore(),
                 "maxPrice", in.maxPriceMinor() / 100.0,
                 "minViable", (cardPrice + in.feeMinor()) / 100.0,
                 "listPrice", in.listMinor() / 100.0,
@@ -139,6 +140,7 @@ public class ExchangeResource {
         evidence.put("feeMinor", in.feeMinor());
         evidence.put("maxPriceMinor", in.maxPriceMinor());
         evidence.put("findings", findings.stream().map(Finding::code).toList());
+        evidence.put("settingsVersion", exchange.settingsVersion(packId));   // which operator settings this auction ran under
         // Order attributes for custom rules: the fixed `order` block (older clients) plus `attributes`, checked against
         // this vertical's master list (an unknown name or a wrong type is a client error, not silently ignored).
         Map<String, Object> attrs = new java.util.HashMap<>();
@@ -268,6 +270,32 @@ public class ExchangeResource {
     public Response partners(@PathParam("pack") String packId) {
         if (exchange.pack(packId) == null) return Response.status(404).build();
         return Response.ok(Map.of("pack", packId, "partners", exchange.partners(packId))).build();
+    }
+
+    /** The settings the exchange applies for a vertical (Auction config), with their change log. */
+    @GET
+    @Path("/{pack}/settings")
+    public Response settings(@PathParam("pack") String packId) {
+        VerticalPack p = exchange.pack(packId);
+        if (p == null) return Response.status(404).build();
+        return Response.ok(Map.of("pack", packId, "settings", exchange.settings(packId), "defaults", Exchange.defaultsOf(p),
+                "version", exchange.settingsVersion(packId), "log", exchange.settingsLog(packId))).build();
+    }
+
+    public record SettingsUpdate(Exchange.Settings settings, String by) {}
+
+    /** Replaces the vertical's settings (operator). 422 with the problems; applied from the next auction on. */
+    @PUT
+    @Path("/{pack}/settings")
+    public Response updateSettings(@PathParam("pack") String packId, SettingsUpdate u) {
+        if (exchange.pack(packId) == null) return Response.status(404).build();
+        if (u == null || u.settings() == null) return Response.status(400).entity(Map.of("error", "settings are required")).build();
+        List<String> problems = u.settings().problems();
+        if (!problems.isEmpty()) return Response.status(422).entity(Map.of("error", "settings not accepted", "problems", problems)).build();
+        String by = u.by() == null || u.by().isBlank() ? "operator" : u.by().strip();
+        if (by.length() > 60) by = by.substring(0, 60);
+        exchange.applySettings(packId, u.settings(), by);
+        return settings(packId);
     }
 
     public record MandateStatusChange(String status) {}

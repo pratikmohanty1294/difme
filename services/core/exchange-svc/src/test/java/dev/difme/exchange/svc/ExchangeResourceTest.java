@@ -450,6 +450,52 @@ class ExchangeResourceTest {
         given().contentType(ContentType.JSON).body("{\"status\":\"REVOKED\"}").post("/v1/exchange/fr01-buy/mandates/" + mid + "/status").then().statusCode(200);
     }
 
+    /** Operator settings change what the exchange does: the risk gate, and who wins (scoring weights). */
+    @Test
+    void operatorSettingsApplyAtRuntime() throws InterruptedException {
+        var d = given().get("/v1/exchange/fr01-buy/settings").then().statusCode(200)
+                .body("defaults.minRiskScore", equalTo(850)).extract().jsonPath();
+        java.util.Map<String, Object> defaults = d.getMap("defaults");
+        java.util.function.Function<java.util.Map<String, Object>, String> body = m -> {
+            try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of("settings", m, "by", "test-operator")); }
+            catch (Exception e) { throw new RuntimeException(e); }
+        };
+        java.util.function.Consumer<java.util.Map<String, Object>> apply = m ->
+                given().contentType(ContentType.JSON).body(body.apply(m)).put("/v1/exchange/fr01-buy/settings").then().statusCode(200);
+        try {
+            var bad = new java.util.HashMap<>(defaults); bad.put("priceWeight", 0.9); bad.put("windowMs", 1);
+            given().contentType(ContentType.JSON).body(body.apply(bad)).put("/v1/exchange/fr01-buy/settings").then().statusCode(422)
+                    .body("problems", hasItem("The three weights must add up to 1."))
+                    .body("problems", hasItem("The batch window must be 5–1000 ms."));
+            // Risk gate: 900 passes at 850, not at 950.
+            var strict = new java.util.HashMap<>(defaults); strict.put("minRiskScore", 950);
+            apply.accept(strict);
+            given().contentType(ContentType.JSON).body(intent(900, 9_500_000)).post("/v1/exchange/fr01-buy/intents").then().statusCode(422)
+                    .body("findings.code", hasItem("RISK_TOO_LOW"));
+            // Weights: node 101 asks less (better price), node 102 answers faster (better latency). Reputation can't be
+            // used here: the exchange ignores self-reported reputation, so two untracked nodes score the same on it.
+            for (var w : java.util.List.of(new Object[] {1.0, 0.0, 101}, new Object[] {0.0, 1.0, 102})) {
+                var ws = new java.util.HashMap<>(defaults);
+                ws.put("priceWeight", w[0]); ws.put("reputationWeight", 0.0); ws.put("latencyWeight", w[1]); ws.put("windowMs", 400);
+                apply.accept(ws);
+                long id = given().contentType(ContentType.JSON).body(intent(900, 9_500_000)).post("/v1/exchange/fr01-buy/intents")
+                        .then().statusCode(202).extract().jsonPath().getLong("auctionId");
+                given().contentType(ContentType.JSON).body(bid(101, 300_000, 60, 40_000, 6_000_000)).post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
+                given().contentType(ContentType.JSON).body(bid(102, 600_000, 60, 1_000, 6_000_000)).post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
+                long deadline = System.currentTimeMillis() + 10_000;
+                while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) Thread.sleep(20);
+                given().get("/v1/exchange/auctions/" + id).then().body("award.winner.nodeRef", equalTo(w[2]));
+                given().get("/v1/exchange/auctions/" + id + "/evidence").then()
+                        .body("artifacts[0].payload.settingsVersion", org.hamcrest.Matchers.greaterThan(0));
+            }
+            given().get("/v1/exchange/fr01-buy/settings").then().statusCode(200)
+                    .body("log.field", hasItem("minRiskScore")).body("log.by", hasItem("test-operator"))
+                    .body("version", org.hamcrest.Matchers.greaterThanOrEqualTo(3));
+        } finally {
+            apply.accept(defaults);   // shared exchange: put the defaults back for the other tests
+        }
+    }
+
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
                                               long amount, long deliveredAt) throws Exception {
         var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",

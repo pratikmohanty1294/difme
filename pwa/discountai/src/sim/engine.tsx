@@ -307,6 +307,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
           backupIds: r.top.slice(1).map((b) => `node-${b.nodeRef}`) } });
         step('OME', `Awarded to node ${r.award.winner.nodeRef} of ${r.ranked} ranked`, 'POL', `A ${inr(split.A)} · Y ${inr(split.Y)} · F ${inr(split.F)} · you pay ${inr(split.B)}`);
         const e = await exchange.execute(opened.auctionId, SCENARIO.merchantId);
+        if (e.escrow) step('Agent PA/PG', `Hold of ${inr(e.escrow.heldMinor / 100)} placed in escrow`, 'PRL', `escrow ${e.escrow.holdId}`);
         if (!e.fulfilled) return fail('No buying partner could complete the purchase; your hold was refunded');
         dispatch({ type: 'patchRequest', id, patch: { status: 'Success', orderId: `ORD-${opened.auctionId}` } });
         step('Merchant', `Bought by node ${e.boughtBy}${e.attempts.length > 1 ? ` after ${e.attempts.length - 1} failover(s)` : ''}`, 'POE');

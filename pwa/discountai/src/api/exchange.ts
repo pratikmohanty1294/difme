@@ -36,7 +36,7 @@ export interface IntentOpened { auctionId: number; maxYieldMinor: number; findin
 export interface SplitMinor { a: number; b: number; yield: number; fee: number; buyerSaves: number }
 export interface Award { winner: { nodeRef: number; askMinor: number; score: number }; split: SplitMinor; collateralMinor: number; tier?: string }
 export interface AuctionResult { auctionId: number; pack: string; ranked: number; top: { nodeRef: number; askMinor: number; score: number }[]; award: Award | null }
-export interface Execution { auctionId: number; fulfilled: boolean; boughtBy: number; slashedMinor: number; attempts: { partnerId: number; responseCode: string }[] }
+export interface Execution { auctionId: number; fulfilled: boolean; boughtBy: number; slashedMinor: number; attempts: { partnerId: number; responseCode: string }[]; escrow?: Hold }
 export interface EvidenceArtifact { seq: number; type: string; signal: string; payload: Record<string, unknown>; prevHash: string; hash: string; postSeal: boolean }
 export interface EvidenceView {
   chain: string; sealed: boolean; artifacts?: EvidenceArtifact[];

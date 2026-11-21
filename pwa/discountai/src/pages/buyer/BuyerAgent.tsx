@@ -1,3 +1,4 @@
+import { LIVE } from '../../api/exchange';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, BadgePercent, Bot, Check, CreditCard, ExternalLink, Fingerprint, Loader2, Plus, Radio, Send, ShieldCheck, Store, Users, Wrench } from 'lucide-react';
 import { MERCHANTS, SCENARIO, SPLIT } from '../../sim/data';
@@ -402,6 +403,8 @@ function Configure({ onBack, onSubmit }: { onBack: () => void; onSubmit: (o: { m
   const [checking, setChecking] = useState(false);
   // Buyer intent (POI) eligibility runs in the DMN rule engine before the request is broadcast.
   const send = async () => {
+    // Live: the exchange checks the same DMN rules on the intent and answers with its findings; no browser pre-check.
+    if (LIVE) { onSubmit({ maxPrice: cap, expiry: `${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`, outcome }); return; }
     setChecking(true);
     const r = await evaluate('buyer_intent_eligibility', {
       riskScore: 850 + Math.floor(Math.random() * 60), maxPrice: cap, minViable: SPLIT.A + SPLIT.F,
@@ -486,7 +489,8 @@ function Configure({ onBack, onSubmit }: { onBack: () => void; onSubmit: (o: { m
             </div>
           </fieldset>
 
-          <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-3">
+          {/* The live exchange decides the outcome; the picker only steers the offline simulation. */}
+          {!LIVE && <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-3">
             <label htmlFor="outcome" className="text-xs font-medium text-amber-900">Prototype control · outcome to simulate</label>
             <select id="outcome" className="input mt-1.5" value={outcome} onChange={(e) => setOutcome(e.target.value as Outcome)}>
               <option value="success">Success · winning buying partner's card approved</option>
@@ -494,7 +498,7 @@ function Configure({ onBack, onSubmit }: { onBack: () => void; onSubmit: (o: { m
               <option value="all-decline">All bidders decline · Guarantee Fund backstop</option>
               <option value="no-match">Timed out · no eligible buying partner bid</option>
             </select>
-          </div>
+          </div>}
         </div>
       </div>
       <div className="mt-6">

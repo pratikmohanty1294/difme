@@ -1,0 +1,28 @@
+# DiscountAI PWAs: typecheck, then the shopbot live buy in a real browser against a recorded exchange
+# (pwa/discountai/e2e/live-buy.cjs: bought and refused paths). No cluster or JVM needed.
+name: pwa
+on:
+  push: { branches: [main, "wip-*"], paths: ["pwa/discountai/**", ".github/workflows/pwa.yml"] }
+  pull_request: { paths: ["pwa/discountai/**"] }
+permissions: { contents: read }
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: pwa/discountai } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: pwa/discountai/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npx vite build --mode shopbot --outDir /tmp/shopbot
+      - name: browser
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+          mkdir -p /tmp/shots
+          node e2e/live-buy.cjs /tmp/shopbot /tmp/shots
+          node e2e/live-buy.cjs /tmp/shopbot /tmp/shots refuse
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: pwa-screens, path: /tmp/shots, retention-days: 7 }

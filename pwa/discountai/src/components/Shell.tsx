@@ -109,7 +109,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
         <Brand />
         {nav}
         <div className="mt-auto px-5 py-4 text-[11px] text-ink-500 border-t border-white/5">
-          Interactive prototype<br />All data simulated · amounts in ₹
+          {LIVE ? <>Connected to the DIFME exchange<br />Dev cluster · simulated card rails · amounts in ₹</> : <>Interactive prototype<br />All data simulated · amounts in ₹</>}
         </div>
       </aside>
 
@@ -127,8 +127,9 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-ink-200">
           <div className="flex items-center gap-3 px-4 md:px-8 h-14">
             <button className="lg:hidden btn-ghost px-2" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={18} /></button>
+            {/* Live builds trade on the real exchange; only its card rails, merchant and carrier are simulated (dev cluster). */}
             <span className="hidden sm:inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-[11.5px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-              <Boxes size={13} /> Prototype · simulated data
+              <Boxes size={13} /> {LIVE ? 'Dev exchange · simulated rails' : 'Prototype · simulated data'}
             </span>
             {live > 0 && (
               <a href={IS_WEB || CURRENT?.id === 'exchange' ? href('exchange') : href('buyer/requests')} className="inline-flex items-center gap-1.5 text-[12.5px] text-exchange-600 font-medium">

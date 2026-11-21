@@ -88,6 +88,29 @@ class HubRailsTest {
     }
 
     @Test
+    void bookingsAreJournalledAndPendingOnesResumeAfterARestart() {
+        SimRails rails = new SimRails();
+        FakeHub hub = new FakeHub();
+        rails.useHub(hub, Map.of(), m -> {});
+        var journal = new java.util.concurrent.ConcurrentHashMap<String, String>();
+        rails.cbsMirror().journalTo((m, st) -> journal.put(m.id(), st));
+        rails.escrow.hold("auction-9", "buyer-9", 500);
+        assertTrue(rails.cbsMirror().drain(5_000));
+        assertEquals(Map.of("hold-auction-9", "BOOKED"), journal);
+        rails.cbsMirror().close();
+        // A new process: one movement was still PENDING when the old one stopped; it is sent again, once.
+        SimRails after = new SimRails();
+        FakeHub hub2 = new FakeHub();
+        after.useHub(hub2, Map.of(), m -> {});
+        after.cbsMirror().journalTo((m, st) -> journal.put(m.id(), st));
+        after.cbsMirror().resume(List.of(new dev.difme.exchange.rails.hub.HubMirror.Move("rel-auction-9-principal", "escrow", "partner-1", 500, "x")));
+        assertTrue(after.cbsMirror().drain(5_000));
+        assertEquals(List.of("transfer rel-auction-9-principal escrow>partner-1 500"), hub2.calls);
+        assertEquals("BOOKED", journal.get("rel-auction-9-principal"));
+        after.cbsMirror().close();
+    }
+
+    @Test
     void merchantNamesBecomeValidAccountNames() {
         SimRails rails = new SimRails();
         FakeHub hub = new FakeHub();

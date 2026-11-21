@@ -1150,6 +1150,23 @@ public class Exchange {
         if (hubUrl.filter(u -> !u.isBlank()).isEmpty()) return;
         Map<Long, dev.difme.exchange.rails.PaymentHub.CardOnFile> cards = partnerCards(hubPartnerCards.orElse(List.of()));
         rails.useHub(new HttpPaymentHub(hubUrl.get()), cards, m -> LOG.warn(m));
+        // Journal every CBS booking in the durable state; those still PENDING from before a restart go out again.
+        List<dev.difme.exchange.rails.hub.HubMirror.Move> pending = new ArrayList<>();
+        for (var n : store.load("cbsmove")) {
+            if ("PENDING".equals(n.path("state").asText())) {
+                pending.add(new dev.difme.exchange.rails.hub.HubMirror.Move(n.path("id").asText(),
+                        n.path("from").isNull() || n.path("from").isMissingNode() ? null : n.path("from").asText(),
+                        n.path("to").asText(), n.path("amountMinor").asLong(), n.path("note").asText()));
+            }
+        }
+        rails.cbsMirror().journalTo((m, state) -> {
+            Map<String, Object> rec = new LinkedHashMap<>();
+            rec.put("id", m.id()); rec.put("from", m.from()); rec.put("to", m.to());
+            rec.put("amountMinor", m.amountMinor()); rec.put("note", m.note()); rec.put("state", state);
+            store.put("cbsmove", m.id(), rec);
+        });
+        if (!pending.isEmpty()) LOG.infof("rails: %d escrow bookings pending from before the restart, sending again", pending.size());
+        rails.cbsMirror().resume(pending);
         metrics.gauge("difme_exchange_cbs_pending", rails, r -> r.cbsMirror() == null ? 0 : r.cbsMirror().pending());
         metrics.gauge("difme_exchange_cbs_refused", rails, r -> r.cbsMirror() == null ? 0 : r.cbsMirror().refused());
         LOG.infof("rails: payment hub %s, %d partner cards on file", hubUrl.get(), cards.size());

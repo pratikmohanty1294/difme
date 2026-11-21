@@ -9,15 +9,22 @@ import java.util.function.Consumer;
  * Books the escrow's money movements on the core banking system, through the hub, in the background: the exchange's
  * escrow ledger decides (conservation, idempotency), the CBS records. A hold is money arriving into the escrow account;
  * a release moves escrow → payee; a refund moves escrow → payer. Ids are derived from the hold and operation ids, so a
- * movement sent twice is booked once; failed sends are retried with backoff until they go through. Not yet durable:
- * movements still queued when the process stops are lost (logged), and the CBS then lags the exchange's ledger.
+ * movement sent twice is booked once; failed sends are retried with backoff until they go through. Each movement is
+ * journalled (PENDING, then BOOKED or REFUSED) so that, after a restart, the ones still pending are sent again.
  */
 public final class HubMirror implements SimEscrow.Mirror, AutoCloseable {
     public static final String ESCROW = "escrow";
 
-    private record Move(String id, String from, String to, long amountMinor, String note) {}
+    /** One money movement to book on the CBS. from == null: money arriving into {@code to} (a deposit). */
+    public record Move(String id, String from, String to, long amountMinor, String note) {}
+
+    /** Durable record of each movement's state: PENDING, BOOKED, REFUSED. */
+    public interface Journal {
+        void record(Move m, String state);
+    }
 
     private final PaymentHub hub;
+    private volatile Journal journal = (m, s) -> {};
     private final LinkedBlockingQueue<Move> queue = new LinkedBlockingQueue<>();
     private final Consumer<String> log;
     private final Thread worker;
@@ -31,16 +38,26 @@ public final class HubMirror implements SimEscrow.Mirror, AutoCloseable {
         this.worker = Thread.ofPlatform().name("escrow-cbs-mirror").daemon().start(this::loop);
     }
 
+    public void journalTo(Journal j) { journal = j == null ? (m, s) -> {} : j; }
+
+    /** Queues movements journalled as PENDING before a restart (their ids make a second booking a no-op). */
+    public void resume(java.util.List<Move> pendingMoves) { queue.addAll(pendingMoves); }
+
+    private void add(Move m) {
+        journal.record(m, "PENDING");
+        queue.add(m);
+    }
+
     @Override public void hold(String holdId, String payer, long amountMinor) {
-        queue.add(new Move("hold-" + holdId, null, ESCROW, amountMinor, "escrow hold " + holdId + " from " + payer));
+        add(new Move("hold-" + holdId, null, ESCROW, amountMinor, "escrow hold " + holdId + " from " + payer));
     }
 
     @Override public void release(String holdId, String releaseId, String payee, long amountMinor) {
-        queue.add(new Move("rel-" + holdId + "-" + releaseId, ESCROW, payee, amountMinor, "escrow release " + holdId + "/" + releaseId));
+        add(new Move("rel-" + holdId + "-" + releaseId, ESCROW, payee, amountMinor, "escrow release " + holdId + "/" + releaseId));
     }
 
     @Override public void refund(String holdId, String refundId, String payer, long amountMinor) {
-        queue.add(new Move("ref-" + holdId + "-" + refundId, ESCROW, payer, amountMinor, "escrow refund " + holdId + "/" + refundId));
+        add(new Move("ref-" + holdId + "-" + refundId, ESCROW, payer, amountMinor, "escrow refund " + holdId + "/" + refundId));
     }
 
     /** Movements not yet booked on the CBS. */
@@ -65,8 +82,12 @@ public final class HubMirror implements SimEscrow.Mirror, AutoCloseable {
                 try {
                     PaymentHub.Outcome o = m.from() == null ? hub.deposit(m.id(), m.to(), m.amountMinor())
                             : hub.transfer(m.id(), m.from(), m.to(), m.amountMinor(), m.note());
-                    if ("DONE".equals(o.status())) booked++;
-                    else { refusedCount++; log.accept("CBS refused " + m.id() + ": " + o.status() + " " + o.detail()); }
+                    if ("DONE".equals(o.status())) { booked++; journal.record(m, "BOOKED"); }
+                    else {
+                        refusedCount++;
+                        journal.record(m, "REFUSED");
+                        log.accept("CBS refused " + m.id() + ": " + o.status() + " " + o.detail());
+                    }
                     backoff = 200;
                     inFlight = false;
                     break;

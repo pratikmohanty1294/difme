@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>dev.difme</groupId>
+  <artifactId>fspiop-ilp-models</artifactId>
+  <version>1.0.0</version>
+  <description>
+    The FSPIOP "Transaction" data model (Mojaloop FSP Interoperability API v1.1) that PH-EE's Mojaloop connector puts
+    in ILP packets, written by DIFME from the open API specification. It takes the place of
+    org.mifos:interop-ilp-conditions, whose licence ("All Rights Reserved. Distribution, reproduction or use is
+    prohibited without permission") is not open source. Same package name, so the vendored connector compiles unchanged.
+    Interledger codecs come from the vendored java-ilp-core (Apache-2.0).
+  </description>
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency><groupId>org.interledger</groupId><artifactId>java-ilp-core</artifactId><version>0.6.1-SNAPSHOT</version></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-annotations</artifactId><version>2.13.5</version><scope>provided</scope></dependency>
+  </dependencies>
+</project>

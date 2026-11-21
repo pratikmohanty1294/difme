@@ -9,6 +9,7 @@ commits are in `vendor/VENDORED.json`.
 | `connector-common` | openMF/ph-ee-connector-common v1.9.1 | Shared DTOs, Camel helpers, error mapping |
 | `connector-channel` | openMF/ph-ee-connector-channel v1.9.0 | The channel API: starts payment flows, answers channels |
 | `connector-ams-mifos` | openMF/ph-ee-connector-ams-mifos v1.7.0 | Fineract (AMS) connector: block / book / release funds through Fineract's interoperation API |
+| `connector-mojaloop` | openMF/ph-ee-connector-mojaloop-java v1.5.2 | Mojaloop (FSPIOP) connector: party lookup, quotes, transfers through the central switch |
 | `flows` | openMF/ph-ee-env-labs, `orchestration/feel` at a pinned commit (no release tags) | The BPMN payment flows |
 
 Not committed on purpose: upstream's development TLS keystores (`keystore.jks` in both connectors; they hold private
@@ -29,6 +30,14 @@ Local changes to the Mifos source: **none**. The port to Fluxnova is done around
 - Flows are converted by `ci/zeebe-bpmn-to-fluxnova.py` (`bill-request-DFSPID.bpmn` is an incomplete upstream draft:
   skipped). DIFME's own flow `processes/ph-ee/DifmeOnUsTransfer-DFSPID.bpmn` is written in the same Zeebe dialect from
   PH-EE task types only.
+
+Licence fixes (owner rule: free and open source only), all in the init script, no source change:
+- `org.mifos:interop-ilp-conditions` (needed by connector-mojaloop) is "All Rights Reserved ... use is prohibited
+  without permission": replaced by `services/fspiop-ilp-models` (FSPIOP models written from the Mojaloop API
+  specification, same package) and the vendored Apache-2.0 `vendor/interledger/java-ilp-core`.
+- `org.json:json` before 20231013 is under the JSON License (not OSI): forced to 20240303 (public domain) everywhere.
+- Rules are registered again after each project is evaluated: Spring's dependency-management plugin otherwise
+  re-applies the declared versions.
 
 Settings the connectors need beyond upstream's defaults (DIFME runtime config):
 - `zeebe.broker.contactpoint`: Fluxnova's engine REST URL; `dfspids`: the Fineract tenant (worker topics are named after it).

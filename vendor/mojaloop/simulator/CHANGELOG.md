@@ -1,0 +1,277 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+
+### [15.5.5](https://github.com/mojaloop/mojaloop-simulator/compare/v15.5.4...v15.5.5) (2026-10-16)
+
+
+### Bug Fixes
+
+* **security:** drop sprintf-js, patch handlebars and shell-quote ([#211](https://github.com/mojaloop/mojaloop-simulator/issues/211)) ([76c75e7](https://github.com/mojaloop/mojaloop-simulator/commit/76c75e783a0fef9b20e7fd5d7e699ec2c3b3020d))
+* **security:** patch vulnerabilities, scope overrides, Node 24 + orb 2.1.7 ([#209](https://github.com/mojaloop/mojaloop-simulator/issues/209)) ([bfb1838](https://github.com/mojaloop/mojaloop-simulator/commit/bfb18380ef79648549dd9cab6c6e6ad82f0e933c))
+
+### [15.5.4](https://github.com/mojaloop/mojaloop-simulator/compare/v15.5.3...v15.5.4) (2026-03-23)
+
+
+### Chore
+
+* add private:true to prevent npm publish ([#4384](https://github.com/mojaloop/mojaloop-simulator/issues/4384)) ([#208](https://github.com/mojaloop/mojaloop-simulator/issues/208)) ([b0e1ab8](https://github.com/mojaloop/mojaloop-simulator/commit/b0e1ab8645c281acf0c37c6e4d2ce3235a4f96fa))
+
+### [15.5.3](https://github.com/mojaloop/mojaloop-simulator/compare/v15.5.2...v15.5.3) (2026-02-18)
+
+
+### Chore
+
+* **ci:** update CircleCI orb to 1.1.10 ([#207](https://github.com/mojaloop/mojaloop-simulator/issues/207)) ([33ebf8a](https://github.com/mojaloop/mojaloop-simulator/commit/33ebf8a5a45652b5d136c6f077da8d8a1d9167d6))
+* **sbom:** update sbom [skip ci] ([bf1fae7](https://github.com/mojaloop/mojaloop-simulator/commit/bf1fae7123d427fe4c8a947a6ebf623dbd502c70))
+
+### [15.5.2](https://github.com/mojaloop/mojaloop-simulator/compare/v15.5.1...v15.5.2) (2026-01-14)
+
+
+### Chore
+
+* maintenance updates ([#205](https://github.com/mojaloop/mojaloop-simulator/issues/205)) ([bd38c43](https://github.com/mojaloop/mojaloop-simulator/commit/bd38c432f8791c4c72df4fbe6e05a0a166db7bf2))
+* **sbom:** update sbom [skip ci] ([2723dd1](https://github.com/mojaloop/mojaloop-simulator/commit/2723dd1b4283c861880f2de33ae9424bc700dd7e))
+
+### [15.5.1](https://github.com/mojaloop/mojaloop-simulator/compare/v15.5.0...v15.5.1) (2025-12-17)
+
+
+### Chore
+
+* **ci:** update CircleCI orb to 1.1.9 ([#202](https://github.com/mojaloop/mojaloop-simulator/issues/202)) ([d159a4d](https://github.com/mojaloop/mojaloop-simulator/commit/d159a4d4ca5a6d1fbab34068f88f24e9f72907b7))
+* **sbom:** update sbom [skip ci] ([be0f032](https://github.com/mojaloop/mojaloop-simulator/commit/be0f03240b37e7e3d874aea3210b218a02d5446c))
+
+## [15.5.0](https://github.com/mojaloop/mojaloop-simulator/compare/v15.4.2...v15.5.0) (2025-09-10)
+
+
+### Features
+
+* improved logging ([#192](https://github.com/mojaloop/mojaloop-simulator/issues/192)) ([d31b4b8](https://github.com/mojaloop/mojaloop-simulator/commit/d31b4b83dd03012727f722fcf4fc51ef61a902ef))
+
+
+### Chore
+
+* **sbom:** update sbom [skip ci] ([ae2cf8e](https://github.com/mojaloop/mojaloop-simulator/commit/ae2cf8e0506a63f79726d3598fef190d249af164))
+
+### [15.4.2](https://github.com/mojaloop/mojaloop-simulator/compare/v15.4.1...v15.4.2) (2025-07-25)
+
+
+### Chore
+
+* fix vuls and update deps ([#189](https://github.com/mojaloop/mojaloop-simulator/issues/189)) ([a607851](https://github.com/mojaloop/mojaloop-simulator/commit/a6078515491f3eb578a2d40937d39130482ad4cf))
+* **sbom:** update sbom [skip ci] ([ff78d78](https://github.com/mojaloop/mojaloop-simulator/commit/ff78d78a34785d31d691baa08861f756158bf16e))
+
+### [15.4.1](https://github.com/mojaloop/mojaloop-simulator/compare/v15.4.0...v15.4.1) (2025-07-17)
+
+
+### Chore
+
+* add initial sbom ([#186](https://github.com/mojaloop/mojaloop-simulator/issues/186)) ([22a8b1c](https://github.com/mojaloop/mojaloop-simulator/commit/22a8b1cea4af184ee07c0e4941ef99a8362ec688))
+
+## [15.4.0](https://github.com/mojaloop/mojaloop-simulator/compare/v15.3.0...v15.4.0) (2025-05-29)
+
+
+### Features
+
+* node version upgrade to v22.15.1 ([#185](https://github.com/mojaloop/mojaloop-simulator/issues/185)) ([92cef25](https://github.com/mojaloop/mojaloop-simulator/commit/92cef257ec5050dd51bc2ec8ee2e8c4fc00ba93c))
+
+## [15.3.0](https://github.com/mojaloop/mojaloop-simulator/compare/v15.2.1...v15.3.0) (2025-03-24)
+
+
+### Features
+
+* support simulating multiple DFSPs with a single simulator ([#183](https://github.com/mojaloop/mojaloop-simulator/issues/183)) ([308bd42](https://github.com/mojaloop/mojaloop-simulator/commit/308bd42387d8269b7d995cb18873e1d09790375a))
+
+### [15.2.1](https://github.com/mojaloop/mojaloop-simulator/compare/v15.2.0...v15.2.1) (2025-02-25)
+
+
+### Chore
+
+* maintenance updates ([#182](https://github.com/mojaloop/mojaloop-simulator/issues/182)) ([116cb4e](https://github.com/mojaloop/mojaloop-simulator/commit/116cb4ec860274fa0b5763f9f1cff54b8eefad0a))
+
+## [15.2.0](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.6...v15.2.0) (2025-02-21)
+
+
+### Features
+
+* **csi-1161:** move middlewares to a separate file ([#178](https://github.com/mojaloop/mojaloop-simulator/issues/178)) ([f6e4665](https://github.com/mojaloop/mojaloop-simulator/commit/f6e4665376d93dc08e83fc64e69b2fe6efc01b69))
+
+### [15.1.6](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.5...v15.1.6) (2025-02-20)
+
+
+### Chore
+
+* maintenance updates ([#180](https://github.com/mojaloop/mojaloop-simulator/issues/180)) ([57263cd](https://github.com/mojaloop/mojaloop-simulator/commit/57263cd61c2e2ca7e301b2a782b9e1214e58591f))
+
+### [15.1.5](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.4...v15.1.5) (2025-02-04)
+
+
+### Bug Fixes
+
+* sim api spec for internal extensionlist ([#177](https://github.com/mojaloop/mojaloop-simulator/issues/177)) ([4fc4b0b](https://github.com/mojaloop/mojaloop-simulator/commit/4fc4b0b0bb02ef78889283fa447b84feb61ec7bf))
+
+### [15.1.4](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.3...v15.1.4) (2025-01-31)
+
+
+### Chore
+
+* maintenance updates ([#176](https://github.com/mojaloop/mojaloop-simulator/issues/176)) ([aea2eae](https://github.com/mojaloop/mojaloop-simulator/commit/aea2eae7358af0338800d58b22dc830006ee77bd))
+
+### [15.1.3](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.2...v15.1.3) (2025-01-29)
+
+
+### Bug Fixes
+
+* **csi-1130:** extensionlist ([#175](https://github.com/mojaloop/mojaloop-simulator/issues/175)) ([d6cbd46](https://github.com/mojaloop/mojaloop-simulator/commit/d6cbd462987e2c0938fdb06fdcd8b9256836f6e6))
+
+### [15.1.2](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.1...v15.1.2) (2025-01-09)
+
+
+### Chore
+
+* update deps, clean audit-ci.jsonc ([#174](https://github.com/mojaloop/mojaloop-simulator/issues/174)) ([f5d9c35](https://github.com/mojaloop/mojaloop-simulator/commit/f5d9c35e37d8f085ef9dd32746e4596f5103f89c))
+
+### [15.1.1](https://github.com/mojaloop/mojaloop-simulator/compare/v15.1.0...v15.1.1) (2024-10-01)
+
+
+### Bug Fixes
+
+* uuid/ulid regex ([#172](https://github.com/mojaloop/mojaloop-simulator/issues/172)) ([b5f03bf](https://github.com/mojaloop/mojaloop-simulator/commit/b5f03bfc10b5f7aae01b655e67fbbd143be2fb4d))
+
+## [15.1.0](https://github.com/mojaloop/mojaloop-simulator/compare/v15.0.0...v15.1.0) (2024-09-25)
+
+
+### Features
+
+* add ULID support ([#171](https://github.com/mojaloop/mojaloop-simulator/issues/171)) ([3bff8ce](https://github.com/mojaloop/mojaloop-simulator/commit/3bff8ceb633450d09deb730ce72a6430a92a4925))
+
+## [15.0.0](https://github.com/mojaloop/mojaloop-simulator/compare/v14.0.2...v15.0.0) (2023-10-06)
+
+
+### CI
+
+* **mojaloop/#3533:** fix build and release pipeline ([#169](https://github.com/mojaloop/mojaloop-simulator/issues/169)) ([52a7572](https://github.com/mojaloop/mojaloop-simulator/commit/52a757286c31e1a77100eabf291bdbb35b9ef0d8))
+
+### [14.0.2](https://github.com/mojaloop/mojaloop-simulator/compare/v14.0.1...v14.0.2) (2023-09-26)
+
+
+### Chore
+
+* **mojaloop/#3444:** nodejs upgrade ([#168](https://github.com/mojaloop/mojaloop-simulator/issues/168)) ([6efb502](https://github.com/mojaloop/mojaloop-simulator/commit/6efb502878eba53f5ee178e3a4aac2992ea48c85)), closes [mojaloop/#3444](https://github.com/mojaloop/mojaloop-simulator/issues/3444) [mojaloop/#3444](https://github.com/mojaloop/mojaloop-simulator/issues/3444)
+
+### [14.0.1](https://github.com/mojaloop/mojaloop-simulator/compare/v14.0.0...v14.0.1) (2023-01-10)
+
+
+### Chore
+
+* **mojaloop/#3053:** update sdk backend api ([#159](https://github.com/mojaloop/mojaloop-simulator/issues/159)) ([165e08a](https://github.com/mojaloop/mojaloop-simulator/commit/165e08ac10e5dbf119b917e443b628f9ace5279e)), closes [mojaloop/#3053](https://github.com/mojaloop/mojaloop-simulator/issues/3053) [mojaloop/#3053](https://github.com/mojaloop/mojaloop-simulator/issues/3053)
+
+## [14.0.0](https://github.com/mojaloop/mojaloop-simulator/compare/v13.1.2...v14.0.0) (2022-12-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* update backend simulator api (#156)
+
+### Features
+
+* update backend simulator api ([#156](https://github.com/mojaloop/mojaloop-simulator/issues/156)) ([ff253a5](https://github.com/mojaloop/mojaloop-simulator/commit/ff253a5c9199de8aa1cdfa32740c08b64d348f35))
+
+### [13.1.2](https://github.com/mojaloop/mojaloop-simulator/compare/v13.1.1...v13.1.2) (2022-11-26)
+
+
+### Chore
+
+* **mojaloop/#2740:** add test currencies to api ([#154](https://github.com/mojaloop/mojaloop-simulator/issues/154)) ([64c80a1](https://github.com/mojaloop/mojaloop-simulator/commit/64c80a12559276da74617b6cdeff5a27e10c9e81)), closes [mojaloop/#2740](https://github.com/mojaloop/mojaloop-simulator/issues/2740)
+
+### [13.1.1](https://github.com/mojaloop/mojaloop-simulator/compare/v13.1.0...v13.1.1) (2022-11-22)
+
+
+### Chore
+
+* bump logger and change logger statements for valid json ([#153](https://github.com/mojaloop/mojaloop-simulator/issues/153)) ([6583dec](https://github.com/mojaloop/mojaloop-simulator/commit/6583dec2e76ec45bd100650813bee905eb94ca9a))
+
+## [13.1.0](https://github.com/mojaloop/mojaloop-simulator/compare/v13.0.1...v13.1.0) (2022-11-17)
+
+
+### Features
+
+* **mojaloop/#2928:** upgrade logger to central-services-logger ([#148](https://github.com/mojaloop/mojaloop-simulator/issues/148)) ([8a1573e](https://github.com/mojaloop/mojaloop-simulator/commit/8a1573ec984d994777de773a678024476dc0fb35)), closes [mojaloop/#2928](https://github.com/mojaloop/mojaloop-simulator/issues/2928)
+
+### [13.0.1](https://github.com/mojaloop/mojaloop-simulator/compare/v13.0.0...v13.0.1) (2022-09-08)
+
+
+### Bug Fixes
+
+* **mojaloop/#2734:** failures in daily cron job running gp tests ([#146](https://github.com/mojaloop/mojaloop-simulator/issues/146)) ([50ebcad](https://github.com/mojaloop/mojaloop-simulator/commit/50ebcadf961aacacebed6d5970f10944a348257c)), closes [mojaloop/#2734](https://github.com/mojaloop/mojaloop-simulator/issues/2734) [mojaloop/#2734](https://github.com/mojaloop/mojaloop-simulator/issues/2734)
+
+## [13.0.0](https://github.com/mojaloop/mojaloop-simulator/compare/v12.1.1...v13.0.0) (2022-07-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* upgrade ci, image, packages, audit (#145)
+
+### Features
+
+* upgrade ci, image, packages, audit ([#145](https://github.com/mojaloop/mojaloop-simulator/issues/145)) ([8c764a9](https://github.com/mojaloop/mojaloop-simulator/commit/8c764a990dc22a34ce53046d62056e6215e81f39))
+
+### [12.1.1](https://github.com/mojaloop/mojaloop-simulator/compare/v12.1.0...v12.1.1) (2022-05-18)
+
+## [12.1.0](https://github.com/mojaloop/mojaloop-simulator/compare/v12.0.0...v12.1.0) (2022-05-17)
+
+
+### Features
+
+* **mbp/#286:** add simulator rule to trigger patch transferState=aborted notification ([#138](https://github.com/mojaloop/mojaloop-simulator/issues/138)) ([d4a407a](https://github.com/mojaloop/mojaloop-simulator/commit/d4a407aad73c4eef353fddf324db212d97f3b3f6)), closes [mbp/#286](https://github.com/mbp/mojaloop-simulator/issues/286)
+
+
+### Chore
+
+* update and re-enable pr-tools ([#134](https://github.com/mojaloop/mojaloop-simulator/issues/134)) ([22e4f33](https://github.com/mojaloop/mojaloop-simulator/commit/22e4f335b3c6758101d22ea98a5a5c89919987a0))
+
+## [12.0.0](https://github.com/mojaloop/mojaloop-simulator/compare/v11.6.2...v12.0.0) (2022-03-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** update simulator schema for latest thirdparty api (#128)
+
+### Refactors
+
+* **api:** update simulator schema for latest thirdparty api ([#128](https://github.com/mojaloop/mojaloop-simulator/issues/128)) ([1a89bdf](https://github.com/mojaloop/mojaloop-simulator/commit/1a89bdfc6a1103c468f3bd7cfb3502627e71f983))
+
+### [11.6.2](https://github.com/mojaloop/mojaloop-simulator/compare/v11.6.1...v11.6.2) (2021-11-11)
+
+
+### Bug Fixes
+
+* **mojaloop/#2574:** sdk-scheme-adapter is not returning party sub-id ([#120](https://github.com/mojaloop/mojaloop-simulator/issues/120)) ([b0e9504](https://github.com/mojaloop/mojaloop-simulator/commit/b0e950468ceeb129dc62f7ad8fdb84c86bf12749)), closes [mojaloop/#2574](https://github.com/mojaloop/mojaloop-simulator/issues/2574) [mojaloop/#2574](https://github.com/mojaloop/mojaloop-simulator/issues/2574) [mojaloop/#2575](https://github.com/mojaloop/mojaloop-simulator/issues/2575)
+
+### [11.6.1](https://github.com/mojaloop/mojaloop-simulator/compare/v11.6.0...v11.6.1) (2021-10-12)
+
+
+### Bug Fixes
+
+* **api:** fix issues with thirdparty api after merge issues ([#119](https://github.com/mojaloop/mojaloop-simulator/issues/119)) ([e6f9ba0](https://github.com/mojaloop/mojaloop-simulator/commit/e6f9ba07aa5378148c6bfd5d83099216b852fc44))
+
+## [11.6.0](https://github.com/mojaloop/mojaloop-simulator/compare/v11.5.1...v11.6.0) (2021-10-11)
+
+
+### Features
+
+* **int:** add integration tests ([#118](https://github.com/mojaloop/mojaloop-simulator/issues/118)) ([823d4a2](https://github.com/mojaloop/mojaloop-simulator/commit/823d4a2399dbffa834e8f285aa800f260a5669a2))
+
+### [11.5.1](https://github.com/mojaloop/mojaloop-simulator/compare/v11.5.0...v11.5.1) (2021-10-08)
+
+
+### Bug Fixes
+
+* **ci:** incorrect changelog path ([#117](https://github.com/mojaloop/mojaloop-simulator/issues/117)) ([755df0d](https://github.com/mojaloop/mojaloop-simulator/commit/755df0d889c387f54d0c0e44b39d93fb751df7c5))
+
+## [11.5.0](https://github.com/mojaloop/mojaloop-simulator/compare/v11.4.3...v11.5.0) (2021-10-08)
+
+
+### Features
+
+* **pisp:** merge in pisp/master ([#115](https://github.com/mojaloop/mojaloop-simulator/issues/115)) ([9460093](https://github.com/mojaloop/mojaloop-simulator/commit/94600933bc503b15668c36b027a435d8c4bc930d)), closes [#50](https://github.com/mojaloop/mojaloop-simulator/issues/50) [#51](https://github.com/mojaloop/mojaloop-simulator/issues/51) [#52](https://github.com/mojaloop/mojaloop-simulator/issues/52) [#321](https://github.com/mojaloop/mojaloop-simulator/issues/321) [#56](https://github.com/mojaloop/mojaloop-simulator/issues/56) [#321](https://github.com/mojaloop/mojaloop-simulator/issues/321) [#64](https://github.com/mojaloop/mojaloop-simulator/issues/64) [#64](https://github.com/mojaloop/mojaloop-simulator/issues/64) [#82](https://github.com/mojaloop/mojaloop-simulator/issues/82) [#87](https://github.com/mojaloop/mojaloop-simulator/issues/87) [#1325](https://github.com/mojaloop/mojaloop-simulator/issues/1325) [#49](https://github.com/mojaloop/mojaloop-simulator/issues/49) [#53](https://github.com/mojaloop/mojaloop-simulator/issues/53) [#54](https://github.com/mojaloop/mojaloop-simulator/issues/54) [#55](https://github.com/mojaloop/mojaloop-simulator/issues/55) [#58](https://github.com/mojaloop/mojaloop-simulator/issues/58) [#48](https://github.com/mojaloop/mojaloop-simulator/issues/48) [#59](https://github.com/mojaloop/mojaloop-simulator/issues/59) [#61](https://github.com/mojaloop/mojaloop-simulator/issues/61) [#62](https://github.com/mojaloop/mojaloop-simulator/issues/62) [#63](https://github.com/mojaloop/mojaloop-simulator/issues/63) [#65](https://github.com/mojaloop/mojaloop-simulator/issues/65) [#66](https://github.com/mojaloop/mojaloop-simulator/issues/66) [#67](https://github.com/mojaloop/mojaloop-simulator/issues/67) [#68](https://github.com/mojaloop/mojaloop-simulator/issues/68) [#69](https://github.com/mojaloop/mojaloop-simulator/issues/69) [#70](https://github.com/mojaloop/mojaloop-simulator/issues/70) [#71](https://github.com/mojaloop/mojaloop-simulator/issues/71) [#74](https://github.com/mojaloop/mojaloop-simulator/issues/74) [#73](https://github.com/mojaloop/mojaloop-simulator/issues/73) [#76](https://github.com/mojaloop/mojaloop-simulator/issues/76) [Feature/#1572](https://github.com/Feature/mojaloop-simulator/issues/1572) [#75](https://github.com/mojaloop/mojaloop-simulator/issues/75) [#77](https://github.com/mojaloop/mojaloop-simulator/issues/77) [#78](https://github.com/mojaloop/mojaloop-simulator/issues/78) [#79](https://github.com/mojaloop/mojaloop-simulator/issues/79) [#81](https://github.com/mojaloop/mojaloop-simulator/issues/81) [#80](https://github.com/mojaloop/mojaloop-simulator/issues/80) [#83](https://github.com/mojaloop/mojaloop-simulator/issues/83) [#84](https://github.com/mojaloop/mojaloop-simulator/issues/84) [#85](https://github.com/mojaloop/mojaloop-simulator/issues/85) [#90](https://github.com/mojaloop/mojaloop-simulator/issues/90) [#91](https://github.com/mojaloop/mojaloop-simulator/issues/91) [#92](https://github.com/mojaloop/mojaloop-simulator/issues/92) [#94](https://github.com/mojaloop/mojaloop-simulator/issues/94) [#95](https://github.com/mojaloop/mojaloop-simulator/issues/95) [#97](https://github.com/mojaloop/mojaloop-simulator/issues/97) [#103](https://github.com/mojaloop/mojaloop-simulator/issues/103) [#105](https://github.com/mojaloop/mojaloop-simulator/issues/105) [#112](https://github.com/mojaloop/mojaloop-simulator/issues/112) [#113](https://github.com/mojaloop/mojaloop-simulator/issues/113)

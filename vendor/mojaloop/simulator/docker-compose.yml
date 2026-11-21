@@ -1,0 +1,50 @@
+services:
+  redis:
+    image: "redis:5.0.4-alpine"
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD" ,"sh", "-c", "redis-cli","ping"]
+      timeout: 20s
+      retries: 10
+      start_period: 40s
+      interval: 30s
+
+  sim:
+    container_name: simulator
+    image: "mojaloop-simulator-backend"
+    build: ./
+    env_file: ./sim-backend.env
+    volumes:
+       - ./rules/example.json:/opt/app/rules.json
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "3003:3003"
+    depends_on:
+      - scheme-adapter
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      timeout: 20s
+      retries: 10
+      start_period: 40s
+      interval: 30s
+
+  scheme-adapter:
+    container_name: scheme-adapter
+    image: "mojaloop/sdk-scheme-adapter:latest"
+    env_file: ./scheme-adapter.env
+    ports:
+      - "3500:3000"
+      - "3501:4000"
+    volumes:
+      - ./test/secrets:/opt/app/secrets
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4001/',(r)=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      timeout: 20s
+      retries: 10
+      start_period: 40s
+      interval: 30s

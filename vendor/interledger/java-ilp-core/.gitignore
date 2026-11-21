@@ -1,0 +1,16 @@
+/bin/
+/.gradle/
+/build/
+/.nb-gradle/
+/target/
+.classpath
+.project
+.settings/*
+*~
+
+# OSX
+**/.DS_Store
+/*.iml
+/.idea
+/classes
+/out

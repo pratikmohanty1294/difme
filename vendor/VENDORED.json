@@ -53,5 +53,30 @@
     "tag": "(no release tag; pinned by commit)",
     "commit": "accaf2d69e8fe6d091ba11be7f19a934d0385660",
     "kept_only": "orchestration/feel"
+  },
+  "ph-ee-mojaloop": {
+    "upstream": "https://github.com/openMF/ph-ee-connector-mojaloop-java",
+    "tag": "v1.5.2",
+    "commit": "f18d1685aa6b24d15803c22bdbc4fc5c786c0d0b"
+  },
+  "ml-ttk": {
+    "upstream": "https://github.com/mojaloop/ml-testing-toolkit",
+    "tag": "v18.19.2",
+    "commit": "02d25f32997686b9c4c5c6b9d80c34202f9beea3"
+  },
+  "ml-simulator": {
+    "upstream": "https://github.com/mojaloop/mojaloop-simulator",
+    "tag": "v15.5.5",
+    "commit": "eb4c55aec5cc54d089529e37f821dfa16f6a71ce"
+  },
+  "ml-sdk-adapter": {
+    "upstream": "https://github.com/mojaloop/sdk-scheme-adapter",
+    "tag": "v24.20.0",
+    "commit": "b5487dcb02798d12d6e80f39ebaf7e0b88e94402"
+  },
+  "java-ilp-core": {
+    "upstream": "https://github.com/interledger/java-ilp-core",
+    "tag": "(no release tag; pinned by commit)",
+    "commit": "de476cd39c2fe6073e5eca2f504ec64ce56b41ee"
   }
 }

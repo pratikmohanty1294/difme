@@ -1,22 +1,38 @@
 // Builds the Mifos PH-EE connectors against the vendored ph-ee-connector-common (vendor/mifos-ph-ee/connector-common,
 // published to mavenLocal first) instead of the SNAPSHOTs upstream pulls from a third-party Artifactory, and on Fluxnova
 // instead of Zeebe: the Zeebe client is replaced by services/zeebe-on-fluxnova (same API subset, Fluxnova REST).
-allprojects {
-    repositories {
-        mavenLocal()
-    }
-    configurations.configureEach {
-        resolutionStrategy.eachDependency { details ->
+// DIFME's dependency rules. Registered twice: now, and again after each project is evaluated, because Spring's
+// dependency-management plugin adds a rule that re-applies declared versions and rules run in registration order.
+def difmeRules = { details ->
             // Module and version together: Spring's dependency management re-applies Zeebe's version after a plain substitution.
             if (details.requested.group == 'io.camunda' && details.requested.name == 'zeebe-client-java') {
                 details.useTarget 'dev.difme:zeebe-client-fluxnova:1.0.0'
                 details.because 'Fluxnova replaces Zeebe (DIFME)'
             }
+            // Not open source ("All Rights Reserved ... use is prohibited without permission"): replaced by DIFME's
+            // FSPIOP models written from the Mojaloop API specification (services/fspiop-ilp-models) + vendored
+            // interledger java-ilp-core (Apache-2.0).
+            if (details.requested.group == 'org.mifos' && details.requested.name == 'interop-ilp-conditions') {
+                details.useTarget 'dev.difme:fspiop-ilp-models:1.0.0'
+                details.because 'licence: interop-ilp-conditions is not open source (DIFME)'
+            }
+            // org.json before 20231013 is under the JSON License ("Good, not Evil"), not OSI; later releases are public domain.
+            if (details.requested.group == 'org.json' && details.requested.name == 'json') {
+                details.useVersion '20240303'
+                details.because 'licence: public-domain release (DIFME)'
+            }
             if (details.requested.group == 'org.mifos' && details.requested.name == 'ph-ee-connector-common') {
                 details.useVersion '1.9.1-SNAPSHOT'
                 details.because 'vendored connector-common (DIFME)'
             }
-        }
+}
+
+allprojects {
+    repositories {
+        mavenLocal()
+    }
+    configurations.configureEach {
+        resolutionStrategy.eachDependency difmeRules
     }
 }
 
@@ -44,5 +60,11 @@ allprojects {
 allprojects {
     if (project.name == 'ph-ee-connector-common') {
         configurations.configureEach { exclude group: 'io.camunda', module: 'zeebe-client-java' }
+    }
+}
+
+allprojects {
+    afterEvaluate {
+        configurations.configureEach { resolutionStrategy.eachDependency difmeRules }
     }
 }

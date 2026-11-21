@@ -1,0 +1,40 @@
+{
+  "exceptions": {
+    "@mojaloop/sdk-scheme-adapter@0.0.0-use.local": {
+      "reason": "this repo's own workspace root package; Apache-2.0 per its package.json/LICENSE, blank in the SBOM's workspace-root metadata",
+      "expires": "2027-07-22"
+    },
+    "@rollup/rollup-linux-x64-musl@4.62.0": {
+      "reason": "MIT per npm registry metadata (rollup/rollup monorepo); optional platform binary ships a blank package.json license field",
+      "expires": "2027-07-22"
+    },
+    "react-is@18.3.1": {
+      "reason": "MIT licensed (React, https://github.com/facebook/react LICENSE) but syft reads the license as empty from the lock metadata. Transitive dev-only dependency (pretty-format via jest). Verified 2026-07-07.",
+      "expires": "2026-12-31"
+    },
+    "@rollup/rollup-linux-x64-musl@4.62.2": {
+      "reason": "MIT per npm registry metadata (rollup/rollup monorepo); optional platform binary ships a blank package.json license field",
+      "expires": "2027-07-22"
+    },
+    "ajv-draft-04@1.0.0": {
+      "reason": "MIT per npm registry metadata (ajv-validator/ajv-draft-04); ships a blank package.json license field",
+      "expires": "2027-07-22"
+    },
+    "pause-stream@0.0.11": {
+      "reason": "dual-licensed MIT/Apache2 per npm registry metadata (dominictarr/pause-stream, via event-stream); declares a non-SPDX license array the SBOM can't parse",
+      "expires": "2027-07-22"
+    },
+    "react-is@19.2.8": {
+      "reason": "MIT licensed (React, https://github.com/facebook/react LICENSE) but syft reads the license as empty from the lock metadata. Transitive dev-only dependency (pretty-format via jest). Verified 2026-07-30.",
+      "expires": "2026-12-31"
+    },
+    "react-is@19.3.0": {
+      "reason": "MIT licensed (React, https://github.com/facebook/react LICENSE) but syft reads the license as empty from the lock metadata. Transitive dev-only dependency (pretty-format via jest). Verified 2026-09-16.",
+      "expires": "2027-12-31"
+    },
+    "glob-promise@3.4.0": {
+      "reason": "ISC per its own package.json (installed under @redocly/openapi-cli's node_modules) but syft reads the license as empty from the lock metadata. Transitive dependency of @redocly/openapi-cli. Verified 2026-09-16.",
+      "expires": "2027-12-31"
+    }
+  }
+}

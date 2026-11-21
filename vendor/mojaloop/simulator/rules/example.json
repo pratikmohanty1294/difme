@@ -1,0 +1,189 @@
+[
+  {
+    "ruleId": 1,
+    "description": "Returns an NDC exceeded error response (ML error 4001) from the simulator when transfer value is 123 in any currency",
+    "conditions": {
+      "all": [
+        {
+          "fact": "path",
+          "operator": "equal",
+          "value": "/transfers"
+        },
+        {
+          "fact": "method",
+          "operator": "equal",
+          "value": "POST"
+        },
+        {
+          "fact": "body",
+          "operator": "equal",
+          "value": "123",
+          "path": "$.amount"
+        }
+      ]
+    },
+    "event": {
+      "type": "simulateError",
+      "params": {
+        "statusCode": 500,
+        "body": {
+          "statusCode": "4001",
+          "message": "Payer FSP insufficient liquidity"
+        }
+      }
+    }
+  },
+  {
+    "ruleId": 2,
+    "description": "Amend the extensionList in the quote response response when the amount is 111",
+    "conditions": {
+      "all": [
+        {
+          "fact": "path",
+          "operator": "equal",
+          "value": "/quoterequests"
+        },
+        {
+          "fact": "method",
+          "operator": "equal",
+          "value": "POST"
+        },
+        {
+          "fact": "body",
+          "operator": "equal",
+          "value": "111",
+          "path": "$.amount"
+        }
+      ]
+    },
+    "event": {
+      "type": "simulateResponse",
+      "params": {
+        "modifyExtension": "merge/replace",
+        "statusCode": 200,
+        "extensionList":{
+          "extension":[
+             {
+                "key":"KYCPayerIDType",
+                "value":"DRIVERSLICENSE"
+             },
+             {
+                "key":"KYCPayerIDValue",
+                "value":"11111111111111"
+             },
+             {
+                "key":"KYCPayerTransferReason",
+                "value":"Tacos"
+             }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "ruleId": 3,
+    "description": "validate consentRequests - WEB",
+    "conditions": {
+      "all": [
+        {
+          "fact": "path",
+          "operator": "equal",
+          "value": "/validateConsentRequests"
+        },
+        {
+          "fact": "method",
+          "operator": "equal",
+          "value": "POST"
+        },
+        {
+          "fact": "body",
+          "operator": "equal",
+          "value": "b51ec534-ee48-4575-b6a9-ead2955b8069",
+          "path": "$.consentRequestId"
+        }
+      ]
+    },
+    "event": {
+      "type": "FIXED_CALLBACK",
+      "params": {
+        "statusCode": 200,
+        "body": {
+          "isValid": true,
+          "data": {
+            "authChannels": [
+              "WEB"
+            ],
+            "authUri": "http://localhost:6060/admin/dfsp/authorize?consentRequestId=b51ec534-ee48-4575-b6a9-ead2955b8069&callbackUri=http://localhost:42181/flutter-web-auth.html"
+          }
+        }
+      }
+    }
+  },
+  {
+    "ruleId": 4,
+    "description": "verify received thirdparty transaction request",
+    "conditions": {
+      "all": [
+        {
+          "fact": "path",
+          "operator": "equal",
+          "value": "/validate-thirdparty-transaction-request"
+        },
+        {
+          "fact": "method",
+          "operator": "equal",
+          "value": "POST"
+        }
+      ]
+    },
+    "event": {
+      "type": "FIXED_CALLBACK",
+      "params": {
+        "statusCode": 200,
+        "body": {
+          "isValid": true,
+          "payerPartyIdInfo": {
+            "partyIdType": "MSISDN",
+            "partyIdentifier": "123456789",
+            "fspId": "dfspa"
+          },
+          "consentId": "46876aac-5db8-4353-bb3c-a6a905843ce7"
+        }
+      }
+    }
+  },
+  {
+    "ruleId": 5,
+    "description": "Returns an invalid fulfillment from the simulator when transfer value is 123456789 in any currency",
+    "conditions": {
+      "all": [
+        {
+          "fact": "path",
+          "operator": "equal",
+          "value": "/transfers"
+        },
+        {
+          "fact": "method",
+          "operator": "equal",
+          "value": "POST"
+        },
+        {
+          "fact": "body",
+          "operator": "equal",
+          "value": "123456789",
+          "path": "$.amount"
+        }
+      ]
+    },
+    "event": {
+      "type": "simulateResponse",
+      "params": {
+        "statusCode": 200,
+        "body": {
+          "homeTransactionId": "274107e7-cac7-427b-8485-065c919db2e6",
+          "fulfilment": "Lw8ygZt5_ZxQ9uPDoT0pSezu7Jyj_CNtmvFFZMgJHo5"
+        }
+      }
+    }
+  }
+]

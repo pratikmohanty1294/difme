@@ -22,6 +22,15 @@ case "$what" in
   ph-ee-ams-mifos) repo=openMF/ph-ee-connector-ams-mifos; dest=vendor/mifos-ph-ee/connector-ams-mifos ;;
   # The BPMN flows only; the rest of env-labs is their own cluster's Helm/env config.
   ph-ee-flows)     repo=openMF/ph-ee-env-labs;            dest=vendor/mifos-ph-ee/flows; keep=orchestration/feel ;;
+  ph-ee-mojaloop)  repo=openMF/ph-ee-connector-mojaloop-java; dest=vendor/mifos-ph-ee/connector-mojaloop ;;
+  # Interledger codecs (Apache-2.0) at the 0.6.1 API PH-EE's Mojaloop connector was written against (no release tag:
+  # pinned by commit). Replaces the jar bundled in interop-ilp-conditions, whose licence forbids use without permission.
+  java-ilp-core)   repo=interledger/java-ilp-core;     dest=vendor/interledger/java-ilp-core ;;
+  # Mojaloop (Apache-2.0; owner 2026-11-21): the Testing Toolkit plays the central switch, mojaloop-simulator the other bank.
+  ml-ttk)          repo=mojaloop/ml-testing-toolkit;  dest=vendor/mojaloop/testing-toolkit ;;
+  ml-simulator)    repo=mojaloop/mojaloop-simulator;  dest=vendor/mojaloop/simulator ;;
+  # Speaks FSPIOP to the switch for the simulated bank (mojaloop-simulator is the bank's back end behind it).
+  ml-sdk-adapter)  repo=mojaloop/sdk-scheme-adapter;  dest=vendor/mojaloop/sdk-scheme-adapter ;;
   *) echo "unknown target $what"; exit 1 ;;
 esac
 tmp=$(mktemp -d)
@@ -37,7 +46,8 @@ rm -rf "$dest" && mkdir -p "$dest"
 rm -rf "$dest/.github" "$dest/.circleci" "$dest/CLAUDE.md" "$dest/AGENTS.md" "$dest/.claude" "$dest/.cursor" "$dest/.devcontainer"
 find "$dest" -name CLAUDE.md -o -name AGENTS.md | xargs -r rm -f
 # Private keys (upstream dev TLS stores and the like) are never committed, wherever they sit in the tree.
-find "$dest" \( -name '*.jks' -o -name '*.p12' -o -name '*.pfx' -o -name '*.key' \) -print -delete
+${PYTHON:-python3} ci/find-private-keys.py "$dest" | while IFS= read -r k; do echo "dropped private key: $k"; rm -f "$k"; done
+find "$dest" -name '*.key' -size +0 -print -delete   # key files with other encodings
 for p in "${prune[@]}"; do rm -rf "${dest:?}/$p"; done
 rm -rf "$tmp"
 ${PYTHON:-python3} - "$what" "$repo" "$tag" "$sha" "${prune[*]:-}" "$keep" <<'PY'

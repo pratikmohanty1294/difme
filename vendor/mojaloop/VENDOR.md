@@ -1,0 +1,22 @@
+# Mojaloop (vendored)
+
+The settlement leg's central switch and the other bank (owner decision 2026-11-21). Licence: Apache-2.0 (each
+directory's `LICENSE.md`). Pinned versions and commits: `vendor/VENDORED.json`.
+
+| Directory | Upstream | Role in DIFME |
+|---|---|---|
+| `testing-toolkit` | mojaloop/ml-testing-toolkit v18.19.2 | The central switch, in hub mode: routes FSPIOP requests and callbacks between participants by rules (party lookup by identifier range, quotes/transfers by `FSPIOP-Destination`) |
+| `sdk-scheme-adapter` | mojaloop/sdk-scheme-adapter v24.20.0 | The other bank's connection to the switch (FSPIOP in/out); only `modules/api-svc` is installed |
+| `simulator` | mojaloop/mojaloop-simulator v15.5.5 | The other bank's core banking behind the scheme adapter (parties, quotes, transfers) |
+
+DIFME connects through Mifos PH-EE's own Mojaloop connector (`vendor/mifos-ph-ee/connector-mojaloop`).
+
+Not committed: upstream private keys and test key stores (`ci/vendor-sync.sh` drops them; `ci/find-private-keys.py`).
+
+Local changes:
+- `simulator/package-lock.json` regenerated (`npm install --package-lock-only`): upstream's lock at v15.5.5 is out of
+  sync with its package.json (missing argparse 1.0.10, sprintf-js 1.0.3), so `npm ci` refuses it.
+
+Installing: `npm ci --omit=dev --ignore-scripts` (testing-toolkit, simulator); the scheme adapter with its bundled Yarn
+(`node .yarn/releases/yarn-4.18.0.cjs workspaces focus @mojaloop/sdk-scheme-adapter-api-svc --production`; corepack
+would download Yarn from a host the session blocks).

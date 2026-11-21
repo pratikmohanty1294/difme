@@ -13,3 +13,6 @@ How DIFME runs it (no change to this tree):
   overrides (`deploy/platform/rails/hyperswitch/hyperswitch.yaml`).
 - Schema: `deploy/images/hyperswitch/migrate.sh` applies `migrations/` with psql and records versions in diesel's
   `__diesel_schema_migrations`, so diesel_cli could take over unchanged.
+
+Reviewed: `crates/router/src/services/encryption.rs` embeds RSA test keys inside `#[cfg(test)]` (unit-test
+fixtures, not compiled into the router). Kept: removing them means editing upstream source.

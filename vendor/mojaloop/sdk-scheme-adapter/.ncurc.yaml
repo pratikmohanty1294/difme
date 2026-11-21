@@ -1,0 +1,23 @@
+## Each rejected dependency upgrade below has a comment stating the reason (exact empirical error or policy) and what unblocks it.
+reject: [
+  ## Effectively pinned to 17.10.3 via root package.json "resolutions"; 18.x changes the outbound OpenAPI snippets and empirically breaks api-svc unit tests
+  ## (8 failures "The response was not valid." in test/unit/api/{transfers,accounts} response validation against sdk-scheme-adapter-outbound-v2_1_0-openapi3-snippets.yaml, re-verified 2026-07 with 18.4.0).
+  '@mojaloop/api-snippets',
+  ## Between version 0.2.15-0.2.21 there is a breaking change that results in a segmentation fault.
+  '@mojaloop/platform-shared-lib-nodejs-kafka-client-lib',
+  ## The kafka connectivity is not working properly and the newer versions cause a service crash at startup.
+  '@mojaloop/logging-bc-client-lib',
+  ## The new version of npm-check-updates uses new Glob v9.x and it is introducing a dependency Package "path-scurry@1.6.1" which is licensed under "BlueOak-1.0.0" which is not permitted by the Mojaloop License Policy.
+  'npm-check-updates',
+  ## express 5 changes routing/middleware semantics (path-to-regexp v8 route syntax, removed API aliases) and is not compatible with the current api-svc and event-handler servers.
+  "express",
+  ## uuid >=12 ships as ESM-only; private-shared-lib and its consumers are compiled to CommonJS, and require('uuid') of the ESM-only build fails under the jest CJS module loader (ERR_REQUIRE_ESM).
+  "uuid",
+  ## @types/node must stay on the 24.x line: its major must match the .nvmrc runtime major (24.18.0); higher majors only weaken type checking (tsc would accept Node-26-only APIs that crash at runtime - an untestable failure mode).
+  "@types/node",
+  ## typescript 7.x is the native compiler port and drops lib/_tsc.js, which breaks Yarn's builtin
+  ## compat/typescript patch at install time (ENOENT ...typescript/lib/_tsc.js). It is also outside the peer
+  ## range of @typescript-eslint 8.63 (typescript <6.1.0) and ts-jest 29. Revisit when @typescript-eslint
+  ## and ts-jest publish TypeScript 7 support.
+  "typescript"
+]

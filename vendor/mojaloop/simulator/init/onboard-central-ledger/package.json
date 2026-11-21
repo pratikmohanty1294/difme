@@ -1,0 +1,35 @@
+{
+  "name": "onboard-central-ledger",
+  "version": "11.0.3",
+  "description": "",
+  "main": "onboard-dfsp.js",
+  "dependencies": {
+    "@mojaloop/finance-portal-lib": "1.0.0",
+    "node-fetch": "3.3.2",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "audit-ci": "7.1.0",
+    "eslint": "9.27.0",
+    "eslint-plugin-import": "2.31.0"
+  },
+  "overrides": {
+    "minimist": "1.2.8",
+    "node-fetch": "3.3.2",
+    "minimatch": "3.1.5",
+    "flatted": "3.4.2",
+    "js-yaml": "4.3.2"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "start": "node onboard-dfsp.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dep:check": "npx ncu -e 2",
+    "dep:update": "npx ncu -u",
+    "audit:check": "npx audit-ci",
+    "audit:fix": "npm audit fix"
+  },
+  "author": "Kamuela Franco <kamuela.franco@modusbox.com>",
+  "license": "Apache-2.0"
+}

@@ -60,7 +60,10 @@ spec:
         - name: iso-adapter
           image: ghcr.io/pratikmohanty1294/difme-scheme-sim:0.1.0
           command: [/usr/local/bin/iso-adapter]
-          env: [{ name: NETWORK_ADDR, value: "scheme-sim.rails.svc:8583" }]
+          env:
+            - { name: NETWORK_ADDR, value: "scheme-sim.rails.svc:8583" }
+            # Acquirer for the PSP simulator (/dummy-connector): Hyperswitch's connector account sends this api-key.
+            - { name: ACQUIRER_API_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: acquirer-api-key } } }
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 15 }   # an ISO echo test to the network
           securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }

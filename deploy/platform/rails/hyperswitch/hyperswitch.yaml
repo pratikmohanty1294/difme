@@ -62,6 +62,8 @@ spec:
             - { name: ROUTER__SECRETS__JWT_SECRET, valueFrom: { secretKeyRef: { name: hyperswitch, key: jwt-secret } } }
             - { name: ROUTER__SECRETS__MASTER_ENC_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: master-enc-key } } }
             - { name: ROUTER__API_KEYS__HASH_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: api-key-hash-key } } }
+            # Card payments: the test processor's calls go to DIFME's acquirer, which sends them over ISO 8583 to the scheme.
+            - { name: ROUTER__CONNECTORS__DUMMYCONNECTOR__BASE_URL, value: "http://iso-adapter.rails.svc:8080/dummy-connector" }
             - { name: ROUTER__LOG__CONSOLE__LEVEL, value: INFO }
             - { name: ROUTER__LOG__TELEMETRY__METRICS_ENABLED, value: "false" }
             - { name: ROUTER__SERVER__WORKERS, value: "2" }

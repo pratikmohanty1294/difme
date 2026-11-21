@@ -31,17 +31,26 @@ func setup(t *testing.T) (*scheme.Network, *httptest.Server, *httptest.Server) {
 			t.Fatal(err)
 		}
 	}
+	ad := httptest.NewServer(adapter.HTTP(adapter.NewClient(startISO(t, n), 3*time.Second)))
+	admin := httptest.NewServer(server.Admin(n))
+	t.Cleanup(ad.Close)
+	t.Cleanup(admin.Close)
+	return n, ad, admin
+}
+
+var isoAddr string // the most recent network started (tests run sequentially)
+
+// startISO serves the network's ISO 8583 side on a random port and returns its address.
+func startISO(t *testing.T, n *scheme.Network) string {
+	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { l.Close() })
 	go server.ServeISO(l, n)
-	ad := httptest.NewServer(adapter.HTTP(adapter.NewClient(l.Addr().String(), 3*time.Second)))
-	admin := httptest.NewServer(server.Admin(n))
-	t.Cleanup(ad.Close)
-	t.Cleanup(admin.Close)
-	return n, ad, admin
+	isoAddr = l.Addr().String()
+	return isoAddr
 }
 
 func post(t *testing.T, url string, body any) (int, map[string]any) {

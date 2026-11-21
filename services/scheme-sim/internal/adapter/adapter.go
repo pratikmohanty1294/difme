@@ -174,6 +174,29 @@ func (c *Client) Reverse(rrn string, amountMinor int64) (AuthResult, error) {
 	return AuthResult{Approved: rc == "00", ResponseCode: rc, RRN: rrn, STAN: stan}, nil
 }
 
+// Refund sends a 0200 credit (processing code 200000) for part or all of an earlier purchase, identified by its RRN.
+func (c *Client) Refund(origRRN, pan string, amountMinor int64, currency, merchantID string) (AuthResult, error) {
+	if currency == "" {
+		currency = "356"
+	}
+	now := time.Now().UTC()
+	stan := c.nextSTAN()
+	m := iso8583.NewMessage(wire.Spec)
+	m.MTI("0200")
+	for f, v := range map[int]string{2: pan, 3: "200000", 4: fmt.Sprintf("%012d", amountMinor), 7: now.Format("0102150405"),
+		11: stan, 37: origRRN, 41: fmt.Sprintf("%-8.8s", "DIFME001"), 42: fmt.Sprintf("%-15.15s", merchantID), 49: currency} {
+		if err := m.Field(f, v); err != nil {
+			return AuthResult{}, fmt.Errorf("field %d: %w", f, err)
+		}
+	}
+	resp, err := c.Send(m)
+	if err != nil {
+		return AuthResult{}, err
+	}
+	rc := wire.Get(resp, 39)
+	return AuthResult{Approved: rc == "00", ResponseCode: rc, AuthCode: wire.Get(resp, 38), RRN: wire.Get(resp, 37), STAN: stan}, nil
+}
+
 // Echo sends 0800 (network management) to check the link.
 func (c *Client) Echo() error {
 	m := iso8583.NewMessage(wire.Spec)

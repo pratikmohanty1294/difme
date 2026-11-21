@@ -55,7 +55,11 @@ type Txn struct {
 	RRN          string    `json:"rrn"`
 	AuthCode     string    `json:"authCode,omitempty"`
 	ResponseCode string    `json:"responseCode"`
-	State        string    `json:"state"` // AUTHORISED, DECLINED, REVERSED
+	State        string    `json:"state"` // AUTHORISED, DECLINED, REVERSED, REFUNDED (a refund credit)
+	OriginalRRN  string    `json:"originalRrn,omitempty"` // refunds: the purchase they credit back
+
+	pan           string // full PAN, never serialised: reversals and refunds find the card by it, not by the mask
+	refundedMinor int64  // purchases: total credited back so far
 }
 
 // Network is the simulated scheme plus issuers. Safe for concurrent use.
@@ -160,7 +164,12 @@ func (n *Network) Handle(req *iso8583.Message) (*iso8583.Message, error) {
 		} else {
 			resp.MTI("0210")
 		}
-		t := n.authorise(req, mti)
+		var t *Txn
+		if strings.HasPrefix(wire.Get(req, 3), "20") { // processing code 20xxxx: refund (credit to the card)
+			t = n.refund(req, mti)
+		} else {
+			t = n.authorise(req, mti)
+		}
 		if t.RRN != "" {
 			_ = resp.Field(37, t.RRN)
 		}
@@ -190,6 +199,7 @@ func (n *Network) authorise(req *iso8583.Message, mti string) *Txn {
 	}
 	t := &Txn{At: n.now(), MTI: mti, PAN: Mask(pan), AmountMinor: amount, Currency: wire.Get(req, 49), MCC: wire.Get(req, 18),
 		Merchant: wire.Get(req, 42), STAN: stan, State: "DECLINED"}
+	t.pan = pan
 	c, ok := n.cards[pan]
 	switch {
 	case stan == "" || pan == "" || aerr != nil:
@@ -223,6 +233,46 @@ func (n *Network) authorise(req *iso8583.Message, mti string) *Txn {
 	return t
 }
 
+// refund credits part or all of an earlier approved purchase back to its card: field 37 carries the purchase's RRN,
+// field 2 must be that purchase's card, and the credits on one purchase never add up to more than it.
+func (n *Network) refund(req *iso8583.Message, mti string) *Txn {
+	pan, stan, term, orig := wire.Get(req, 2), wire.Get(req, 11), wire.Get(req, 41), wire.Get(req, 37)
+	amount, aerr := strconv.ParseInt(strings.TrimLeft(wire.Get(req, 4), "0")+"0", 10, 64)
+	amount /= 10
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	key := term + "|" + stan
+	if prev, ok := n.seen[key]; ok && prev.PAN == Mask(pan) && prev.AmountMinor == amount {
+		return prev // retransmission: same answer, no second credit
+	}
+	t := &Txn{At: n.now(), MTI: mti, PAN: Mask(pan), AmountMinor: amount, Currency: wire.Get(req, 49), Merchant: wire.Get(req, 42),
+		STAN: stan, OriginalRRN: orig, State: "DECLINED", pan: pan}
+	p, ok := n.byRRN[orig]
+	switch {
+	case stan == "" || pan == "" || orig == "" || aerr != nil:
+		t.ResponseCode = FormatError
+	case !ok || p.pan != pan:
+		t.ResponseCode = UnableToLocate
+	case p.State != "AUTHORISED":
+		t.ResponseCode = DoNotHonour // reversed purchases have nothing left to refund
+	case amount <= 0 || p.refundedMinor+amount > p.AmountMinor:
+		t.ResponseCode = InvalidAmount
+	default:
+		p.refundedMinor += amount
+		if c, ok := n.cards[pan]; ok {
+			c.OutstandingMinor -= amount
+			if c.OutstandingMinor < 0 {
+				c.OutstandingMinor = 0
+			}
+		}
+		t.ResponseCode, t.State, t.AuthCode = Approved, "REFUNDED", digits(6)
+	}
+	t.RRN = digits(12)
+	n.seen[key] = t
+	n.record(t)
+	return t
+}
+
 func (n *Network) reverse(req *iso8583.Message) string {
 	rrn := wire.Get(req, 37)
 	n.mu.Lock()
@@ -239,13 +289,10 @@ func (n *Network) reverse(req *iso8583.Message) string {
 		n.record(r)
 		return Approved
 	}
-	for pan, c := range n.cards {
-		if Mask(pan) == t.PAN {
-			c.OutstandingMinor -= t.AmountMinor
-			if c.OutstandingMinor < 0 {
-				c.OutstandingMinor = 0
-			}
-			break
+	if c, ok := n.cards[t.pan]; ok {
+		c.OutstandingMinor -= t.AmountMinor - t.refundedMinor // what a refund already credited isn't released twice
+		if c.OutstandingMinor < 0 {
+			c.OutstandingMinor = 0
 		}
 	}
 	t.State = "REVERSED"

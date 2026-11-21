@@ -45,7 +45,7 @@ secret database-tier fineract-db password="$FINERACT_PG"
 HYPERSWITCH_PG=$(rand)
 hex32() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }   # Hyperswitch wants 32-byte hex keys
 secret rails         hyperswitch db-password="$HYPERSWITCH_PG" admin-api-key="$(rand 32)" jwt-secret="$(rand 48)" \
-                     master-enc-key="$(hex32)" api-key-hash-key="$(hex32)"
+                     master-enc-key="$(hex32)" api-key-hash-key="$(hex32)" acquirer-api-key="$(rand 32)"
 secret database-tier hyperswitch-db password="$HYPERSWITCH_PG"
 APICURIO_PG=$(rand)
 secret streaming     apicurio-db password="$APICURIO_PG"

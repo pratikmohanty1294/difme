@@ -158,8 +158,16 @@ def cargo_packages():
 def go_packages():
     out = {}
     for mod in ROOT.glob("services/*/go.mod"):
-        r = subprocess.run(["go", "list", "-m", "-json", "all"], cwd=mod.parent, capture_output=True, text=True,
+        # Work on a temporary copy of go.mod/go.sum: listing all modules may add go.sum lines, never in the repo.
+        import shutil, tempfile
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        shutil.copy(mod, tmp / "go.mod")
+        if (mod.parent / "go.sum").exists():
+            shutil.copy(mod.parent / "go.sum", tmp / "go.sum")
+        r = subprocess.run(["go", "list", "-m", "-json", f"-modfile={tmp / 'go.mod'}", "all"], cwd=mod.parent,
+                           capture_output=True, text=True,
                            env={**__import__("os").environ, "GOTOOLCHAIN": "auto", "GOFLAGS": "-mod=mod"}, timeout=600)
+        shutil.rmtree(tmp, ignore_errors=True)
         dec = json.JSONDecoder()
         s, i = r.stdout, 0
         while i < len(s):

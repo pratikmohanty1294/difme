@@ -12,6 +12,7 @@ import { CustomRulesEditor } from './CustomRulesEditor';
 import { RuleResultView, SOURCE } from '../../components/RuleResultView';
 import { vic, type VicResult } from '../../sim/vic';
 import { VicCallView } from '../../components/VicCallView';
+import { LIVE } from '../../api/exchange';
 
 import { MCC_CATEGORIES as CATS, parseDelegation, type Delegation as Parsed } from '../../sim/nl';
 
@@ -39,7 +40,8 @@ export default function MandateFactory() {
   // Custom fields and rules: compiled to a DMN decision and run in the rule engine at every auction.
   const [draftId] = useState(() => `M-2026-${8830 + Math.floor(Math.random() * 160)}`);
   const [custom, setCustom] = useState<CustomTable>(DEFAULT_CUSTOM);
-  const [useCustom, setUseCustom] = useState(true);
+  // Live: the exchange doesn't enforce partner custom rules yet, so they can't be switched on (they'd be shown, not applied).
+  const [useCustom, setUseCustom] = useState(!LIVE);
   const [sample, setSample] = useState<Record<string, string | number>>(sampleOrder);
   const [customCheck, setCustomCheck] = useState<CustomResult>();
   const [deploy, setDeploy] = useState(0);
@@ -62,12 +64,14 @@ export default function MandateFactory() {
     // Step 1: the intent goes through the DMN rule engine (mandate_validation) before anything is deployed.
     setChecking(true);
     const limit = limitFor(path);
-    const r = await evaluate('mandate_validation', {
+    // Live: the exchange runs mandate_validation itself when the mandate is registered (addMandate) and answers with its
+    // findings; a browser pre-check against /api/rules would only 404 there.
+    const r = LIVE ? { ok: true } as RuleResult : await evaluate('mandate_validation', {
       maxPerOrder: rules.maxPerTx, limit, minYieldPct: rules.minYield, deposit, depositRequired: deposit,
       budgetTotal: rules.budgetTotal, merchantCount: rules.merchants.length, goodsCount: rules.goods.length, validityDays: rules.validityDays,
       cardJurisdiction: path === 'card' ? 'IN_DOMESTIC_AFA' : 'NOT_CARD',
     });
-    setCheck(r);
+    if (!LIVE) setCheck(r);
     if (!r.ok) { setChecking(false); return; }
     // Custom fields and rules: compile and run once in the rule engine; a syntax error or an unreachable engine stops the deploy.
     if (useCustom) {
@@ -241,9 +245,10 @@ export default function MandateFactory() {
           ) : (
             <div className="flex flex-col gap-4">
               <label className="flex items-start gap-2.5 text-sm">
-                <input type="checkbox" className="mt-0.5 accent-investor-600" checked={useCustom} onChange={(e) => setUseCustom(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5 accent-investor-600" checked={useCustom} disabled={LIVE} onChange={(e) => setUseCustom(e.target.checked)} />
                 <span><b>Apply these custom rules to every order</b>, on top of the standard limits. They run in the rule engine at each auction; a Reject stops your agent bidding, a Flag lets it bid and notes it.</span>
               </label>
+              {LIVE && <Callout tone="info" title="Custom rules aren't available on the live exchange yet">Your mandate uses the standard limits above, which the exchange enforces on every bid. Custom rules can be drafted here but aren't applied to live orders.</Callout>}
               <CustomRulesEditor value={custom} onChange={setCustom} sample={sample} onSample={setSample} mandateId={draftId} />
             </div>
           )}

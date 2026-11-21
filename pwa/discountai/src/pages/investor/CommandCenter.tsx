@@ -3,7 +3,8 @@ import { ArrowDownRight, ArrowUpRight, Plus, Radio } from 'lucide-react';
 import { YIELD_SERIES } from '../../sim/data';
 import { useEngine } from '../../sim/engine';
 import { time, inr, inr2 } from '../../sim/format';
-import { Badge, Card, FlowTag, Meter, PageHeader, Stat, cx } from '../../components/ui';
+import { Badge, Callout, Card, FlowTag, Meter, PageHeader, Stat, cx } from '../../components/ui';
+import { LIVE } from '../../api/exchange';
 import { href } from '../../router';
 import type { FeedItem } from '../../sim/types';
 
@@ -30,7 +31,7 @@ export default function CommandCenter() {
         actions={<a className="btn-primary" href={href('investor/factory')}><Plus size={15} /> New smart mandate</a>} />
 
       <div className="grid gap-4 grid-cols-2 xl:grid-cols-4 mb-5">
-        <Stat label="Total commerce yield" value={inr2(yieldTotal)} sub="+12.4% vs last week" tone="good" />
+        <Stat label="Total commerce yield" value={inr2(yieldTotal)} sub={LIVE ? 'as reported by the exchange' : '+12.4% vs last week'} tone="good" />
         <Stat label="Active mandates" value={<>{live.length}<span className="text-ink-400 text-lg">/{mandates.length}</span></>} sub={`${mandates.length - live.length} paused or revoked`} />
         <Stat label="Capital utilisation" value={`${limit ? Math.round((used / limit) * 100) : 0}%`} sub={`${inr(used)} of ${inr(limit)} allocated`} />
         <Stat label="Race win rate" value={races ? `${Math.round((wins / races) * 100)}%` : '—'} sub={`${wins} won of ${races} races this session`} />
@@ -42,7 +43,7 @@ export default function CommandCenter() {
             <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-investor-600" />Flow A card</span>
             <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-audit-600" />Flow B Finternet</span>
             <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-buyer-600" />Flow C UPI</span></div>}>
-            <div className="h-64 -ml-3">
+            {LIVE ? <Callout tone="info" title="No yield history yet">The exchange reports each mandate's yield so far (below); a day-by-day history appears once it keeps one.</Callout> : <div className="h-64 -ml-3">
               <ResponsiveContainer>
                 <AreaChart data={YIELD_SERIES} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#edf1f6" vertical={false} />
@@ -54,7 +55,7 @@ export default function CommandCenter() {
                   <Area type="monotone" dataKey="flowB" name="Flow B" stackId="1" stroke="#6b3fb5" fill="#ece4fa" />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
+            </div>}
           </Card>
 
           <Card title="Mandate performance" sub="Token performance per smart mandate" pad={false}>

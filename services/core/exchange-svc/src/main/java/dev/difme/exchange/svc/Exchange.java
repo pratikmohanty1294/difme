@@ -238,15 +238,29 @@ public class Exchange {
 
     /** Registered mandates (in memory for now; persistence and budget draw-down come with settlement). */
     /** A registered mandate and what the exchange tracks for it (the partner cannot misstate these). */
+    /** ACTIVE bids; PAUSED stops new bids until resumed; REVOKED (the partner terminated it) is final. */
+    public enum MandateStatus { ACTIVE, PAUSED, REVOKED }
+
     public record MandateState(String pack, ExchangeResource.Mandate terms, long registeredAtMillis, AtomicLong budgetLeftMinor,
-                               int nodeRef, java.util.concurrent.atomic.AtomicInteger awards, AtomicLong yieldEarnedMinor) {
+                               int nodeRef, java.util.concurrent.atomic.AtomicInteger awards, AtomicLong yieldEarnedMinor,
+                               java.util.concurrent.atomic.AtomicReference<MandateStatus> status) {
         public int ageDays() {
             return (int) ((System.currentTimeMillis() - registeredAtMillis) / 86_400_000L);
         }
 
-        /** Still a standing order: within its validity and with budget left. */
+        /** Still a standing order: active, within its validity and with budget left. */
         public boolean standing() {
-            return ageDays() < terms.validityDays() && budgetLeftMinor.get() > 0;
+            return status.get() == MandateStatus.ACTIVE && ageDays() < terms.validityDays() && budgetLeftMinor.get() > 0;
+        }
+
+        /** Pause, resume or revoke. Revoked is final; returns false when the change isn't allowed. */
+        public boolean setStatus(MandateStatus next) {
+            MandateStatus cur;
+            do {
+                cur = status.get();
+                if (cur == MandateStatus.REVOKED && next != MandateStatus.REVOKED) return false;
+            } while (!status.compareAndSet(cur, next));
+            return true;
         }
     }
 
@@ -273,7 +287,8 @@ public class Exchange {
     public long registerMandate(String pack, ExchangeResource.Mandate m) {
         long id = mandateIds.incrementAndGet();
         mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor()),
-                nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong()));
+                nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong(),
+                new java.util.concurrent.atomic.AtomicReference<>(MandateStatus.ACTIVE)));
         return id;
     }
 

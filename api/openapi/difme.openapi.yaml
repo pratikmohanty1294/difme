@@ -80,6 +80,22 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { $ref: "#/components/responses/ExchangeError" }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/{pack}/mandates/{mandateId}/status:
+    post:
+      operationId: setMandateStatus
+      summary: Pause (stops new bids), resume, or revoke (terminate; final) a buying partner's mandate
+      security: [{ oauth2: [exchange:write] }]
+      parameters:
+        - { name: pack, in: path, required: true, schema: { type: string } }
+        - { name: mandateId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [ACTIVE, PAUSED, REVOKED] } } } } }
+      responses:
+        "200": { description: The mandate after the change, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "404": { description: Unknown mandate }
+        "409": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/{pack}/mandates/{mandateId}:
     get:
       operationId: getMandate

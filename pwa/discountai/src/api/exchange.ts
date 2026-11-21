@@ -56,6 +56,7 @@ export interface MandateRegistered { mandateId: number; depositRequiredMinor: nu
 export interface MandateState {
   mandateId: number; partnerRef: string; nodeRef: number; standing: boolean; budgetTotalMinor: number; budgetLeftMinor: number;
   awards: number; yieldEarnedMinor: number; minYieldPct: number; ageDays: number; validityDays: number; tier: string;
+  status: 'ACTIVE' | 'PAUSED' | 'REVOKED';
 }
 
 export const exchange = {
@@ -70,6 +71,8 @@ export const exchange = {
   returnOrder: (id: number, fractionBps = 10_000) => call<ReturnResult>('POST', `/auctions/${id}/returns`, { fractionBps }),
   registerMandate: (m: MandateIn) => call<MandateRegistered>('POST', `/${PACK}/mandates`, m),
   mandate: (id: number) => call<MandateState>('GET', `/${PACK}/mandates/${id}`),
+  /** Pause (no new bids), resume, or revoke (final). */
+  setMandateStatus: (id: number, status: MandateState['status']) => call<MandateState>('POST', `/${PACK}/mandates/${id}/status`, { status }),
   /** Cheap reachability probe (the public verification keys). */
   ping: () => call<Record<string, string>>('GET', '/keys', undefined, 3000).then(() => true, () => false),
 };

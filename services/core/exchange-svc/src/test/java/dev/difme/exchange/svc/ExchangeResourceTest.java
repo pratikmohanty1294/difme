@@ -322,6 +322,30 @@ class ExchangeResourceTest {
         given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200).body("artifacts.type", hasItem("refund"));
     }
 
+    /** A paused mandate stops standing and its bids are refused; resume restores it; revoke is final. */
+    @Test
+    void mandateCanBePausedResumedAndRevoked() {
+        long m = given().contentType(ContentType.JSON).body(mandate(200_000, 5))
+                .post("/v1/exchange/fr01-buy/mandates").then().statusCode(201).extract().jsonPath().getLong("mandateId");
+        String path = "/v1/exchange/fr01-buy/mandates/" + m;
+        given().get(path).then().statusCode(200).body("status", equalTo("ACTIVE"));
+        given().contentType(ContentType.JSON).body("{\"status\":\"PAUSED\"}").post(path + "/status").then().statusCode(200)
+                .body("status", equalTo("PAUSED")).body("standing", equalTo(false));
+        long id = given().contentType(ContentType.JSON).body(intent(900, 9_500_000))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        String pausedBid = bid(71, 400_000, 90, 5_000, 6_000_000).replace("\"validityDays\": 30}", "\"validityDays\": 30, \"mandateId\": " + m + "}");
+        org.junit.jupiter.api.Assertions.assertTrue(pausedBid.contains("\"mandateId\": " + m), pausedBid);
+        given().contentType(ContentType.JSON).body(pausedBid).post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(409)
+                .body("error", equalTo("mandate is paused"));
+        given().contentType(ContentType.JSON).body("{\"status\":\"ACTIVE\"}").post(path + "/status").then().statusCode(200)
+                .body("standing", equalTo(true));
+        given().contentType(ContentType.JSON).body("{\"status\":\"REVOKED\"}").post(path + "/status").then().statusCode(200)
+                .body("status", equalTo("REVOKED")).body("standing", equalTo(false));
+        given().contentType(ContentType.JSON).body("{\"status\":\"ACTIVE\"}").post(path + "/status").then().statusCode(409);
+        given().contentType(ContentType.JSON).body("{\"status\":\"SOMETHING\"}").post(path + "/status").then().statusCode(400);
+        given().contentType(ContentType.JSON).body("{\"status\":\"PAUSED\"}").post("/v1/exchange/fr01-buy/mandates/1/status").then().statusCode(404);
+    }
+
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
                                               long amount, long deliveredAt) throws Exception {
         var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",

@@ -111,6 +111,11 @@ export function refundFor(s: Split, kind: RefundCase): Omit<RefundRecord, 'at'> 
   };
 }
 
+/** The exchange's view of a mandate as the screens show it: exhausted or expired mandates no longer bid either. */
+function liveStatus(s: { status?: string; standing: boolean }): Mandate['status'] {
+  return s.status === 'REVOKED' ? 'Revoked' : s.status === 'PAUSED' || !s.standing ? 'Paused' : 'LIVE';
+}
+
 // ---------- seed ----------
 function seedState(): State {
   const iso = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
@@ -166,9 +171,10 @@ function seedState(): State {
     config: DEFAULT_CONFIG,
     configAudit: [{ at: iso(3 * 24 * 60), who: 'ops.admin', change: 'Initial weights (A 0.5/0.4/0.1 · B 0.6/0.3/0.1 · C 0.7/0.3/0.0), Lmax 50 ms' }],
     nodes: NODES,
-    mandates: SEED_MANDATES,
-    requests,
-    feed,
+    // Role builds trade on the live exchange: start empty and show only what it reports, never demo history.
+    mandates: LIVE ? [] : SEED_MANDATES,
+    requests: LIVE ? [] : requests,
+    feed: LIVE ? [] : feed,
     regulator: [],
     notifications: [],
     guaranteeFund: 125000,
@@ -256,7 +262,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       for (const m of ref.current.mandates) {
         if (!m.exchangeMandateId) continue;
         exchange.mandate(m.exchangeMandateId).then((s) => dispatch({ type: 'patchMandate', id: m.id, patch: {
-          utilised: (s.budgetTotalMinor - s.budgetLeftMinor) / 100, yieldEarned: s.yieldEarnedMinor / 100, status: s.standing ? 'LIVE' : 'Paused',
+          utilised: (s.budgetTotalMinor - s.budgetLeftMinor) / 100, yieldEarned: s.yieldEarnedMinor / 100, status: liveStatus(s),
         } }), () => undefined);
       }
     }, 10_000);
@@ -791,7 +797,19 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'feed', item: { id: rid('f'), at: new Date().toISOString(), kind: 'mandate', text: `Mandate ${m.id} ACTIVE · deposit ${inr(deposit)} in escrow`, nodeId: you.id } });
     dispatch({ type: 'notify', notice: { id: rid('n'), at: new Date().toISOString(), party: 'Buying Partner', title: `Mandate ${m.id} is ACTIVE`, body: `${m.instrument} is live in the order book. Security deposit ${inr(deposit)} held in Agent PA/PG escrow; your agent buys for you, with no human in the loop, up to ${inr(m.maxPerTx)} per order${m.budgetTotal ? ` and ${inr(m.budgetTotal)} in total` : ''} at yield ≥ ${m.minYieldPct}%, shipping each item to the matched buyer. The instruction lasts ${m.validityDays ?? 7} days; then you approve a new one with your passkey.`, tone: 'good' } });
   }, []);
-  const patchMandate = useCallback((id: string, patch: Partial<Mandate>) => dispatch({ type: 'patchMandate', id, patch }), []);
+  const patchMandate = useCallback((id: string, patch: Partial<Mandate>) => {
+    const m = ref.current.mandates.find((x) => x.id === id);
+    if (LIVE && patch.status && m?.exchangeMandateId) {
+      // The exchange owns the mandate's state: a pause that only changed the screen would keep bidding.
+      const want = patch.status === 'LIVE' ? 'ACTIVE' : patch.status === 'Paused' ? 'PAUSED' : 'REVOKED';
+      exchange.setMandateStatus(m.exchangeMandateId, want)
+        .then((st) => dispatch({ type: 'patchMandate', id, patch: { ...patch, status: liveStatus(st) } }))
+        .catch((e) => dispatch({ type: 'notify', notice: { id: rid('n'), at: new Date().toISOString(), party: 'Buying Partner', tone: 'warn',
+          title: 'Mandate not changed', body: e instanceof ExchangeError ? (e.status === 0 ? 'The exchange is unreachable.' : e.message) : String(e) } }));
+      return;
+    }
+    dispatch({ type: 'patchMandate', id, patch });
+  }, []);
   const setSpeed = useCallback((speed: Speed) => dispatch({ type: 'speed', speed }), []);
   const reset = useCallback(() => { runId.current++; dispatch({ type: 'reset', state: seedState() }); }, []);
 

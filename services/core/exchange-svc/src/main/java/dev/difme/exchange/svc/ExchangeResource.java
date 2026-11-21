@@ -149,6 +149,24 @@ public class ExchangeResource {
     }
 
     /** What a buying partner sees about one mandate: what is left, what it won and earned, and its tier. */
+    public record MandateStatusChange(String status) {}
+
+    /** Pause (stops new bids), resume, or revoke (terminate; final) a mandate. Awards already made are unaffected. */
+    @POST
+    @Path("/{pack}/mandates/{id}/status")
+    public Response mandateStatus(@PathParam("pack") String packId, @PathParam("id") long mandateId, MandateStatusChange req) {
+        Exchange.MandateState ms = exchange.mandate(mandateId);
+        if (ms == null || !ms.pack().equals(packId)) return Response.status(404).build();
+        Exchange.MandateStatus next;
+        try {
+            next = Exchange.MandateStatus.valueOf(req == null || req.status() == null ? "" : req.status());
+        } catch (IllegalArgumentException e) {
+            return Response.status(400).entity(Map.of("error", "status must be ACTIVE, PAUSED or REVOKED")).build();
+        }
+        if (!ms.setStatus(next)) return Response.status(409).entity(Map.of("error", "a revoked mandate can't be reactivated")).build();
+        return mandateState(packId, mandateId);
+    }
+
     @GET
     @Path("/{pack}/mandates/{id}")
     public Response mandateState(@PathParam("pack") String packId, @PathParam("id") long mandateId) {
@@ -159,6 +177,7 @@ public class ExchangeResource {
         out.put("partnerRef", ms.terms().partnerRef());
         out.put("nodeRef", ms.nodeRef());
         out.put("standing", ms.standing());
+        out.put("status", ms.status().get().name());
         out.put("budgetTotalMinor", ms.terms().budgetTotalMinor());
         out.put("budgetLeftMinor", ms.budgetLeftMinor().get());
         out.put("awards", ms.awards().get());
@@ -185,6 +204,9 @@ public class ExchangeResource {
             if (pt.mandateId() != null && ms == null) return Response.status(404).entity(Map.of("error", "unknown mandate")).build();
             if (ms != null && !ms.pack().equals(exchange.packOf(auctionId))) {
                 return Response.status(409).entity(Map.of("error", "mandate belongs to another vertical")).build();
+            }
+            if (ms != null && ms.status().get() != Exchange.MandateStatus.ACTIVE) {
+                return Response.status(409).entity(Map.of("error", "mandate is " + ms.status().get().name().toLowerCase())).build();
             }
             Map<String, Object> in = new java.util.HashMap<>();
             in.put("flow", pt.flow());

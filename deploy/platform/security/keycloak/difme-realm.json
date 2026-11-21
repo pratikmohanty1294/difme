@@ -73,6 +73,144 @@
         "email",
         "groups"
       ]
+    },
+    {
+      "clientId": "ph-ee-ams",
+      "name": "ph-ee-ams",
+      "description": "Mifos payment hub Fineract connector: calls Fineract (OIDC federation) as Fineract user ph-ee-ams (claim fineract_user)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${PH_EE_AMS_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "900"
+      },
+      "protocolMappers": [
+        {
+          "name": "authorities",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "authorities",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "fineract_user",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "fineract_user",
+            "claim.value": "ph-ee-ams",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "difme-exchange",
+      "name": "difme-exchange",
+      "description": "DIFME exchange: calls the Mifos payment hub channel API (role ph-ee-transfer)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${DIFME_EXCHANGE_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "900"
+      },
+      "protocolMappers": [
+        {
+          "name": "authorities",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "authorities",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "fineract-admin",
+      "name": "fineract-admin",
+      "description": "Fineract bootstrap job only: acts as Fineract's admin user (mifos) to create the service users",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${FINERACT_ADMIN_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "300"
+      },
+      "protocolMappers": [
+        {
+          "name": "fineract_user",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "fineract_user",
+            "claim.value": "mifos",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "ph-ee-transfer",
+        "description": "May start transfers through the Mifos payment hub channel API"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-difme-exchange",
+      "enabled": true,
+      "serviceAccountClientId": "difme-exchange",
+      "realmRoles": [
+        "ph-ee-transfer"
+      ]
+    },
+    {
+      "username": "service-account-ph-ee-ams",
+      "enabled": true,
+      "serviceAccountClientId": "ph-ee-ams",
+      "realmRoles": []
+    },
+    {
+      "username": "service-account-fineract-admin",
+      "enabled": true,
+      "serviceAccountClientId": "fineract-admin"
     }
   ]
 }

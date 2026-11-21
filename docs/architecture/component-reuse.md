@@ -16,7 +16,7 @@ off, so nothing runs · **kept** = no DIFME equivalent, or the overlap is intend
 | Redis (standalone/cluster) | Valkey (`cache-tier`) | done |
 | Kafka (events, drainer) | Strimzi Kafka (`streaming`) | not used: `events.source = logs`; when events are wanted, point `events.kafka.brokers` at our Kafka, not a new broker |
 | ClickHouse + OpenSearch (analytics, search) | Postgres via `analytics.source = sqlx`; Trino/RisingWave for our own analytics | not used (both off) |
-| Grafana, Loki, Prometheus, Tempo, OTel collector, Vector (its compose stack) | VictoriaMetrics, Loki, Tempo, Alloy (OTLP) | todo: router telemetry to Alloy's OTLP endpoint; nothing of theirs deployed |
+| Grafana, Loki, Prometheus, Tempo, OTel collector, Vector (its compose stack) | VictoriaMetrics, Loki, Tempo, Alloy (OTLP) | done (manifest): router traces + metrics to Alloy's OTLP endpoint (`ROUTER__LOG__TELEMETRY__*`, 10% trace sampling) → Tempo / VictoriaMetrics; nothing of theirs deployed |
 | Secrets: AWS/GCP/OCI KMS or HashiCorp Vault (`hashicorp-vault` feature) | OpenBao (Vault API) | todo: build with `hashicorp-vault`, URL = OpenBao; until then secrets come from Kubernetes Secrets |
 | File storage: local disk or S3 (`aws_s3`, custom endpoint + path style supported) | SeaweedFS S3 (`lakehouse`) | todo when disputes/files are used (needs the `aws_s3` feature) |
 | Superposition (config service) | none needed | not used: falls back to the bundled seed file |
@@ -29,11 +29,11 @@ off, so nothing runs · **kept** = no DIFME equivalent, or the overlap is intend
 | It expects | DIFME component | Status |
 |---|---|---|
 | PostgreSQL or MariaDB | shared Postgres (`fineract_tenants`, `fineract_default`) | done |
-| Basic auth with its own users | Keycloak (`security`) — Fineract has OAuth2 resource server and OIDC federation (`FINERACT_SECURITY_OAUTH_ENABLED`, `..._OIDC_FEDERATION_ENABLED`) | todo: Keycloak client for the payment hub; drop the generated basic-auth password afterwards |
+| Basic auth with its own users | Keycloak (`security`) via Fineract's OIDC federation | done, verified locally: Keycloak token → claim `fineract_user` → a Fineract user (no auto-create). Clients: `ph-ee-ams` → user `ph-ee-ams` (role "Payment hub": interop API + savings/client reads; offices/users/roles → 403), `fineract-admin` → `mifos` (bootstrap job and the interim hub only). Passwords refused on `/api` (401), unsigned/forged tokens 401. Generated admin password dropped. Upstream quirks: basic auth must stay switched on for Fineract to start (the OIDC chain still owns `/api`); a bean cycle needs `SPRING_MAIN_ALLOW_CIRCULAR_REFERENCES=true` |
 | External events via ActiveMQ (JMS) or Kafka | Strimzi Kafka | not used yet; when enabled: Kafka (`FINERACT_EXTERNAL_EVENTS_KAFKA_*`), never ActiveMQ |
 | Remote batch workers via JMS/Kafka | Kafka | not used (single node runs manager + worker) |
-| Document/image storage on disk or S3 (path style supported) | SeaweedFS S3 | todo: `FINERACT_CONTENT_S3_*` (pod disk is ephemeral today) |
-| Actuator / Prometheus metrics | VictoriaMetrics scrape | todo: scrape annotation |
+| Document/image storage on disk or S3 (path style supported) | SeaweedFS S3 | done (manifest): `FINERACT_CONTENT_S3_*`, bucket `fineract`, path style |
+| Actuator / Prometheus metrics | VictoriaMetrics (vmagent) | done (manifest): pod label `difme/metrics` + `difme/metrics-path`, scraped by `observability/dashboards/scrape.yaml`; vmagent joined the ambient mesh for STRICT mTLS. Endpoint checked locally |
 | Its own ledger | TigerBeetle is DIFME's payments ledger | kept: Fineract simulates the banks' core systems; TigerBeetle stays DIFME's own ledger |
 
 ## Mifos Payment Hub EE
@@ -43,7 +43,9 @@ off, so nothing runs · **kept** = no DIFME equivalent, or the overlap is intend
 | Zeebe (workflow engine) | Fluxnova (`process`) | done (services/zeebe-on-fluxnova) |
 | Zeebe exporters → Kafka/Elasticsearch, Operate, operations app + importer (MySQL) | Fluxnova history API; Loki/Tempo; back-office UI | not used (not vendored) |
 | Redis (channel idempotency) | Valkey | done (local runs too) |
-| Keycloak / OAuth for channel APIs (`rest.authorization`) | Keycloak | todo: enable with a DIFME realm client |
+| Login to Fineract (basic, or `authtype: oauth` = "TODO implement" upstream) | Keycloak | done, verified: patch `ph-ee-ams-mifos/0001` (client credentials); cross-bank transfer with it |
+| Metrics (micrometer-core, no registry) | VictoriaMetrics | done: Prometheus registry added by the Gradle init script; `/actuator/prometheus` answers on all three connectors (ams under `/fineract`). Pod labels go into the PH-EE manifests |
+| Keycloak / OAuth for channel APIs (`rest.authorization`) | Keycloak, checked in the Istio mesh | todo with the PH-EE manifests: `RequestAuthentication` (Keycloak keys) + `AuthorizationPolicy` (realm role `ph-ee-transfer`, client `difme-exchange` has it). Upstream's own check is dead code in channel 1.9.0 (controllers drop the `Authorization` header) |
 | Spring Boot 2.6 runtime | Quarkus is DIFME's Java framework | kept: the connectors stay Spring Boot (upstream code); upgraded to Boot 3 for CVEs |
 | JWS message signing keys | OpenBao (transit) | not used (`security.jws.enable: false`) |
 

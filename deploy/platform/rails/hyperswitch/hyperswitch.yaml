@@ -65,7 +65,12 @@ spec:
             # Card payments: the test processor's calls go to DIFME's acquirer, which sends them over ISO 8583 to the scheme.
             - { name: ROUTER__CONNECTORS__DUMMYCONNECTOR__BASE_URL, value: "http://iso-adapter.rails.svc:8080/dummy-connector" }
             - { name: ROUTER__LOG__CONSOLE__LEVEL, value: INFO }
-            - { name: ROUTER__LOG__TELEMETRY__METRICS_ENABLED, value: "false" }
+            # Traces and metrics to DIFME's collector (Alloy, OTLP gRPC) → Tempo / VictoriaMetrics; not Hyperswitch's own stack.
+            - { name: ROUTER__LOG__TELEMETRY__TRACES_ENABLED, value: "true" }
+            - { name: ROUTER__LOG__TELEMETRY__METRICS_ENABLED, value: "true" }
+            - { name: ROUTER__LOG__TELEMETRY__OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.observability.svc:4317" }
+            - { name: ROUTER__LOG__TELEMETRY__SAMPLING_RATE, value: "0.1" }
+            - { name: ROUTER__LOG__TELEMETRY__IGNORE_ERRORS, value: "true" }     # collector down must not stop payments
             - { name: ROUTER__SERVER__WORKERS, value: "2" }
           ports: [{ name: http, containerPort: 8080 }]
           startupProbe: { httpGet: { path: /health, port: 8080 }, periodSeconds: 5, failureThreshold: 60 }

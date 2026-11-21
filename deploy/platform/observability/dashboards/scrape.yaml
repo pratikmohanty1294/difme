@@ -1,0 +1,19 @@
+# Metrics of DIFME's own and copied-in services (component reuse: Fineract, the Mifos payment hub connectors, ...)
+# go to VictoriaMetrics, scraped by vmagent. A pod opts in with:
+#   label       difme/metrics: "true"
+#   annotation  difme/metrics-path: /path/to/prometheus/metrics   (default /metrics)
+# and a container port named "http". vmagent runs inside the ambient mesh (victoria-metrics values), so the scrape
+# is mutual TLS like every other call to a meshed pod.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata: { name: difme-pods }
+spec:
+  namespaceSelector: { any: true }
+  selector: { matchLabels: { difme/metrics: "true" } }
+  podMetricsEndpoints:
+    - port: http
+      interval: 30s
+      relabelConfigs:
+        - { sourceLabels: [__meta_kubernetes_pod_annotation_difme_metrics_path], regex: "(.+)", targetLabel: __metrics_path__ }
+        - { sourceLabels: [__meta_kubernetes_pod_label_app], targetLabel: app }
+        - { sourceLabels: [__meta_kubernetes_namespace], targetLabel: namespace }

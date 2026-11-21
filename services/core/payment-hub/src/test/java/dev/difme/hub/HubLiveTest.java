@@ -29,7 +29,12 @@ class HubLiveTest {
     @BeforeEach
     void setUp() {
         assumeTrue(FINERACT != null, "HUB_LIVE_FINERACT not set");
-        cbs = new Fineract(FINERACT, env("HUB_LIVE_FINERACT_USER", "mifos"), env("HUB_LIVE_FINERACT_PASSWORD", "password"), "default");
+        // HUB_LIVE_FINERACT_TOKEN_URL set: Keycloak login, USER/PASSWORD are the client id/secret (Fineract with OIDC).
+        String tokenUrl = System.getenv("HUB_LIVE_FINERACT_TOKEN_URL");
+        cbs = tokenUrl == null
+                ? new Fineract(FINERACT, env("HUB_LIVE_FINERACT_USER", "mifos"), env("HUB_LIVE_FINERACT_PASSWORD", "password"), "default")
+                : new Fineract(FINERACT, Fineract.clientCredentials(tokenUrl, env("HUB_LIVE_FINERACT_USER", "fineract-admin"),
+                        System.getenv("HUB_LIVE_FINERACT_PASSWORD")), "default");
         Hyperswitch psp = PSP == null ? null : new Hyperswitch(PSP, System.getenv("HUB_LIVE_HYPERSWITCH_ADMIN"), System.getenv("HUB_LIVE_ACQUIRER_KEY"));
         env = TestWorkflowEnvironment.newInstance();
         Hub.register(env.getWorkerFactory(), cbs, psp);

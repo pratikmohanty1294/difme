@@ -12,7 +12,9 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: fineract } }
   template:
-    metadata: { labels: { app: fineract, difme/team: rails, business.metric: core-banking-sim } }
+    metadata:
+      labels: { app: fineract, difme/team: rails, business.metric: core-banking-sim, difme/metrics: "true" }
+      annotations: { difme/metrics-path: /fineract-provider/actuator/prometheus }   # scraped into VictoriaMetrics (observability/dashboards/scrape.yaml)
     spec:
       serviceAccountName: fineract
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
@@ -44,7 +46,28 @@ spec:
             - { name: FINERACT_DEFAULT_TENANTDB_TIMEZONE, value: Asia/Kolkata }
             - { name: FINERACT_DEFAULT_MASTER_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-db, key: master-password } } }
             - { name: FINERACT_MANAGEMENT_ENDPOINT_WEB_EXPOSURE_INCLUDE, value: "health,info,prometheus" }
+            # Client documents and images on DIFME's object store (SeaweedFS S3), not the pod's disk.
+            - { name: FINERACT_CONTENT_FILESYSTEM_ENABLED, value: "false" }
+            - { name: FINERACT_CONTENT_S3_ENABLED, value: "true" }
+            - { name: FINERACT_CONTENT_S3_BUCKET_NAME, value: fineract }
+            - { name: FINERACT_CONTENT_S3_ENDPOINT, value: "http://seaweedfs-s3.lakehouse.svc:8333" }
+            - { name: FINERACT_CONTENT_S3_REGION, value: us-east-1 }
+            - { name: FINERACT_CONTENT_S3_PATH_STYLE_ADDRESSING_ENABLED, value: "true" }
+            - { name: FINERACT_CONTENT_S3_ACCESS_KEY, valueFrom: { secretKeyRef: { name: fineract-s3, key: access-key } } }
+            - { name: FINERACT_CONTENT_S3_SECRET_KEY, valueFrom: { secretKeyRef: { name: fineract-s3, key: secret-key } } }
             - { name: FINERACT_CONTENT_FILESYSTEM_ROOT_FOLDER, value: /tmp }
+            # Logins come from Keycloak (component reuse): Fineract checks Keycloak's signature and maps the token's
+            # fineract_user claim to one of its own users (no auto-create, so only users made by the bootstrap job get in).
+            # Basic auth stays switched on only because Fineract 1.16 needs its beans to start; the OIDC filter chain owns
+            # /api/** first, so passwords (including the built-in default login) are refused there (checked: 401).
+            # The OIDC config and its issuer resolver depend on each other (upstream bug): Spring's switch allows it.
+            - { name: SPRING_MAIN_ALLOW_CIRCULAR_REFERENCES, value: "true" }
+            - { name: FINERACT_SECURITY_OIDC_FEDERATION_ENABLED, value: "true" }
+            - { name: FINERACT_SECURITY_OIDC_USERNAME_CLAIM, value: fineract_user }
+            - { name: FINERACT_SECURITY_OIDC_PROVIDER, value: keycloak }
+            - { name: FINERACT_SECURITY_OIDCFEDERATION_ISSUERS_0_ISSUERURI, value: "https://id.difme.local/realms/difme" }
+            - { name: FINERACT_SECURITY_OIDCFEDERATION_ISSUERS_0_TENANTID, value: default }
+            - { name: FINERACT_SECURITY_OIDCFEDERATION_ISSUERS_0_JWKSURI, value: "http://keycloak.security.svc:8080/realms/difme/protocol/openid-connect/certs" }
             - { name: JAVA_TOOL_OPTIONS, value: "-Xmx512m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k" }
           ports: [{ name: http, containerPort: 8080 }]
           startupProbe: { httpGet: { path: /fineract-provider/actuator/health, port: 8080 }, periodSeconds: 10, failureThreshold: 60 }   # Liquibase on first start
@@ -59,11 +82,12 @@ kind: Service
 metadata: { name: fineract }
 spec: { selector: { app: fineract }, ports: [{ name: http, port: 8080 }] }
 ---
-# Fineract ships a public default login (mifos/password). After every sync this switches it to the generated
-# admin-password once (idempotent: does nothing when the generated password already works).
+# Creates Fineract's own users for the Keycloak clients that call it, after every sync (idempotent). It logs in through
+# Keycloak as client fineract-admin, whose token says fineract_user=mifos (Fineract's admin user).
+#   ph-ee-ams: role "Payment hub" (interoperation API, savings and client reads; the permission list is in the script)
 apiVersion: batch/v1
 kind: Job
-metadata: { name: fineract-admin-password, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+metadata: { name: fineract-service-users, annotations: { argocd.argoproj.io/hook: PostSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
 spec:
   backoffLimit: 30
   template:
@@ -71,21 +95,47 @@ spec:
       restartPolicy: OnFailure
       securityContext: { runAsNonRoot: true, runAsUser: 100, seccompProfile: { type: RuntimeDefault } }
       containers:
-        - name: rotate
+        - name: users
           image: curlimages/curl:8.11.1
           env:
-            - { name: NEW, valueFrom: { secretKeyRef: { name: fineract-db, key: admin-password } } }
+            - { name: CLIENT_ID, valueFrom: { secretKeyRef: { name: fineract-admin-oauth, key: client-id } } }
+            - { name: CLIENT_SECRET, valueFrom: { secretKeyRef: { name: fineract-admin-oauth, key: client-secret } } }
+            - { name: TOKEN_URL, value: "http://keycloak.security.svc:8080/realms/difme/protocol/openid-connect/token" }
+            - { name: FINERACT, value: "http://fineract:8080/fineract-provider" }
           command: [sh, -c]
           args:
             - |
               set -eu
-              B=http://fineract:8080/fineract-provider
-              until curl -sf $B/actuator/health >/dev/null; do sleep 5; done
-              code() { curl -s -o /dev/null -w '%{http_code}' -H 'Fineract-Platform-TenantId: default' -u "$1" $B/api/v1/offices; }
-              if [ "$(code "mifos:$NEW")" = 200 ]; then echo "admin password already set"; exit 0; fi
-              [ "$(code mifos:password)" = 200 ] || { echo "neither password works"; exit 1; }
-              printf '{"password":"%s","repeatPassword":"%s"}' "$NEW" "$NEW" | curl -sf -X PUT -H 'Fineract-Platform-TenantId: default' \
-                -H 'Content-Type: application/json' -u mifos:password --data @- $B/api/v1/users/1 >/dev/null
-              [ "$(code "mifos:$NEW")" = 200 ] && echo "default admin password replaced"
+              until curl -sf "$FINERACT/actuator/health" >/dev/null; do sleep 5; done
+              TOKEN=$(curl -sf -X POST "$TOKEN_URL" -d grant_type=client_credentials --data-urlencode "client_id=$CLIENT_ID" \
+                --data-urlencode "client_secret=$CLIENT_SECRET" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+              [ -n "$TOKEN" ] || { echo "no token from Keycloak"; exit 1; }
+              api() { curl -sf -H "Authorization: Bearer $TOKEN" -H 'Fineract-Platform-TenantId: default' -H 'Content-Type: application/json' "$@"; }
+              # id of the first object whose "name" (roles) or "username" (users) is $2, from the JSON list in $1
+              id_of() { printf '%s' "$1" | tr '{' '\n' | grep "\"$2\":\"$3\"" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -1; }
+
+              role() {  # name description permission...
+                name=$1; desc=$2; shift 2
+                id=$(id_of "$(api "$FINERACT/api/v1/roles")" name "$name")
+                [ -n "$id" ] || id=$(api -X POST "$FINERACT/api/v1/roles" -d "{\"name\":\"$name\",\"description\":\"$desc\"}" | sed -n 's/.*"resourceId":\([0-9]*\).*/\1/p')
+                perms=$(for p in "$@"; do printf '"%s":true,' "$p"; done)
+                api -X PUT "$FINERACT/api/v1/roles/$id/permissions" -d "{\"permissions\":{${perms%,}}}" >/dev/null
+                echo "$id"
+              }
+              user() {  # username role-id
+                [ -n "$(id_of "$(api "$FINERACT/api/v1/users")" username "$1")" ] && { echo "user $1 exists"; return; }
+                # Only ever used through Keycloak: the password is random and thrown away.
+                # Fineract's policy: 12-50 chars, upper, lower, digit, symbol, no character twice in a row (tr -s squeezes repeats).
+                pw="Dx#$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' | tr -s '0-9a-f')Q7"
+                api -X POST "$FINERACT/api/v1/users" -d "{\"username\":\"$1\",\"firstname\":\"service\",\"lastname\":\"$1\",\"officeId\":1,\
+              \"roles\":[$2],\"sendPasswordToEmail\":false,\"password\":\"$pw\",\"repeatPassword\":\"$pw\"}" >/dev/null
+                echo "user $1 created"
+              }
+
+              hub=$(role "Payment hub" "Mifos payment hub connector (ph-ee-ams)" \
+                READ_INTERID CREATE_INTERID DELETE_INTERID READ_INTERQUOTE CREATE_INTERQUOTE READ_INTERREQUEST CREATE_INTERREQUEST \
+                READ_INTERTRANSFER CREATE_INTERTRANSFER PREPARE_INTERTRANSFER RELEASE_INTERTRANSFER \
+                READ_SAVINGSACCOUNT READ_CLIENT READ_LOAN REPAYMENT_LOAN)
+              user ph-ee-ams "$hub"
           securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
           resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 64Mi } }

@@ -40,8 +40,15 @@ secret lakehouse     polaris-db password="$POLARIS_PG"
 secret database-tier polaris-db password="$POLARIS_PG"
 FINERACT_PG=$(rand)
 ns rails
-secret rails         fineract-db password="$FINERACT_PG" master-password="$(rand)" admin-password="Dx$(rand)9!"   # Fineract wants mixed case, a digit and a symbol
+secret rails         fineract-db password="$FINERACT_PG" master-password="$(rand)"   # logins go through Keycloak (no Fineract admin password)
 secret database-tier fineract-db password="$FINERACT_PG"
+secret rails         fineract-s3 access-key="$S3_KEY" secret-key="$S3_SECRET"   # documents on SeaweedFS (component reuse)
+# Keycloak confidential clients: the same secret in Keycloak's namespace and in each client's namespace.
+PHEE_AMS_CS=$(rand 32); EXCHANGE_CS=$(rand 32); FIN_ADMIN_CS=$(rand 32)
+secret security      keycloak-clients ph-ee-ams="$PHEE_AMS_CS" difme-exchange="$EXCHANGE_CS" fineract-admin="$FIN_ADMIN_CS"
+secret rails         ph-ee-ams-oauth client-id=ph-ee-ams client-secret="$PHEE_AMS_CS"
+secret rails         fineract-admin-oauth client-id=fineract-admin client-secret="$FIN_ADMIN_CS"
+secret core-platform difme-exchange-oauth client-id=difme-exchange client-secret="$EXCHANGE_CS"
 HYPERSWITCH_PG=$(rand)
 hex32() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }   # Hyperswitch wants 32-byte hex keys
 secret rails         hyperswitch db-password="$HYPERSWITCH_PG" admin-api-key="$(rand 32)" jwt-secret="$(rand 48)" \

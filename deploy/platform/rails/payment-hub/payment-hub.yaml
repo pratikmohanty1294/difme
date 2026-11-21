@@ -23,7 +23,9 @@ spec:
           env:
             - { name: TEMPORAL_TARGET, value: "temporal-frontend.temporal.svc:7233" }
             - { name: FINERACT_URL, value: "http://fineract.rails.svc:8080/fineract-provider" }
-            - { name: FINERACT_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-db, key: admin-password } } }
+            - { name: FINERACT_TOKEN_URL, value: "http://keycloak.security.svc:8080/realms/difme/protocol/openid-connect/token" }
+            - { name: FINERACT_USER, valueFrom: { secretKeyRef: { name: fineract-admin-oauth, key: client-id } } }
+            - { name: FINERACT_PASSWORD, valueFrom: { secretKeyRef: { name: fineract-admin-oauth, key: client-secret } } }
             - { name: HYPERSWITCH_URL, value: "http://hyperswitch.rails.svc:8080" }
             - { name: HYPERSWITCH_ADMIN_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: admin-api-key } } }
             - { name: ACQUIRER_API_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: acquirer-api-key } } }

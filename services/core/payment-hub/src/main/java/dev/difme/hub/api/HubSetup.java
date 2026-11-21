@@ -25,6 +25,7 @@ public class HubSetup {
     @ConfigProperty(name = "difme.hub.fineract.user") String fineractUser;
     @ConfigProperty(name = "difme.hub.fineract.password") String fineractPassword;
     @ConfigProperty(name = "difme.hub.fineract.tenant") String tenant;
+    @ConfigProperty(name = "difme.hub.fineract.token-url") java.util.Optional<String> fineractTokenUrl;
     @ConfigProperty(name = "difme.hub.hyperswitch.url") String pspUrl;
     @ConfigProperty(name = "difme.hub.hyperswitch.admin-key") String pspAdminKey;
     @ConfigProperty(name = "difme.hub.hyperswitch.acquirer-key") String acquirerKey;
@@ -33,7 +34,10 @@ public class HubSetup {
     private Hub hub;
 
     void start(@Observes StartupEvent ev) {
-        Fineract cbs = new Fineract(fineractUrl, fineractUser, fineractPassword, tenant);
+        // With a token URL, user/password are the Keycloak client id/secret (Fineract with OIDC federation).
+        Fineract cbs = fineractTokenUrl.filter(u -> !u.isBlank())
+                .map(u -> new Fineract(fineractUrl, Fineract.clientCredentials(u, fineractUser, fineractPassword), tenant))
+                .orElseGet(() -> new Fineract(fineractUrl, fineractUser, fineractPassword, tenant));
         Hyperswitch psp = new Hyperswitch(pspUrl, pspAdminKey, acquirerKey);
         WorkflowServiceStubs stubs = WorkflowServiceStubs.newServiceStubs(WorkflowServiceStubsOptions.newBuilder().setTarget(target).build());
         WorkflowClient client = WorkflowClient.newInstance(stubs, WorkflowClientOptions.newBuilder().setNamespace(namespace).build());

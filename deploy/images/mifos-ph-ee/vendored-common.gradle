@@ -55,6 +55,18 @@ allprojects {
     }
 }
 
+// Metrics for VictoriaMetrics (component reuse): the connectors carry micrometer-core but no Prometheus registry, so
+// /actuator/prometheus doesn't exist. The registry must match micrometer-core: Spring's dependency management picks
+// it where the project uses it (connector-mojaloop); ams and channel don't, and carry micrometer-core 1.8.1.
+allprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin('org.springframework.boot')) {
+            def managed = plugins.hasPlugin('io.spring.dependency-management')
+            dependencies { runtimeOnly(managed ? 'io.micrometer:micrometer-registry-prometheus' : 'io.micrometer:micrometer-registry-prometheus:1.8.1') }
+        }
+    }
+}
+
 // connector-common declares the Zeebe client but never uses it (no references in its code); Spring's dependency
 // management there forces Zeebe's version even onto a retargeted module, so the dependency is simply dropped.
 allprojects {

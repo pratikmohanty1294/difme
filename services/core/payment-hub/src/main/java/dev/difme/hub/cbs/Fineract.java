@@ -43,15 +43,61 @@ public final class Fineract {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final URI base;
-    private final String auth, tenant;
+    private final java.util.function.Supplier<String> auth;
+    private final String tenant;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final Map<String, Long> products = new ConcurrentHashMap<>();
     private final Map<String, Account> accounts = new ConcurrentHashMap<>();   // ids never change once opened
 
+    /** Password login (a Fineract without OIDC federation, e.g. a local one). */
     public Fineract(String baseUrl, String user, String password, String tenant) {
+        this(baseUrl, basic(user, password), tenant);
+    }
+
+    /** {@code auth} gives the Authorization header for each request. */
+    public Fineract(String baseUrl, java.util.function.Supplier<String> auth, String tenant) {
         this.base = URI.create(baseUrl.endsWith("/") ? baseUrl : baseUrl + "/");
-        this.auth = "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
+        this.auth = auth;
         this.tenant = tenant;
+    }
+
+    static java.util.function.Supplier<String> basic(String user, String password) {
+        String h = "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
+        return () -> h;
+    }
+
+    /**
+     * Keycloak login (OAuth2 client credentials): Fineract accepts the token through its OIDC federation and maps the
+     * token's {@code fineract_user} claim to one of its users. The token is reused until a minute before it expires.
+     */
+    public static java.util.function.Supplier<String> clientCredentials(String tokenUrl, String clientId, String clientSecret) {
+        HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+        String form = "grant_type=client_credentials&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                + "&client_secret=" + URLEncoder.encode(clientSecret, StandardCharsets.UTF_8);
+        Object lock = new Object();
+        String[] header = {null};
+        long[] renewAt = {0};
+        return () -> {
+            synchronized (lock) {
+                if (header[0] == null || System.currentTimeMillis() >= renewAt[0]) {
+                    try {
+                        HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(tokenUrl)).timeout(Duration.ofSeconds(10))
+                                .header("Content-Type", "application/x-www-form-urlencoded")
+                                .POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
+                        if (r.statusCode() != 200) throw new IllegalStateException("identity provider refused the login: HTTP " + r.statusCode());
+                        JsonNode t = JSON.readTree(r.body());
+                        header[0] = "Bearer " + t.path("access_token").asText();
+                        renewAt[0] = System.currentTimeMillis() + Math.max(10, t.path("expires_in").asLong(300) - 60) * 1000;
+                    } catch (java.io.IOException e) {
+                        throw new IllegalStateException("identity provider unreachable: " + e.getMessage(), e);   // retryable
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("interrupted", e);
+                    }
+                }
+                return header[0];
+            }
+        };
     }
 
     /**
@@ -168,7 +214,7 @@ public final class Fineract {
 
     private HttpRequest.Builder req(String path) {
         return HttpRequest.newBuilder(base.resolve(path)).timeout(Duration.ofSeconds(30))
-                .header("Authorization", auth).header("Fineract-Platform-TenantId", tenant).header("Accept", "application/json");
+                .header("Authorization", auth.get()).header("Fineract-Platform-TenantId", tenant).header("Accept", "application/json");
     }
 
     private HttpResponse<String> send(HttpRequest r) {

@@ -43,7 +43,7 @@ spec:
           envFrom: [{ secretRef: { name: seaweedfs-s3-admin } }]   # RCLONE_CONFIG_SW_* variables
           command: [sh, -c]
           args:
-            - for b in lakehouse flink risingwave velero etcd-snapshots airbyte mlflow loki harbor cdn; do
+            - for b in lakehouse flink risingwave velero etcd-snapshots mlflow loki harbor cdn fineract; do
                 rclone mkdir sw:$b; done
 ---
 # One volume per growth instead of seven. Every S3 bucket is its own collection, and each new volume reserves

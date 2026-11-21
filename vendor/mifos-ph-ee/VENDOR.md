@@ -28,6 +28,17 @@ Local changes to the Mifos source: two patches to connector-mojaloop (`vendor/pa
 - `0002` quote: the payer no longer re-derives the payee's ILP condition with its own secret (only possible when both
   FSPs share one secret); it checks the packet carries this quote and the condition is a 32-byte SHA-256. The
   fulfilment is checked at commit by the switch (see Known gaps).
+
+And one to connector-ams-mifos (`vendor/patches/ph-ee-ams-mifos/`), for logins through Keycloak (component reuse):
+- `0001` tenant `authtype: oauth` for Fineract 1.2 (upstream: "TODO implement") = OAuth2 client credentials at
+  `ams.local.oauth.token-url`; the tenant's `user`/`password` are the Keycloak client id/secret. Fineract accepts the
+  token through its OIDC federation (claim `fineract_user` → Fineract user `ph-ee-ams`, role "Payment hub").
+  Verified 2026-11-21: cross-bank transfer through the Mojaloop switch with this login (payer 8,300 → 8,150 INR).
+
+The channel's own token check (`rest.authorization`) is not used: in channel 1.9.0 the HTTP controllers call the
+Camel routes without the `Authorization` header, so it would refuse every call. Callers are checked in the mesh
+instead (Istio `RequestAuthentication` on Keycloak's keys + `AuthorizationPolicy` for realm role `ph-ee-transfer`),
+added with the PH-EE deploy manifests.
 Everything else is done around the source:
 - `services/zeebe-on-fluxnova` replaces the Zeebe client (same API subset, on Fluxnova's REST API); the init script
   swaps it in (`io.camunda:zeebe-client-java` → `dev.difme:zeebe-client-fluxnova`). connector-common declares the Zeebe

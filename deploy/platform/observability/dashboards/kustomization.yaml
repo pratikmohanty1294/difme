@@ -1,4 +1,4 @@
-resources: [alerts.yaml]
+resources: [alerts.yaml, scrape.yaml]
 configMapGenerator:
   - name: difme-dashboards
     options: { labels: { grafana_dashboard: "1" } }

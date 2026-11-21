@@ -9,7 +9,9 @@ kubeScheduler: { enabled: false }
 kubeEtcd: { enabled: false }
 kubeProxy: { enabled: false }
 vmsingle: { spec: { retentionPeriod: "30d", resources: { requests: { cpu: 100m, memory: 512Mi }, limits: { memory: 1Gi } }, storage: { resources: { requests: { storage: 8Gi } } } } }
-vmagent: { spec: { resources: { requests: { cpu: 50m, memory: 128Mi } } } }
+# vmagent joins the ambient mesh (pod label) so it can scrape meshed pods, whose mesh policy is STRICT mutual TLS;
+# targets outside the mesh (node exporter, kubelet) are reached as before. Pods to scrape: dashboards/scrape.yaml.
+vmagent: { spec: { podMetadata: { labels: { istio.io/dataplane-mode: ambient } }, resources: { requests: { cpu: 50m, memory: 128Mi } } } }
 alertmanager:
   spec: { resources: { requests: { cpu: 10m, memory: 32Mi } } }
   config:

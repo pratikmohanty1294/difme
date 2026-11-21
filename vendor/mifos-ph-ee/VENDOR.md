@@ -71,3 +71,5 @@ Known gaps:
   not, and PH-EE's payer side does not either. To close with the real switch core or a payer-side check.
 - After COMMITTED the other bank's SDK asks the payer for the transfer (`GET /transfers/{id}`), which PH-EE's
   connector does not serve; harmless for the payment, noisy in the switch log.
+
+Infrastructure it expects and the DIFME component used instead: `docs/architecture/component-reuse.md`.

@@ -16,3 +16,5 @@ How DIFME runs it (no change to this tree):
 
 Reviewed: `crates/router/src/services/encryption.rs` embeds RSA test keys inside `#[cfg(test)]` (unit-test
 fixtures, not compiled into the router). Kept: removing them means editing upstream source.
+
+Infrastructure it expects and the DIFME component used instead: `docs/architecture/component-reuse.md`.

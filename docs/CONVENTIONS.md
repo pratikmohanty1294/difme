@@ -1,6 +1,7 @@
 # DIFME — engineering conventions
 
 - Architecture source of truth: Financial Platform Architecture v1.2 (11 layers). The coverage matrix in README.md maps every PDF component to its path. Keep it complete when adding or changing components.
+- Reuse before adding (owner 2026-11-21): when copying in another system, map every infrastructure component it expects (database, cache, broker, object store, search, identity, secrets, workflow, observability) to the one DIFME already runs and use that; never deploy a second one. Record the mapping in its VENDOR.md and in docs/architecture/component-reuse.md.
 - Licence rule (hard): OSI-approved **and** free with no limitations. No BSL, SSPL, ELv2 or source-available licences, no watermark/attribution-display terms, no usage-capped free tiers, no open-core where the needed feature is paid. Copyleft (GPL, AGPL, MPL) is fine. Check every new dependency, chart and image. Swaps are recorded in docs/architecture/decisions.md.
 - Alternatives: when a spec names a component, look for a newer or better free alternative and let the owner choose before adopting it.
 - Everything runs remotely (Codespaces + GitHub Actions). Do not assume a local machine.

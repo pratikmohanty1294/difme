@@ -20,3 +20,5 @@ Local changes:
 Installing: `npm ci --omit=dev --ignore-scripts` (testing-toolkit, simulator); the scheme adapter with its bundled Yarn
 (`node .yarn/releases/yarn-4.18.0.cjs workspaces focus @mojaloop/sdk-scheme-adapter-api-svc --production`; corepack
 would download Yarn from a host the session blocks).
+
+Infrastructure it expects and the DIFME component used instead: `docs/architecture/component-reuse.md`.

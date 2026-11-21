@@ -12,3 +12,5 @@ tags, and this copy lives inside the DIFME repo, which has no Fineract tags. Wit
 `0.0.0-SNAPSHOT`; the real version is the tag above.
 
 Local changes: none yet. Any change is listed here with its reason.
+
+Infrastructure it expects and the DIFME component used instead: `docs/architecture/component-reuse.md`.

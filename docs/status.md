@@ -7,7 +7,7 @@ Updated 2026-11-18 (evening). Read this first when picking up work, then CONTRIB
   - core: Cilium, Argo CD, Kyverno, Envoy Gateway, cert-manager, MetalLB, YugabyteDB, TigerBeetle, Valkey, the shared Postgres (ADR-019), Temporal, flagd and the core services.
   - streaming: Strimzi 0.51 / Kafka 4.2, Apicurio 3.3.4, Debezium 3.7.1 (both connectors RUNNING), RisingWave (meta on the shared Postgres), Flink operator and fraud-cep, KEDA, SeaweedFS.
   - Only `event-archive` is down, because it needs the lakehouse profile's Iceberg catalog.
-- **Built, not yet deployed live:** lakehouse, ml, observability, security, process, backoffice, hub.
+- **All 13 profiles have converged on a cluster one by one** (base, core, observability, backoffice, platform-ops, streaming, streaming-extra, security, hub, process, lakehouse, lakehouse-extra, ml). Pending installs (2026-11-21): all profiles at once (run 5), onnx-serving/fraud scorer on a cluster, dbt lineage, dev memory halving merge (all need Actions); Feast feature tables have no dbt model yet; scale-to-zero (KEDA HTTP add-on) undecided until run 5.
 - **First real streaming install:** it surfaced about 20 defects, all fixed. See `docs/knowledge-base/gitops.md` and `cluster.md`. The worst: SeaweedFS reserved about 21 GB of disk and caused an eviction storm.
 - **DIFME/DiscountAI (ADR-020):** `services/core/exchange-kernel` (scoring, collateral, slashing, reputation, conservation identity, evidence chains; 8 tests) and `verticals/` (FR-01 live pack, FR-02…09 declared).
 

@@ -13,7 +13,34 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: hyperswitch } }
   template:
-    metadata: { labels: { app: hyperswitch, difme/team: rails, business.metric: psp-sim } }
+    metadata:
+      labels: { app: hyperswitch, difme/team: rails, business.metric: psp-sim }
+      # Secrets come from OpenBao (component reuse), not Kubernetes Secrets: OpenBao's agent injector adds an init
+      # container that logs in with this pod's service account (role hyperswitch, read-only on its own path) and
+      # writes them to an in-memory file, which the containers below read at start. No agent keeps running.
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-pre-populate-only: "true"
+        vault.hashicorp.com/agent-init-first: "true"                                 # before the migrate step
+        vault.hashicorp.com/role: hyperswitch
+        vault.hashicorp.com/agent-service-account-token-volume-name: openbao-token    # audience "vault", 10 min
+        vault.hashicorp.com/agent-requests-cpu: 10m
+        vault.hashicorp.com/agent-requests-mem: 16Mi
+        vault.hashicorp.com/agent-limits-mem: 64Mi
+        vault.hashicorp.com/agent-inject-secret-router.env: secret/data/rails/hyperswitch
+        vault.hashicorp.com/agent-inject-template-router.env: |
+          {{- with secret "secret/data/rails/hyperswitch" }}
+          PGPASSWORD='{{ .Data.data.db_password }}'
+          ROUTER__MASTER_DATABASE__PASSWORD='{{ .Data.data.db_password }}'
+          ROUTER__REPLICA_DATABASE__PASSWORD='{{ .Data.data.db_password }}'
+          ROUTER__ACCOUNTS_DATABASE__PASSWORD='{{ .Data.data.db_password }}'
+          ROUTER__GLOBAL_DATABASE__PASSWORD='{{ .Data.data.db_password }}'
+          ROUTER__ANALYTICS__SQLX__PASSWORD='{{ .Data.data.db_password }}'
+          ROUTER__SECRETS__ADMIN_API_KEY='{{ .Data.data.admin_api_key }}'
+          ROUTER__SECRETS__JWT_SECRET='{{ .Data.data.jwt_secret }}'
+          ROUTER__SECRETS__MASTER_ENC_KEY='{{ .Data.data.master_enc_key }}'
+          ROUTER__API_KEYS__HASH_KEY='{{ .Data.data.api_key_hash_key }}'
+          {{- end }}
     spec:
       serviceAccountName: hyperswitch
       securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
@@ -21,47 +48,38 @@ spec:
         # Schema first: applies only the migrations not yet recorded (idempotent), then the router starts.
         - name: migrate
           image: ghcr.io/pratikmohanty1294/difme-hyperswitch:0.1.0
-          command: [bash, -c, 'until pg_isready -q -h postgres-docdb.database-tier.svc; do sleep 3; done; exec /local/bin/migrate.sh']
+          command: [bash, -c, 'set -a; . /vault/secrets/router.env; set +a; until pg_isready -q -h postgres-docdb.database-tier.svc; do sleep 3; done; exec /local/bin/migrate.sh']
           env:
-            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
             - { name: DATABASE_URL, value: "postgresql://hyperswitch@postgres-docdb.database-tier.svc:5432/hyperswitch" }
           securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
           resources: { requests: { cpu: 20m, memory: 32Mi }, limits: { memory: 128Mi } }
       containers:
         - name: router
           image: ghcr.io/pratikmohanty1294/difme-hyperswitch:0.1.0
+          command: [bash, -c, 'set -a; . /vault/secrets/router.env; set +a; exec /local/bin/router -f /local/config/docker_compose.toml']
           env:
             - { name: ROUTER__MASTER_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
             - { name: ROUTER__MASTER_DATABASE__USERNAME, value: hyperswitch }
-            - { name: ROUTER__MASTER_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
             - { name: ROUTER__MASTER_DATABASE__DBNAME, value: hyperswitch }
             - { name: ROUTER__MASTER_DATABASE__MAX_POOL_SIZE, value: "3" }
             - { name: ROUTER__REPLICA_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
             - { name: ROUTER__REPLICA_DATABASE__USERNAME, value: hyperswitch }
-            - { name: ROUTER__REPLICA_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
             - { name: ROUTER__REPLICA_DATABASE__DBNAME, value: hyperswitch }
             - { name: ROUTER__REPLICA_DATABASE__MAX_POOL_SIZE, value: "3" }
             - { name: ROUTER__ACCOUNTS_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
             - { name: ROUTER__ACCOUNTS_DATABASE__USERNAME, value: hyperswitch }
-            - { name: ROUTER__ACCOUNTS_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
             - { name: ROUTER__ACCOUNTS_DATABASE__DBNAME, value: hyperswitch }
             - { name: ROUTER__ACCOUNTS_DATABASE__MAX_POOL_SIZE, value: "3" }
             - { name: ROUTER__GLOBAL_DATABASE__HOST, value: postgres-docdb.database-tier.svc }
             - { name: ROUTER__GLOBAL_DATABASE__USERNAME, value: hyperswitch }
-            - { name: ROUTER__GLOBAL_DATABASE__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
             - { name: ROUTER__GLOBAL_DATABASE__DBNAME, value: hyperswitch }
             - { name: ROUTER__GLOBAL_DATABASE__MAX_POOL_SIZE, value: "3" }
             - { name: ROUTER__ANALYTICS__SQLX__HOST, value: postgres-docdb.database-tier.svc }
             - { name: ROUTER__ANALYTICS__SQLX__USERNAME, value: hyperswitch }
-            - { name: ROUTER__ANALYTICS__SQLX__PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
             - { name: ROUTER__ANALYTICS__SQLX__DBNAME, value: hyperswitch }
             - { name: ROUTER__ANALYTICS__SQLX__MAX_POOL_SIZE, value: "3" }
             - { name: ROUTER__REDIS__HOST, value: valkey.cache-tier.svc }
             - { name: ROUTER__REDIS__POOL_SIZE, value: "3" }
-            - { name: ROUTER__SECRETS__ADMIN_API_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: admin-api-key } } }
-            - { name: ROUTER__SECRETS__JWT_SECRET, valueFrom: { secretKeyRef: { name: hyperswitch, key: jwt-secret } } }
-            - { name: ROUTER__SECRETS__MASTER_ENC_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: master-enc-key } } }
-            - { name: ROUTER__API_KEYS__HASH_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: api-key-hash-key } } }
             # Card payments: the test processor's calls go to DIFME's acquirer, which sends them over ISO 8583 to the scheme.
             - { name: ROUTER__CONNECTORS__DUMMYCONNECTOR__BASE_URL, value: "http://iso-adapter.rails.svc:8080/dummy-connector" }
             - { name: ROUTER__LOG__CONSOLE__LEVEL, value: INFO }
@@ -78,8 +96,63 @@ spec:
           livenessProbe: { httpGet: { path: /health, port: 8080 }, periodSeconds: 30 }
           securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
           resources: { requests: { cpu: 50m, memory: 160Mi }, limits: { memory: 512Mi } }
+      volumes:
+        - name: openbao-token
+          projected: { sources: [{ serviceAccountToken: { audience: vault, expirationSeconds: 600, path: token } }] }
 ---
 apiVersion: v1
 kind: Service
 metadata: { name: hyperswitch }
 spec: { selector: { app: hyperswitch }, ports: [{ name: http, port: 8080 }] }
+---
+# Puts Hyperswitch's bootstrap values (Kubernetes Secret "hyperswitch", made by dev-secrets.sh) into OpenBao once,
+# before the router starts; afterwards OpenBao is the source and this job leaves an existing path alone. Its role may
+# only create that path (policy hyperswitch-seeder), never read it back.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: hyperswitch-seeder, annotations: { argocd.argoproj.io/hook: PreSync, argocd.argoproj.io/sync-wave: "-1", argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata: { name: hyperswitch-openbao-seed, annotations: { argocd.argoproj.io/hook: PreSync, argocd.argoproj.io/hook-delete-policy: BeforeHookCreation } }
+spec:
+  backoffLimit: 30
+  template:
+    spec:
+      serviceAccountName: hyperswitch-seeder
+      restartPolicy: OnFailure
+      securityContext: { runAsNonRoot: true, runAsUser: 100, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: seed
+          image: curlimages/curl:8.11.1
+          env:
+            - { name: BAO_ADDR, value: "http://openbao.security.svc:8200" }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: hyperswitch, key: db-password } } }
+            - { name: ADMIN_API_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: admin-api-key } } }
+            - { name: JWT_SECRET, valueFrom: { secretKeyRef: { name: hyperswitch, key: jwt-secret } } }
+            - { name: MASTER_ENC_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: master-enc-key } } }
+            - { name: API_KEY_HASH_KEY, valueFrom: { secretKeyRef: { name: hyperswitch, key: api-key-hash-key } } }
+          command: [sh, -c]
+          args:
+            - |
+              set -eu
+              JWT=$(cat /var/run/secrets/openbao/token)
+              LOGIN=$(curl -sf -X POST "$BAO_ADDR/v1/auth/kubernetes/login" -d "{\"role\":\"hyperswitch-seeder\",\"jwt\":\"$JWT\"}")
+              TOKEN=$(printf '%s' "$LOGIN" | sed -n 's/.*"client_token":"\([^"]*\)".*/\1/p')
+              [ -n "$TOKEN" ] || { echo "OpenBao login failed"; exit 1; }
+              if curl -sf -o /dev/null -H "X-Vault-Token: $TOKEN" "$BAO_ADDR/v1/secret/metadata/rails/hyperswitch"; then
+                echo "secret/rails/hyperswitch already in OpenBao: left as it is"; exit 0
+              fi
+              # cas=0: written only if nobody wrote it in between. Values are random letters/digits/hex (no JSON escaping needed).
+              code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "X-Vault-Token: $TOKEN" "$BAO_ADDR/v1/secret/data/rails/hyperswitch" \
+                -d "{\"options\":{\"cas\":0},\"data\":{\"db_password\":\"$DB_PASSWORD\",\"admin_api_key\":\"$ADMIN_API_KEY\",\
+              \"jwt_secret\":\"$JWT_SECRET\",\"master_enc_key\":\"$MASTER_ENC_KEY\",\"api_key_hash_key\":\"$API_KEY_HASH_KEY\"}}")
+              [ "$code" = 200 ] || { echo "write refused: HTTP $code"; exit 1; }
+              echo "secret/rails/hyperswitch written to OpenBao"
+          volumeMounts: [{ name: openbao-token, mountPath: /var/run/secrets/openbao, readOnly: true }]
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 64Mi } }
+      volumes:
+        - name: openbao-token
+          projected: { sources: [{ serviceAccountToken: { audience: vault, expirationSeconds: 600, path: token } }] }

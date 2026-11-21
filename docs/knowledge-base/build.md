@@ -123,3 +123,10 @@ decompress `pkg-*.tar.zst` with the Python `zstandard` package (no `zstd` binary
   register DIFME's rules again in `afterEvaluate`.
 - **Restarting a Spring Boot service:** SIGTERM can take >30 s (webServer shutdown timeout); wait for the old process to
   exit before starting the new one, or the old code keeps serving (we lost time to that).
+
+## Hyperswitch router needs more than 16 GB to compile (2026-11-21)
+In a 16 GB / 4 CPU container (nothing else running, `-j 2`, `CARGO_INCREMENTAL=0`), `cargo build --profile
+release-fast --bin router` was killed by the kernel three times: on `router` with opt-level 1, and on
+`hyperswitch_connectors` (peak 14,989 MB used) with router at opt-level 0. The build tree also needs ~8 GB of disk.
+Build the image on a machine with at least 24 GB RAM (or with swap), or turn off router features DIFME doesn't use.
+

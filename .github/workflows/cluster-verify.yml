@@ -13,7 +13,9 @@ on:
       measure:  { description: "Payment baseline after the profiles: ci/measure.sh args, e.g. '200 60s' (empty = skip)", default: "", type: string }
       settle:   { description: "Seconds to wait after convergence before the process report (idle I/O measurements; 0 = none)", default: "0", type: string }
 permissions: { contents: read }
-concurrency: { group: "cluster-verify-${{ github.ref }}-${{ inputs.profiles }}-${{ inputs.runner }}", cancel-in-progress: false }
+# One cluster at a time, repo-wide: each run holds a 16 GB runner for up to ~3 h, and five in parallel on 2026-11-20
+# preceded GitHub disabling Actions for the account. A newer dispatch waits; GitHub keeps only the latest one pending.
+concurrency: { group: cluster-verify, cancel-in-progress: false }
 
 jobs:
   verify:

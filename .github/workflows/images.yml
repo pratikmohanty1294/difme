@@ -3,7 +3,7 @@ name: images
 on:
   push:
     branches: [main]
-    paths: ["services/**", "ml/fraud/**", "vendor/**", "backoffice/**", "pwa/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml", ".github/workflows/_manifest.yml"]
+    paths: ["services/**", "ml/fraud/**", "ml/feast/**", "verticals/**", "vendor/**", "backoffice/**", "pwa/**", "analytics/**", "processes/dmn/**", "deploy/images/**", "api/proto/**", ".github/workflows/images.yml", ".github/workflows/_image.yml", ".github/workflows/_manifest.yml"]
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write, attestations: write }
 # A newer push supersedes an older image build of the same ref: every run rebuilds every image, so three merges in a
@@ -11,7 +11,57 @@ permissions: { contents: read, packages: write, id-token: write, attestations: w
 concurrency: { group: "images-${{ github.ref }}", cancel-in-progress: true }
 
 jobs:
+  # Builds only the images whose sources changed since the last successful images run on this branch (not just since
+  # the previous push: a cancelled run must not drop an image). Manual dispatch, a first run, or a change to the image
+  # pipeline itself rebuilds everything. Every-image rebuilds on each merge (~30 jobs) were the bulk of the Actions
+  # usage that got the account's Actions disabled (2026-11-20).
+  changes:
+    runs-on: ubuntu-24.04
+    permissions: { contents: read, actions: read }
+    outputs:
+      core: ${{ steps.d.outputs.core }}
+      backoffice: ${{ steps.d.outputs.backoffice }}
+      pwa: ${{ steps.d.outputs.pwa }}
+      flink: ${{ steps.d.outputs.flink }}
+      dbt: ${{ steps.d.outputs.dbt }}
+      formio: ${{ steps.d.outputs.formio }}
+      hub: ${{ steps.d.outputs.hub }}
+      attestation: ${{ steps.d.outputs.attestation }}
+      feast: ${{ steps.d.outputs.feast }}
+      notary: ${{ steps.d.outputs.notary }}
+      fraud: ${{ steps.d.outputs.fraud }}
+      debezium: ${{ steps.d.outputs.debezium }}
+      veraison: ${{ steps.d.outputs.veraison }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: d
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          base=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow images.yml --branch "$GITHUB_REF_NAME" --status success \
+                 --limit 1 --json headSha -q '.[0].headSha' 2>/dev/null || true)
+          all=false
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then all=true; fi
+          files=$([ "$all" = true ] || git diff --name-only "$base" HEAD)
+          echo "$files" | grep -qE '^\.github/workflows/(images|_image|_manifest)\.yml$' && all=true
+          echo "base ${base:-none} all=$all"; echo "$files" | head -50
+          check() { if [ "$all" = true ] || echo "$files" | grep -qE "$2"; then echo "$1=true" >> "$GITHUB_OUTPUT"; echo "build: $1"; else echo "$1=false" >> "$GITHUB_OUTPUT"; fi; }
+          check core '^(services/core/|api/proto/|api/openapi/|verticals/)'
+          check backoffice '^(backoffice/|vendor/formio/js/)'
+          check pwa '^pwa/'
+          check flink '^(analytics/flink-jobs/|processes/dmn/)'
+          check dbt '^analytics/dbt/'
+          check formio '^(vendor/formio/server/|deploy/images/formio/)'
+          check hub '^(services/hub/|api/proto/|deploy/images/quinn-hub/)'
+          check attestation '^(services/attestation/|api/proto/|deploy/images/attestation-verifier/)'
+          check feast '^(ml/feast/|deploy/images/feast/)'
+          check notary '^(services/notary/|deploy/images/notary/)'
+          check fraud '^(services/fraud-scorer/|ml/fraud/|deploy/images/fraud-scorer/)'
+          check debezium '^deploy/images/debezium-connect/'
+          check veraison '^deploy/images/veraison/'
   core:
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
     # ADR-012 hybrid runtimes: native images for light I/O-bound services, JVM + AOT cache for hot paths.
     # Built per arch on matching runners (2026-11-20, arm64 runtime): native binaries and the Java AOT cache are both
     # CPU-specific, so emulation is not an option. core-manifest joins -amd64/-arm64 under the plain tag and signs it.
@@ -55,8 +105,8 @@ jobs:
     # -U above: the restored x64 Maven cache held "not found" markers for artifacts that exist in Central (qry-svc
     # failed twice on amd64 only, 2026-11-20). !cancelled(): one failed leg must not skip every other manifest;
     # a module whose arch images are missing fails its own join step.
-    needs: core
-    if: ${{ !cancelled() }}
+    needs: [changes, core]
+    if: ${{ !cancelled() && needs.changes.outputs.core == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +117,8 @@ jobs:
       name: difme-${{ matrix.module }}
 
   backoffice:
+    needs: changes
+    if: needs.changes.outputs.backoffice == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -86,6 +138,8 @@ jobs:
         OUT=${{ matrix.out }}
 
   pwa:
+    needs: changes
+    if: needs.changes.outputs.pwa == 'true'
     # DiscountAI role apps (ADR-020): installable PWAs on the live exchange.
     strategy:
       fail-fast: false
@@ -100,6 +154,8 @@ jobs:
         APP=${{ matrix.app }}
 
   flink-jobs:
+    needs: changes
+    if: needs.changes.outputs.flink == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-flink-jobs
@@ -108,6 +164,8 @@ jobs:
       prebuild: mvn -B -ntp -q -f analytics/flink-jobs/pom.xml package -DskipTests
 
   dbt:
+    needs: changes
+    if: needs.changes.outputs.dbt == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-dbt
@@ -115,6 +173,8 @@ jobs:
       dockerfile: analytics/dbt/Dockerfile
 
   formio:
+    needs: changes
+    if: needs.changes.outputs.formio == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-formio
@@ -122,26 +182,36 @@ jobs:
       dockerfile: deploy/images/formio/Dockerfile
 
   quinn-hub:
+    needs: changes
+    if: needs.changes.outputs.hub == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-quinn-hub
       dockerfile: deploy/images/quinn-hub/Dockerfile
   attestation-verifier:
+    needs: changes
+    if: needs.changes.outputs.attestation == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-attestation-verifier
       dockerfile: deploy/images/attestation-verifier/Dockerfile
   feast:
+    needs: changes
+    if: needs.changes.outputs.feast == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-feast
       dockerfile: deploy/images/feast/Dockerfile
   notary:
+    needs: changes
+    if: needs.changes.outputs.notary == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-notary
       dockerfile: deploy/images/notary/Dockerfile
   fraud-scorer:
+    needs: changes
+    if: needs.changes.outputs.fraud == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-fraud-scorer
@@ -152,6 +222,8 @@ jobs:
         curl -fsS -X POST -H 'content-type: application/json' -d '{"amountZscore":0.2,"txnCount1h":1,"distinctCounterparties24h":2,"geoJumpKm1h":3,"newDeviceFlag":0,"edgeScoreMean24h":860}' localhost:18090/v1/score || { docker logs fs; exit 1; }
 
   debezium-connect:
+    needs: changes
+    if: needs.changes.outputs.debezium == 'true'
     uses: ./.github/workflows/_image.yml
     with:
       name: difme-debezium-connect
@@ -160,6 +232,8 @@ jobs:
       version: "3.7.1"
 
   veraison:
+    needs: changes
+    if: needs.changes.outputs.veraison == 'true'
     # Veraison publishes no images; built from a pinned commit (see the Dockerfile). The smoke test starts all three
     # services against the dev config and fails if any exits within 15 s.
     uses: ./.github/workflows/_image.yml

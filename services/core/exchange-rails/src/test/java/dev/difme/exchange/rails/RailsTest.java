@@ -157,4 +157,17 @@ class RailsTest {
         assertEquals(b, h.releasedMinor(), "B = A + Y + F fully accounted for");
         assertEquals(p - b, dp - y - f, "buyer saving S = P − B");
     }
+
+    @Test
+    void partialRefundKeepsTheHoldBalancedAndIsIdempotent() {
+        var escrow = new SimRails().escrow;
+        escrow.hold("h-1", "buyer", 1_000);
+        escrow.release("h-1", "principal", "partner", 800);
+        assertEquals(100, escrow.refund("h-1", "return", 100).refundedMinor());
+        assertEquals(100, escrow.refund("h-1", "return", 100).refundedMinor());          // retried: applied once
+        assertThrows(IllegalStateException.class, () -> escrow.refund("h-1", "more", 200)); // only 100 remains
+        var settled = escrow.release("h-1", "yield", "partner", 100);
+        assertEquals(EscrowPort.State.SETTLED, settled.state());                           // released + refunded = held
+        assertEquals(0, settled.remainingMinor());
+    }
 }

@@ -34,7 +34,7 @@ public final class SimEscrow implements EscrowPort {
         }
         long released = h.releasedMinor() + amountMinor;
         Hold n = new Hold(holdId, h.payer(), h.heldMinor(), released, h.refundedMinor(),
-                released == h.heldMinor() ? State.SETTLED : State.PARTLY_RELEASED);
+                released + h.refundedMinor() == h.heldMinor() ? State.SETTLED : State.PARTLY_RELEASED);   // a partial refund counts
         holds.put(holdId, n);
         return n;
     }
@@ -44,6 +44,22 @@ public final class SimEscrow implements EscrowPort {
         Hold h = require(holdId);
         if (h.remainingMinor() == 0) return h;
         Hold n = new Hold(holdId, h.payer(), h.heldMinor(), h.releasedMinor(), h.refundedMinor() + h.remainingMinor(), State.REFUNDED);
+        holds.put(holdId, n);
+        return n;
+    }
+
+    @Override
+    public synchronized Hold refund(String holdId, String refundId, long amountMinor) {
+        Hold h = require(holdId);
+        if (!releases.add(holdId + "|refund|" + refundId)) return h;   // retried refund: already applied
+        if (h.state() == State.REFUNDED || amountMinor <= 0 || amountMinor > h.remainingMinor()) {
+            releases.remove(holdId + "|refund|" + refundId);
+            throw new IllegalStateException("refund " + amountMinor + " exceeds remaining " + h.remainingMinor() + " on " + holdId);
+        }
+        long refunded = h.refundedMinor() + amountMinor;
+        boolean done = h.releasedMinor() + refunded == h.heldMinor();
+        Hold n = new Hold(holdId, h.payer(), h.heldMinor(), h.releasedMinor(), refunded,
+                done ? (h.releasedMinor() == 0 ? State.REFUNDED : State.SETTLED) : h.state());
         holds.put(holdId, n);
         return n;
     }

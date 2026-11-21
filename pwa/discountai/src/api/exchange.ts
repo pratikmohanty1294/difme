@@ -44,6 +44,10 @@ export interface EvidenceView {
 }
 export interface Hold { holdId: string; heldMinor: number; releasedMinor: number; state: string }
 export interface Fulfilment { auctionId: number; verified: boolean; problems: string[]; escrow: Hold; yieldReleaseAtMs: number }
+export interface ReturnResult {
+  auctionId: number; fractionBps: number; buyerRefundMinor: number; merchantRefundMinor: number; partnerClawbackMinor: number;
+  yieldVoidedMinor: number; feeReversedMinor: number; escrow: Hold;
+}
 export interface MandateIn {
   partnerRef: string; limitMinor: number; maxPerOrderMinor: number; minYieldPct: number; depositMinor: number;
   budgetTotalMinor: number; merchantCount: number; goodsCount: number; validityDays: number; cardJurisdiction: string;
@@ -62,6 +66,8 @@ export const exchange = {
   evidence: (id: number) => call<EvidenceView>('GET', `/auctions/${id}/evidence`),
   /** Dev clusters: the simulated merchant and carrier deliver and submit their signed proof of delivery. */
   simDelivery: (id: number) => call<Fulfilment>('POST', `/auctions/${id}/sim/delivery`),
+  /** FR-01 return inside the return window: full (10000) or partial (fractionBps of the order). */
+  returnOrder: (id: number, fractionBps = 10_000) => call<ReturnResult>('POST', `/auctions/${id}/returns`, { fractionBps }),
   registerMandate: (m: MandateIn) => call<MandateRegistered>('POST', `/${PACK}/mandates`, m),
   mandate: (id: number) => call<MandateState>('GET', `/${PACK}/mandates/${id}`),
   /** Cheap reachability probe (the public verification keys). */

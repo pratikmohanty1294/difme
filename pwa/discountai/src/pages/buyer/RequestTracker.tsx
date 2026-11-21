@@ -5,6 +5,7 @@ import { refundFor, useEngine } from '../../sim/engine';
 import { inr, ms } from '../../sim/format';
 import type { BuyRequest, RefundCase, TimelineStep } from '../../sim/types';
 import { Badge, Callout, KV, cx } from '../../components/ui';
+import { LIVE } from '../../api/exchange';
 
 const PHASES: { key: TimelineStep['phase']; label: string }[] = [
   { key: 'POI', label: 'Request' }, { key: 'POL', label: 'Matched' }, { key: 'PRL', label: 'Hold placed' }, { key: 'POE', label: 'Bought · shipped' }, { key: 'POC', label: 'Settled' },
@@ -99,7 +100,8 @@ export function RequestTracker({ req, compact }: { req: BuyRequest; compact?: bo
           <p className="label mb-2 flex items-center gap-1.5"><RotateCcw size={13} /> Withdraw from contract here</p>
           <p className="text-[13px] text-ink-600 mb-3">Choose what you are sending back, then confirm. Refunds run in two legs: the merchant refunds the buying partner's card, and DiscountAI refunds you straight away from escrow.</p>
           <div className="flex flex-wrap gap-2">
-            {CASES.map((c) => {
+            {/* Live: inside the return window the yield is still frozen, so "after payout" can't happen; the exchange refuses returns after it. */}
+            {CASES.filter((c) => !LIVE || c.id !== 'post-payout').map((c) => {
               const r = refundFor(s, c.id);
               return confirm === c.id ? (
                 <span key={c.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
@@ -117,7 +119,7 @@ export function RequestTracker({ req, compact }: { req: BuyRequest; compact?: bo
         </div>
       )}
 
-      {ack && (
+      {ack && (!LIVE || (req.refunds?.length ?? 0) > 0) && (
         <Callout tone="good" title="Withdrawal received">
           We received your withdrawal for order <span className="font-mono">{req.orderId}</span> ({ack.label.toLowerCase()}) on {ack.at.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}. Your refund of {inr(ack.amount)} is on its way. In the live service this acknowledgement is also e-mailed to you.
         </Callout>

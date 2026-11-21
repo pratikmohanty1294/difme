@@ -19,5 +19,8 @@ public interface EscrowPort {
     /** Refunds whatever remains to the payer. */
     Hold refund(String holdId);
 
+    /** Refunds part of what remains to the payer (a partial return); refundId makes retries safe. */
+    Hold refund(String holdId, String refundId, long amountMinor);
+
     Hold get(String holdId);
 }

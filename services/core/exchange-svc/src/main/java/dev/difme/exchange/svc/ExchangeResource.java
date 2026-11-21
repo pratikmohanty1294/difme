@@ -294,6 +294,26 @@ public class ExchangeResource {
         return fulfilment(auctionId, exchange.simParties().deliver(auctionId, e.merchantId(), r.award().split().a(), System.currentTimeMillis()));
     }
 
+    public record ReturnRequest(Integer fractionBps) {}
+
+    /**
+     * FR-01 buyer return inside the return window: full (default) or partial (fractionBps of the order). Two-leg
+     * refund; see Exchange.returnOrder. 409 before delivery is accepted, after the window, or for a second return.
+     */
+    @POST
+    @Path("/auctions/{id}/returns")
+    public Response returnOrder(@PathParam("id") long auctionId, ReturnRequest req) {
+        int bps = req == null || req.fractionBps() == null ? 10_000 : req.fractionBps();
+        if (bps <= 0 || bps > 10_000) return Response.status(400).entity(Map.of("error", "fractionBps must be 1..10000")).build();
+        try {
+            Exchange.Return r = exchange.returnOrder(auctionId, bps, System.currentTimeMillis());
+            if (r == null) return Response.status(409).entity(Map.of("error", "no accepted delivery for this order")).build();
+            return Response.ok(r).build();
+        } catch (IllegalStateException e) {
+            return Response.status(409).entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+
     /** Releases the yield Y after the return window. */
     @POST
     @Path("/auctions/{id}/settle")

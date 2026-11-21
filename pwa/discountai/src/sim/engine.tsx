@@ -708,6 +708,30 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const refundRequest = useCallback<Ctx['refundRequest']>((id, kind) => {
     const r = ref.current.requests.find((x) => x.id === id);
     if (!r?.split || r.status !== 'Success') return;
+    if (LIVE) {
+      // The exchange runs the two-leg refund and decides what is allowed (return window, one return per order).
+      const auction = Number(r.auctionId.replace(/^auc_/, ''));
+      const t0 = (r.timeline.at(-1)?.t ?? 0) + 1;
+      const step = (dt: number, actor: TimelineStep['actor'], label: string, detail?: string) =>
+        dispatch({ type: 'step', id, step: { t: t0 + dt, actor, label, detail, phase: 'REFUND' } });
+      exchange.returnOrder(auction, kind === 'partial' ? 5_000 : 10_000).then((x) => {
+        const rec: RefundRecord = { case: kind, at: new Date().toISOString(), merchantRefundToInvestor: x.merchantRefundMinor / 100,
+          buyerRefund: x.buyerRefundMinor / 100, investorClawback: x.partnerClawbackMinor / 100, feeReversal: x.feeReversedMinor / 100,
+          recovery: `Frozen yield ${inr(x.yieldVoidedMinor / 100)} refunded from escrow; the merchant's refund to the buying partner's card is clawed back` };
+        step(0, 'Merchant PSP', `Leg 1 · ${r.merchant} refunds ${inr(rec.merchantRefundToInvestor)} to the buying partner's card`);
+        step(0.1, 'Agent PA/PG', `Leg 2 · ${inr(rec.buyerRefund)} refunded to you`, `yield ${inr(x.yieldVoidedMinor / 100)} voided · fee ${inr(rec.feeReversal)} reversed`);
+        dispatch({ type: 'refund', id, refund: rec });
+        dispatch({ type: 'patchRequest', id, patch: { status: kind === 'partial' ? 'Success' : 'Refunded' } });
+        dispatch({ type: 'notify', notice: { id: rid('n'), at: new Date().toISOString(), party: 'Buyer', title: `Refunded ${inr(rec.buyerRefund)}`,
+          body: `Back to your original payment method straight away.`, amount: rec.buyerRefund, tone: 'good', requestId: id } });
+      }).catch((e) => {
+        const why = e instanceof ExchangeError ? (e.status === 0 ? 'the exchange is unreachable' : e.message) : String(e);
+        step(0, 'OME', `Return refused: ${why}`);
+        dispatch({ type: 'notify', notice: { id: rid('n'), at: new Date().toISOString(), party: 'Buyer', title: 'Return not accepted',
+          body: `The exchange refused the return: ${why}.`, tone: 'warn', requestId: id } });
+      });
+      return;
+    }
     // Claw back what was actually paid out (a failover backup may have earned a different yield than the quote).
     const rec: RefundRecord = { at: new Date().toISOString(), ...refundFor({ ...r.split, Y: r.investorYieldPaid ?? r.split.Y }, kind) };
     const t = (r.timeline.at(-1)?.t ?? 0) + 1000;

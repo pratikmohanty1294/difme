@@ -286,6 +286,42 @@ class ExchangeResourceTest {
                 .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).body("riskSource", equalTo("edge"));
     }
 
+    /** FR-01 return: two-leg refund inside the window; the partner keeps only the yield on what was kept. */
+    @Test
+    void halfReturnRefundsTheBuyerAndVoidsHalfTheYield() throws Exception {
+        long id = given().contentType(ContentType.JSON).body(intent(900, 9_500_000))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body(bid(61, 400_000, 95, 5_000, 6_000_000))
+                .post("/v1/exchange/auctions/" + id + "/bids").then().statusCode(202);
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline && given().get("/v1/exchange/auctions/" + id).jsonPath().get("award") == null) {
+            Thread.sleep(20);
+        }
+        given().contentType(ContentType.JSON).body("{}").post("/v1/exchange/auctions/" + id + "/returns").then().statusCode(409);  // not bought
+        given().contentType(ContentType.JSON).body("{\"merchantId\": \"m-8\"}")
+                .post("/v1/exchange/auctions/" + id + "/execute").then().statusCode(200);
+        given().post("/v1/exchange/auctions/" + id + "/sim/delivery").then().statusCode(200);
+        // Test profile: return window 0, so over HTTP the window has already closed...
+        given().contentType(ContentType.JSON).body("{}").post("/v1/exchange/auctions/" + id + "/returns").then().statusCode(409)
+                .body("error", equalTo("the return window has closed"));
+        given().contentType(ContentType.JSON).body("{\"fractionBps\": 0}").post("/v1/exchange/auctions/" + id + "/returns").then().statusCode(400);
+        // ...so the half return is made at a time inside it. A = 8,000,000, Y = 400,000, F = 100,000, B = 8,500,000.
+        var ret = exchange.returnOrder(id, 5_000, 0);
+        org.junit.jupiter.api.Assertions.assertEquals(4_000_000, ret.merchantRefundMinor());   // leg 1: merchant → partner card
+        org.junit.jupiter.api.Assertions.assertEquals(4_000_000, ret.partnerClawbackMinor());  // ...clawed back
+        org.junit.jupiter.api.Assertions.assertEquals(200_000, ret.yieldVoidedMinor());        // frozen yield, from escrow
+        org.junit.jupiter.api.Assertions.assertEquals(50_000, ret.feeReversedMinor());
+        org.junit.jupiter.api.Assertions.assertEquals(4_250_000, ret.buyerRefundMinor());      // leg 2: half of B
+        org.junit.jupiter.api.Assertions.assertEquals(200_000, ret.escrow().refundedMinor());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> exchange.returnOrder(id, 5_000, 0));
+        // Settlement pays the partner only the yield on the half that was kept, and the hold balances exactly.
+        given().post("/v1/exchange/auctions/" + id + "/settle").then().statusCode(200)
+                .body("releasedMinor", equalTo(8_000_000 + 100_000 + 200_000))
+                .body("refundedMinor", equalTo(200_000))
+                .body("state", equalTo("SETTLED"));
+        given().get("/v1/exchange/auctions/" + id + "/evidence").then().statusCode(200).body("artifacts.type", hasItem("refund"));
+    }
+
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
                                               long amount, long deliveredAt) throws Exception {
         var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",

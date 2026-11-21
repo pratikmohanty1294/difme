@@ -174,6 +174,12 @@ public class Exchange {
                 return size() > keep;
             }
         });
+        returns = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, false) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Long, Return> e) {
+                return size() > keep;
+            }
+        });
         for (String id : packIds) {
             VerticalPack pack;
             try {
@@ -478,6 +484,55 @@ public class Exchange {
         }
     }
 
+    /**
+     * A buyer's return inside the pack's return window (after an accepted proof of delivery, before the yield is
+     * released). Two legs, as in FR-01: the merchant refunds A·r to the buying partner's card, which the exchange claws
+     * back; the buyer gets B·r at once, made of that A·r, the frozen yield Y·r (refunded from escrow) and the fee F·r
+     * (reversed). The partner is made whole and loses only the yield on what came back.
+     */
+    public record Return(long auctionId, int fractionBps, long buyerRefundMinor, long merchantRefundMinor, long partnerClawbackMinor,
+                         long yieldVoidedMinor, long feeReversedMinor, EscrowPort.Hold escrow) {}
+
+    private Map<Long, Return> returns;
+
+    public Return returnOrder(long auctionId, int fractionBps, long nowMs) {
+        if (fractionBps <= 0 || fractionBps > 10_000) throw new IllegalArgumentException("fractionBps must be 1..10000");
+        Fulfilment f = fulfilments.get(auctionId);
+        Result r = results.get(auctionId);
+        Execution e = executions.get(auctionId);
+        if (f == null || r == null || e == null) return null;
+        synchronized (returns) {
+            if (returns.containsKey(auctionId)) throw new IllegalStateException("this order already has a return");
+            if (nowMs >= f.yieldReleaseAtMs()) throw new IllegalStateException("the return window has closed");
+            CommerceSplit s = r.award().split();
+            long merchant = Math.round(s.a() * (fractionBps / 10_000.0));
+            long yieldBack = Math.round(s.yield() * (fractionBps / 10_000.0));
+            long feeBack = Math.round(s.fee() * (fractionBps / 10_000.0));
+            String holdId = "auction-" + auctionId;
+            EscrowPort.Hold hold = yieldBack > 0 ? rails.escrow.refund(holdId, "return", yieldBack) : rails.escrow.get(holdId);
+            Return ret = new Return(auctionId, fractionBps, merchant + yieldBack + feeBack, merchant, merchant, yieldBack, feeBack, hold);
+            EvidenceChain chain = chains.get(auctionId);
+            if (chain != null) {
+                Map<String, Object> p = new LinkedHashMap<>();
+                p.put("fractionBps", fractionBps);
+                p.put("buyerRefund", ret.buyerRefundMinor());
+                p.put("merchantRefundToPartner", merchant);
+                p.put("partnerClawback", merchant);
+                p.put("yieldVoided", yieldBack);
+                p.put("feeReversed", feeBack);
+                p.put("currency", "INR");
+                chain.append(EvidenceChain.Type.refund, EvidenceChain.Signal.Asserted, p);
+            }
+            returns.put(auctionId, ret);
+            metrics.counter("difme_exchange_returns_total", "pack", r.pack()).increment();
+            return ret;
+        }
+    }
+
+    public Return returned(long auctionId) {
+        return returns.get(auctionId);
+    }
+
     /** Releases the yield Y once the return window has passed. Null when there is no accepted fulfilment. */
     public EscrowPort.Hold settle(long auctionId, long nowMs) {
         Fulfilment f = fulfilments.get(auctionId);
@@ -485,7 +540,8 @@ public class Exchange {
         Execution e = executions.get(auctionId);
         if (f == null || r == null || e == null) return null;
         if (nowMs < f.yieldReleaseAtMs()) throw new IllegalStateException("return window open for another " + (f.yieldReleaseAtMs() - nowMs) + " ms");
-        long y = r.award().split().yield();
+        Return ret = returns.get(auctionId);
+        long y = r.award().split().yield() - (ret == null ? 0 : ret.yieldVoidedMinor());   // only the yield on what was kept
         String holdId = "auction-" + auctionId;
         return y > 0 ? rails.escrow.release(holdId, "yield", "partner-" + e.boughtBy(), y) : rails.escrow.get(holdId);
     }

@@ -166,6 +166,34 @@ paths:
         "404": { description: Simulated parties are off }
         "409": { $ref: "#/components/responses/ExchangeError" }
         "422": { description: Proof rejected (problems listed), content: { application/json: { schema: { $ref: "#/components/schemas/Fulfilment" } } } }
+  /v1/exchange/auctions/{auctionId}/returns:
+    post:
+      operationId: returnOrder
+      summary: FR-01 buyer return inside the return window (full by default, or fractionBps of the order); two-leg refund
+      description: "The merchant refunds A·r to the buying partner's card and the exchange claws it back; the buyer is refunded B·r at once (that A·r, the frozen yield Y·r from escrow and the reversed fee F·r). One return per order."
+      security: [{ oauth2: [exchange:write] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AuctionId" }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { fractionBps: { type: integer, minimum: 1, maximum: 10000, default: 10000 } } } } }
+      responses:
+        "200":
+          description: Refunded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auctionId: { type: integer, format: int64 }
+                  fractionBps: { type: integer }
+                  buyerRefundMinor: { type: integer, format: int64 }
+                  merchantRefundMinor: { type: integer, format: int64 }
+                  partnerClawbackMinor: { type: integer, format: int64 }
+                  yieldVoidedMinor: { type: integer, format: int64 }
+                  feeReversedMinor: { type: integer, format: int64 }
+                  escrow: { type: object }
+        "400": { $ref: "#/components/responses/ExchangeError" }
+        "409": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/auctions/{auctionId}/settle:
     post:
       operationId: settleYield

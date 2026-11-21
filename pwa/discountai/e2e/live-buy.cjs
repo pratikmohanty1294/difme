@@ -24,6 +24,7 @@ const api = {
   'GET /api/v1/exchange/auctions/1795210509895001/evidence': [200, { chain: 'c1', sealed: true, artifacts: [], verdict: { hashes: true, links: true, seal: true, witnesses: true, notes: [] } }],
   'POST /api/v1/exchange/auctions/1795210509895001/sim/delivery': [200, { auctionId: 1795210509895001, verified: true, problems: [],
     escrow: { holdId: 'auction-1795210509895001', heldMinor: 1684000, releasedMinor: 1620000, state: 'PARTLY_RELEASED' }, yieldReleaseAtMs: Date.now() + 7 * 86400000 }],
+  'POST /api/v1/exchange/auctions/1795210509895001/returns': [200, { auctionId: 1795210509895001, fractionBps: 5000 }],
   'GET /api/v1/exchange/keys': [200, { 'exchange-svc': 'k', 'notary-1': 'k' }],
 };
 const srv = http.createServer((req, res) => {
@@ -42,7 +43,10 @@ const srv = http.createServer((req, res) => {
       if (key.endsWith('/intents') && body) split = fromIntent(JSON.parse(body));
       let [code, json] = api[key] ?? [404, { error: 'not faked: ' + key }];
       if (split && json.award) json = { ...json, award: { ...json.award, split } };
-      if (split && json.escrow) json = { ...json, escrow: { ...json.escrow, heldMinor: split.b,
+      if (split && key.endsWith('/returns')) { const h = (m) => Math.round(m / 2);
+        json = { ...json, merchantRefundMinor: h(split.a), partnerClawbackMinor: h(split.a), yieldVoidedMinor: h(split.yield),
+                 feeReversedMinor: h(split.fee), buyerRefundMinor: h(split.a) + h(split.yield) + h(split.fee), escrow: { refundedMinor: h(split.yield) } }; }
+      if (split && json.escrow && !key.endsWith('/returns')) json = { ...json, escrow: { ...json.escrow, heldMinor: split.b,
         releasedMinor: key.endsWith('/delivery') ? split.a + split.fee : split.a } };
       res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(json));
     }); return;
@@ -76,12 +80,18 @@ srv.listen(18181, async () => {
   await p.getByRole('button', { name: /Send to the exchange/ }).click();
   await p.waitForTimeout(5000);
   await p.screenshot({ path: path.join(OUT, REFUSE ? 'refused.png' : 'bought.png'), fullPage: true });
+  if (!REFUSE) {                                   // FR-01 return: half the order back, two legs
+    await p.getByRole('button', { name: /Return half/ }).click();
+    await p.getByRole('button', { name: 'Confirm withdrawal' }).click();
+    await p.waitForTimeout(1500);
+  }
   const txt = await p.locator('main').innerText();
   const page = await p.innerText('body');
   const inr = (m) => '₹' + Math.round(m / 100).toLocaleString('en-IN');
   const want = REFUSE ? ['Refused by the exchange: RISK_UNSCORED']
     : ['Intent accepted', 'Awarded to node', 'Hold of', 'Bought by node', 'Evidence chain verified', 'Delivered',
-       inr(split.b), `Saved ${inr(split.buyerSaves)}`];
+       inr(split.b), `Saved ${inr(split.buyerSaves)}`,
+       `Leg 2 · ${inr(Math.round(split.a / 2) + Math.round(split.yield / 2) + Math.round(split.fee / 2))} refunded to you`];
   const checks = [...want.map((k) => [k, txt.includes(k)]),
     ['no browser rule pre-check', !calls.some((c) => c.startsWith('POST /api/rules'))],
     ['no prototype labels', !page.includes('All data simulated') && !page.includes('Prototype control')],

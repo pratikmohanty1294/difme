@@ -147,6 +147,24 @@ if [ "$rc" -eq 0 ] && kubectl -n core-platform get svc pwa-shopbot >/dev/null 2>
   echo "== live buy through the PWA"
   python3 ci/live-buy.py || true
 fi
+# Exchange restart smoke (informational): a mandate registered before the pod is replaced must still be there after
+# (StateStore in YugabyteDB). Runs only where exchange-svc has its store configured.
+if [ "$rc" -eq 0 ] && kubectl -n core-platform get deploy exchange-svc -o yaml 2>/dev/null | grep -q DIFME_EXCHANGE_STORE_URL; then
+  echo "== exchange state survives a restart"
+  ex=/api/v1/namespaces/core-platform/services/exchange-svc:8089/proxy/v1/exchange
+  kubectl -n core-platform port-forward svc/exchange-svc 18089:8089 >/dev/null 2>&1 & pf=$!; sleep 3
+  mid=$(curl -s -X POST -H 'Content-Type: application/json' localhost:18089/v1/exchange/fr01-buy/mandates -d '{"partnerRef":"restart-smoke","limitMinor":2500000,"maxPerOrderMinor":2500000,"minYieldPct":4,"depositMinor":2000000,"budgetTotalMinor":2500000,"merchantCount":2,"goodsCount":5,"validityDays":5,"cardJurisdiction":"IN_DOMESTIC_AFA"}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mandateId",""))' 2>/dev/null)
+  kill $pf 2>/dev/null
+  sleep 1   # > the 50 ms flush interval
+  if [ -n "$mid" ]; then
+    kubectl -n core-platform rollout restart deploy/exchange-svc >/dev/null && kubectl -n core-platform rollout status deploy/exchange-svc --timeout=180s >/dev/null 2>&1
+    got=$(kubectl get --raw "$ex/fr01-buy/mandates/$mid" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mandateId",""))' 2>/dev/null)
+    [ "$got" = "$mid" ] && echo "  mandate $mid survived the restart: ok" || echo "  mandate $mid NOT found after the restart"
+    kubectl -n core-platform logs deploy/exchange-svc --tail=200 2>/dev/null | grep -E "state restored|state store|cannot load" | tail -2 | cut -c1-200
+  else
+    echo "  could not register a mandate"
+  fi
+fi
 # Lineage smoke (informational): what has reached Marquez (Trino queries, dbt runs every 15 min, Flink job status).
 if [ "$rc" -eq 0 ] && kubectl -n governance get svc marquez >/dev/null 2>&1; then
   echo "== lineage in Marquez"

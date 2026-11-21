@@ -446,6 +446,8 @@ spec:
           value: 'true'
         - name: FLAGD_HOST
           value: flagd.core-platform.svc
+        - name: DIFME_EXCHANGE_STORE_URL
+          value: jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme
         readinessProbe:
           httpGet:
             path: /q/health/ready

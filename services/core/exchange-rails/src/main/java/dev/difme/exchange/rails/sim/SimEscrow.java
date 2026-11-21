@@ -67,6 +67,15 @@ public final class SimEscrow implements EscrowPort {
     @Override
     public synchronized Hold get(String holdId) { return require(holdId); }
 
+    /** Every hold, for the exchange's durable state (the simulator has no ledger of its own). */
+    public synchronized java.util.List<Hold> all() { return java.util.List.copyOf(holds.values()); }
+
+    /**
+     * Puts back a stored hold after a restart. Releases and refunds are not replayed, so their retry ids are not known
+     * any more: a retried release after a restart is rejected by the balance check instead of being a no-op.
+     */
+    public synchronized void restore(Hold h) { holds.put(h.holdId(), h); }
+
     private Hold require(String holdId) {
         Hold h = holds.get(holdId);
         if (h == null) throw new IllegalArgumentException("no hold " + holdId);

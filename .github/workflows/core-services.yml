@@ -45,6 +45,15 @@ jobs:
           pip install -q --break-system-packages schemathesis==4.32.7
           st --config-file api/openapi/schemathesis.toml run api/openapi/difme.openapi.yaml --url http://localhost:8089 \
             --include-path-regex '^/v1/exchange' --checks not_a_server_error --max-examples 30
+      # Durable state (StateStore): a full order, a restart, and every record back (the runner image ships PostgreSQL;
+      # the cluster uses YugabyteDB over the same protocol). The contract-test exchange above runs without a store.
+      - name: Exchange state survives a restart (PostgreSQL)
+        run: |
+          pkill -f quarkus-run.jar || true
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "CREATE ROLE difme LOGIN SUPERUSER PASSWORD 'difme'" -c "CREATE DATABASE difme OWNER difme"
+          DIFME_EXCHANGE_STORE_PASSWORD=difme python3 ci/exchange-restart-check.py \
+            services/core/exchange-svc/target/quarkus-app/quarkus-run.jar jdbc:postgresql://127.0.0.1:5432/difme
       - name: exchange-svc log on failure
         if: failure()
         run: grep -E 'ERROR|Caused by' /tmp/exchange-svc.log | tail -40 || true

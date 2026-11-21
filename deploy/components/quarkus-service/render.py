@@ -44,6 +44,9 @@ def manifests(s: dict) -> list[dict]:
         volumes.append({"name": "openbao-sa", "projected": {"sources": [{"serviceAccountToken": {
             "audience": "vault", "expirationSeconds": 3600, "path": "token"}}]}})
         mounts.append({"name": "openbao-sa", "mountPath": "/var/run/secrets/openbao-sa", "readOnly": True})
+    # Durable exchange state (StateStore, 2026-11-21): latest version of each record in YugabyteDB, schema "exchange".
+    if s.get("store"):
+        env.append({"name": "DIFME_EXCHANGE_STORE_URL", "value": "jdbc:postgresql://yb-tservers.database-tier.svc:5433/difme"})
     if mounts:
         container["volumeMounts"] = mounts
     # No service-link env (KUBERNETES-style <SVC>_PORT=tcp://...): our services resolve by DNS, and those variables

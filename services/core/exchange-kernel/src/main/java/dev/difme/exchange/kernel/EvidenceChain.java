@@ -84,6 +84,18 @@ public final class EvidenceChain {
         this.kind = Objects.requireNonNull(kind);
     }
 
+    /**
+     * Rebuilds a stored chain exactly as it was (artifacts with their hashes, and the seal). Nothing is recomputed or
+     * trusted: {@link #verify} still recomputes every hash and checks every signature, so a record altered in storage
+     * shows up as a failed verdict.
+     */
+    public static EvidenceChain restore(String id, Kind kind, List<Artifact> artifacts, Seal seal) {
+        EvidenceChain c = new EvidenceChain(id, kind);
+        c.artifacts.addAll(artifacts);
+        c.seal = seal;
+        return c;
+    }
+
     public String id() { return id; }
 
     public Kind kind() { return kind; }

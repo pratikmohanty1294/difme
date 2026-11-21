@@ -131,6 +131,22 @@ public class Exchange {
     private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1000L);
     private Map<Long, Result> results;
 
+    // Durable state (StateStore): off unless a JDBC URL is configured (tests and local runs keep everything in memory).
+    @ConfigProperty(name = "difme.exchange.store.url") java.util.Optional<String> storeUrl;
+    @ConfigProperty(name = "difme.exchange.store.user", defaultValue = "difme") String storeUser;
+    @ConfigProperty(name = "difme.exchange.store.password") java.util.Optional<String> storePassword;   // dev YugabyteDB: none
+    @ConfigProperty(name = "difme.exchange.store.flush-ms", defaultValue = "50") long storeFlushMs;
+    /** Dev only: keep the in-process evidence keys here so chains sealed before a restart still verify after it. */
+    @ConfigProperty(name = "difme.evidence.local-keys-dir") java.util.Optional<String> localKeysDir;
+    private StateStore store = StateStore.none();
+
+    record MandateRecord(long id, String pack, ExchangeResource.Mandate terms, long registeredAtMillis, long budgetLeftMinor,
+                         int nodeRef, int awards, long yieldEarnedMinor, MandateStatus status) {}
+    record ChainRecord(long auctionId, String id, EvidenceChain.Kind kind, List<EvidenceChain.Artifact> artifacts, EvidenceChain.Seal seal) {}
+    record KeyRecord(String name, String x509) {}
+    record ScoreRecord(String key, double value) {}
+    record CountRecord(String key, int count) {}
+
     @PostConstruct
     void start() {
         try {
@@ -180,6 +196,15 @@ public class Exchange {
                 return size() > keep;
             }
         });
+        if (storeUrl.filter(u -> !u.isBlank()).isPresent()) {
+            try {
+                store = new StateStore(storeUrl.get(), storeUser, storePassword.orElse(""), storeFlushMs);
+            } catch (java.sql.SQLException e) {
+                throw new IllegalStateException("exchange state store unavailable: " + e.getMessage(), e);
+            }
+            restore();
+            metrics.gauge("difme_exchange_state_pending", store, StateStore::pending);
+        }
         for (String id : packIds) {
             VerticalPack pack;
             try {
@@ -199,6 +224,76 @@ public class Exchange {
             packs.put(id, pack);
             intakes.put(id, new MatchingIntake(ring));
         }
+    }
+
+    /** Rebuilds the durable state at start (before the matching engines run). */
+    private void restore() {
+        var json = StateStore.JSON;
+        try {
+            for (var n : store.load("partykey")) {
+                KeyRecord k = json.treeToValue(n, KeyRecord.class);
+                partyKeys.put(k.name(), java.security.KeyFactory.getInstance("Ed25519")
+                        .generatePublic(new java.security.spec.X509EncodedKeySpec(java.util.Base64.getDecoder().decode(k.x509()))));
+            }
+            for (var n : store.load("reputation")) { ScoreRecord r = json.treeToValue(n, ScoreRecord.class); reputation.put(r.key(), r.value()); }
+            for (var n : store.load("deliveries")) { CountRecord c = json.treeToValue(n, CountRecord.class); deliveries.put(c.key(), c.count()); }
+            long maxMandate = 0, maxAuction = 0;
+            for (var n : store.load("mandate")) {
+                MandateRecord m = json.treeToValue(n, MandateRecord.class);
+                mandates.put(m.id(), new MandateState(m.pack(), m.terms(), m.registeredAtMillis(), new AtomicLong(m.budgetLeftMinor()),
+                        m.nodeRef(), new java.util.concurrent.atomic.AtomicInteger(m.awards()), new AtomicLong(m.yieldEarnedMinor()),
+                        new java.util.concurrent.atomic.AtomicReference<>(m.status())));
+                partnerNodes.put(m.terms().partnerRef(), m.nodeRef());
+                nextPartnerNode.accumulateAndGet(m.nodeRef(), Math::max);
+                maxMandate = Math.max(maxMandate, m.id());
+            }
+            mandateIds.accumulateAndGet(maxMandate, Math::max);
+            for (var n : store.load("result")) { Result r = json.treeToValue(n, Result.class); results.put(r.auctionId(), r); maxAuction = Math.max(maxAuction, r.auctionId()); }
+            for (var n : store.load("chain")) {
+                ChainRecord c = json.treeToValue(n, ChainRecord.class);
+                chains.put(c.auctionId(), EvidenceChain.restore(c.id(), c.kind(), c.artifacts(), c.seal()));
+            }
+            for (var n : store.load("execution")) { Execution e = json.treeToValue(n, Execution.class); executions.put(e.auctionId(), e); }
+            for (var n : store.load("fulfilment")) { Fulfilment f = json.treeToValue(n, Fulfilment.class); fulfilments.put(f.auctionId(), f); }
+            for (var n : store.load("return")) { Return r = json.treeToValue(n, Return.class); returns.put(r.auctionId(), r); }
+            for (var n : store.load("escrow")) rails.escrow.restore(json.treeToValue(n, EscrowPort.Hold.class));
+            ids.accumulateAndGet(maxAuction, Math::max);
+            LOG.infof("exchange state restored: %d mandates, %d results, %d executions, %d deliveries, %d returns",
+                    mandates.size(), results.size(), executions.size(), fulfilments.size(), returns.size());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | GeneralSecurityException e) {
+            throw new IllegalStateException("stored exchange state is unreadable: " + e.getMessage(), e);
+        }
+    }
+
+    private void saveMandate(long id) {
+        MandateState m = mandates.get(id);
+        if (m != null) store.put("mandate", id, new MandateRecord(id, m.pack(), m.terms(), m.registeredAtMillis(),
+                m.budgetLeftMinor().get(), m.nodeRef(), m.awards().get(), m.yieldEarnedMinor().get(), m.status().get()));
+    }
+
+    /** Saves everything the exchange holds for one auction (coalesced: only the newest version is written). */
+    private void saveAuction(long auctionId) {
+        if (!store.enabled()) return;
+        Result r = results.get(auctionId);
+        if (r != null) store.put("result", auctionId, r);
+        EvidenceChain c = chains.get(auctionId);
+        if (c != null) store.put("chain", auctionId, new ChainRecord(auctionId, c.id(), c.kind(), c.artifacts(), c.seal()));
+        Execution e = executions.get(auctionId);
+        if (e != null) store.put("execution", auctionId, e);
+        Fulfilment f = fulfilments.get(auctionId);
+        if (f != null) store.put("fulfilment", auctionId, f);
+        Return ret = returns.get(auctionId);
+        if (ret != null) store.put("return", auctionId, ret);
+        try {
+            store.put("escrow", "auction-" + auctionId, rails.escrow.get("auction-" + auctionId));
+        } catch (IllegalArgumentException noHold) {
+            // no escrow hold yet (not executed)
+        }
+    }
+
+    /** Persists a mandate change made outside the exchange's own methods (status changes via the API). */
+    public void mandateChanged(long id) {
+        saveMandate(id);
     }
 
     public VerticalPack pack(String id) {
@@ -289,6 +384,7 @@ public class Exchange {
         mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor()),
                 nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong(),
                 new java.util.concurrent.atomic.AtomicReference<>(MandateStatus.ACTIVE)));
+        saveMandate(id);
         return id;
     }
 
@@ -360,8 +456,33 @@ public class Exchange {
         }
     }
 
-    private static EvidenceSigners.Published localSigner(String name) throws GeneralSecurityException {
+    /**
+     * Dev keys: fresh per start, or kept as PKCS#8/X.509 files in {@code difme.evidence.local-keys-dir} when set, so
+     * stored chains still verify after a restart. Production signs with OpenBao transit and the notary instead.
+     */
+    private KeyPair localKeys(String name) throws GeneralSecurityException, IOException {
+        if (localKeysDir.filter(d -> !d.isBlank()).isEmpty()) return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        java.nio.file.Path dir = java.nio.file.Path.of(localKeysDir.get());
+        java.nio.file.Path priv = dir.resolve(name + ".key"), pub = dir.resolve(name + ".pub");
+        var kf = java.security.KeyFactory.getInstance("Ed25519");
+        if (java.nio.file.Files.exists(priv) && java.nio.file.Files.exists(pub)) {
+            return new KeyPair(kf.generatePublic(new java.security.spec.X509EncodedKeySpec(java.nio.file.Files.readAllBytes(pub))),
+                    kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(java.nio.file.Files.readAllBytes(priv))));
+        }
         KeyPair kp = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        java.nio.file.Files.createDirectories(dir);
+        java.nio.file.Files.write(pub, kp.getPublic().getEncoded());
+        java.nio.file.Files.write(priv, kp.getPrivate().getEncoded());
+        try {
+            java.nio.file.Files.setPosixFilePermissions(priv, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        } catch (UnsupportedOperationException ignored) {
+            // non-POSIX filesystem
+        }
+        return kp;
+    }
+
+    private EvidenceSigners.Published localSigner(String name) throws GeneralSecurityException, IOException {
+        KeyPair kp = localKeys(name);
         EvidenceChain.Signer s = EvidenceChain.local(name, kp.getPrivate());
         return new EvidenceSigners.Published() {
             public String name() { return name; }
@@ -375,6 +496,7 @@ public class Exchange {
     private void seal(String pack, long auctionId, EvidenceChain chain) {
         try {
             chain.seal(operator, List.of(witness));
+            saveAuction(auctionId);
         } catch (RuntimeException e) {
             metrics.counter("difme_exchange_seal_failures_total", "pack", pack).increment();
             LOG.warnf("evidence chain %s left unsealed: %s", chain.id(), e.getMessage());
@@ -430,6 +552,7 @@ public class Exchange {
             metrics.counter("difme_exchange_executions_total", "pack", r.pack(), "fulfilled", f.fulfilled() ? "yes" : "no").increment();
             Execution e = new Execution(auctionId, merchantId, f.winner(), f.fulfilled(), f.attempts(), f.totalSlashMinor(), hold);
             executions.put(auctionId, e);
+            saveAuction(auctionId);
             return e;
         }
     }
@@ -452,10 +575,13 @@ public class Exchange {
         VerticalPack p = packs.get(pack);
         reputation.compute(pack + ":" + nodeRef, (k, prev) -> Reputation.update(prev == null ? coldStart : prev, taskScore,
                 valueMinor, p.reputationReferenceMinor(), p.reputationAlphaBase()));
+        String key = pack + ":" + nodeRef;
+        store.put("reputation", key, new ScoreRecord(key, reputation.get(key)));
     }
 
     public void registerPartyKey(String name, PublicKey key) {
         partyKeys.put(name, key);
+        store.put("partykey", name, new KeyRecord(name, java.util.Base64.getEncoder().encodeToString(key.getEncoded())));
     }
 
     /**
@@ -491,9 +617,11 @@ public class Exchange {
                 chain.append(EvidenceChain.Type.fulfillment, EvidenceChain.Signal.Attested, f);
             }
             learn(r.pack(), e.boughtBy(), 100, s.a(), Reputation.PRIOR_UNVERIFIED);   // delivered: a successful task
-            deliveries.merge(r.pack() + ":" + e.boughtBy(), 1, Integer::sum);
+            int delivered = deliveries.merge(r.pack() + ":" + e.boughtBy(), 1, Integer::sum);
+            store.put("deliveries", r.pack() + ":" + e.boughtBy(), new CountRecord(r.pack() + ":" + e.boughtBy(), delivered));
             Fulfilment ok = new Fulfilment(auctionId, true, List.of(), hold, yieldAt);
             fulfilments.put(auctionId, ok);
+            saveAuction(auctionId);
             metrics.counter("difme_exchange_fulfilments_total", "pack", r.pack()).increment();
             return ok;
         }
@@ -539,6 +667,7 @@ public class Exchange {
                 chain.append(EvidenceChain.Type.refund, EvidenceChain.Signal.Asserted, p);
             }
             returns.put(auctionId, ret);
+            saveAuction(auctionId);
             metrics.counter("difme_exchange_returns_total", "pack", r.pack()).increment();
             return ret;
         }
@@ -558,7 +687,9 @@ public class Exchange {
         Return ret = returns.get(auctionId);
         long y = r.award().split().yield() - (ret == null ? 0 : ret.yieldVoidedMinor());   // only the yield on what was kept
         String holdId = "auction-" + auctionId;
-        return y > 0 ? rails.escrow.release(holdId, "yield", "partner-" + e.boughtBy(), y) : rails.escrow.get(holdId);
+        EscrowPort.Hold h = y > 0 ? rails.escrow.release(holdId, "yield", "partner-" + e.boughtBy(), y) : rails.escrow.get(holdId);
+        saveAuction(auctionId);
+        return h;
     }
 
     public Result result(long auctionId) {
@@ -608,6 +739,7 @@ public class Exchange {
                 ms.budgetLeftMinor().updateAndGet(left -> Math.max(0, left - split.a()));
                 ms.awards().incrementAndGet();
                 ms.yieldEarnedMinor().addAndGet(split.yield());
+                saveMandate(mandateId);
             }
         }
         EvidenceChain chain = chains.get(auctionId);
@@ -640,11 +772,13 @@ public class Exchange {
         }
         results.put(auctionId, new Result(auctionId, pack, ranked, List.copyOf(top), award));
         openAuctions.remove(auctionId);
+        saveAuction(auctionId);
         metrics.counter("difme_exchange_auctions_closed_total", "pack", pack, "matched", ranked > 0 ? "yes" : "no").increment();
     }
 
     @PreDestroy
     void stop() {
         runners.forEach(AgentRunner::close);
+        store.close();   // flushes what's pending
     }
 }

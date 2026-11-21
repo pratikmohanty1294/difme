@@ -164,6 +164,7 @@ public class ExchangeResource {
             return Response.status(400).entity(Map.of("error", "status must be ACTIVE, PAUSED or REVOKED")).build();
         }
         if (!ms.setStatus(next)) return Response.status(409).entity(Map.of("error", "a revoked mandate can't be reactivated")).build();
+        exchange.mandateChanged(mandateId);
         return mandateState(packId, mandateId);
     }
 

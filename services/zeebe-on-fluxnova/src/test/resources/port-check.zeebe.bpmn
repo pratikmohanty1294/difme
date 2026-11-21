@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A flow in Payment Hub EE's Zeebe dialect (as in vendor/mifos-ph-ee/flows), converted by ci/zeebe-bpmn-to-fluxnova.py for the live test. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="defs" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="port-check-DFSPID" isExecutable="true">
+    <bpmn:startEvent id="start"><bpmn:outgoing>f1</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:serviceTask id="block" name="Block funds">
+      <bpmn:extensionElements><zeebe:taskDefinition type="check-block-DFSPID" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>f1</bpmn:incoming><bpmn:outgoing>f2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="prepared"><bpmn:incoming>f2</bpmn:incoming><bpmn:outgoing>fFail</bpmn:outgoing><bpmn:outgoing>fOk</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="failedEnd"><bpmn:incoming>fFail</bpmn:incoming></bpmn:endEvent>
+    <bpmn:receiveTask id="waitResponse" messageRef="msg"><bpmn:incoming>fOk</bpmn:incoming><bpmn:outgoing>f3</bpmn:outgoing></bpmn:receiveTask>
+    <bpmn:boundaryEvent id="timeout" attachedToRef="waitResponse">
+      <bpmn:outgoing>fTimeout</bpmn:outgoing>
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= timer</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="timedOutEnd"><bpmn:incoming>fTimeout</bpmn:incoming></bpmn:endEvent>
+    <bpmn:serviceTask id="book" name="Book funds">
+      <bpmn:extensionElements><zeebe:taskDefinition type="check-book-DFSPID" retries="3" /></bpmn:extensionElements>
+      <bpmn:incoming>f3</bpmn:incoming><bpmn:outgoing>f4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="booked"><bpmn:incoming>f4</bpmn:incoming><bpmn:outgoing>fBig</bpmn:outgoing><bpmn:outgoing>fSmall</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="bigEnd"><bpmn:incoming>fBig</bpmn:incoming></bpmn:endEvent>
+    <bpmn:endEvent id="smallEnd"><bpmn:incoming>fSmall</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="block" />
+    <bpmn:sequenceFlow id="f2" sourceRef="block" targetRef="prepared" />
+    <bpmn:sequenceFlow id="fFail" sourceRef="prepared" targetRef="failedEnd">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= transferPrepareFailed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="fOk" sourceRef="prepared" targetRef="waitResponse">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= transferPrepareFailed = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f3" sourceRef="waitResponse" targetRef="book" />
+    <bpmn:sequenceFlow id="fTimeout" sourceRef="timeout" targetRef="timedOutEnd" />
+    <bpmn:sequenceFlow id="f4" sourceRef="book" targetRef="booked" />
+    <bpmn:sequenceFlow id="fBig" sourceRef="booked" targetRef="bigEnd">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= amount &gt; 100 and transferState != "FAILED"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="fSmall" sourceRef="booked" targetRef="smallEnd">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= amount &lt;= 100 or transferState = "FAILED"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmn:message id="msg" name="transferResponse">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="= transactionId" /></bpmn:extensionElements>
+  </bpmn:message>
+</bpmn:definitions>

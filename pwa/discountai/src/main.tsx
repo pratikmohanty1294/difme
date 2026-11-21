@@ -25,6 +25,7 @@ const Mandates: Page = INV ? lazy(() => import('./pages/investor/Mandates')) : n
 const LiveAuction: Page = OME ? lazy(() => import('./pages/exchange/LiveAuction')) : none;
 const OrderBook: Page = OME ? lazy(() => import('./pages/exchange/OrderBook')) : none;
 const AuctionConfig: Page = OME ? lazy(() => import('./pages/exchange/AuctionConfig')) : none;
+const RuleAttributes: Page = OME ? lazy(() => import('./pages/exchange/RuleAttributes')) : none;
 const Network: Page = OME ? lazy(() => import('./pages/exchange/Network')) : none;
 const ProofChain: Page = OME ? lazy(() => import('./pages/audit/ProofChain')) : none;
 const Compliance: Page = OME ? lazy(() => import('./pages/audit/Compliance')) : none;
@@ -42,6 +43,7 @@ function App() {
       case 'exchange': return <LiveAuction key={param} focus={param} />;
       case 'exchange/orderbook': return <OrderBook />;
       case 'exchange/config': return <AuctionConfig />;
+      case 'exchange/attributes': return <RuleAttributes />;
       case 'exchange/network': return <Network />;
       case 'audit': return <ProofChain key={param} focus={param} />;
       case 'audit/compliance': return <Compliance />;

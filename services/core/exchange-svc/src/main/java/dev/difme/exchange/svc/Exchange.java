@@ -145,6 +145,7 @@ public class Exchange {
                          int nodeRef, int awards, long yieldEarnedMinor, MandateStatus status, Map<String, Long> yieldByDay) {}
     record ChainRecord(long auctionId, String id, EvidenceChain.Kind kind, List<EvidenceChain.Artifact> artifacts, EvidenceChain.Seal seal) {}
     record KeyRecord(String name, String x509) {}
+    record AttributesRecord(String pack, List<dev.difme.exchange.rules.CustomRules.Attribute> attributes) {}
     record ScoreRecord(String key, double value) {}
     record CountRecord(String key, int count) {}
 
@@ -236,6 +237,7 @@ public class Exchange {
                 partyKeys.put(k.name(), java.security.KeyFactory.getInstance("Ed25519")
                         .generatePublic(new java.security.spec.X509EncodedKeySpec(java.util.Base64.getDecoder().decode(k.x509()))));
             }
+            for (var n : store.load("attributes")) { AttributesRecord a = json.treeToValue(n, AttributesRecord.class); attributeCatalogs.put(a.pack(), a.attributes()); }
             for (var n : store.load("reputation")) { ScoreRecord r = json.treeToValue(n, ScoreRecord.class); reputation.put(r.key(), r.value()); }
             for (var n : store.load("deliveries")) { CountRecord c = json.treeToValue(n, CountRecord.class); deliveries.put(c.key(), c.count()); }
             long maxMandate = 0, maxAuction = 0;
@@ -247,7 +249,7 @@ public class Exchange {
                         new java.util.concurrent.ConcurrentSkipListMap<>(m.yieldByDay() == null ? Map.of() : m.yieldByDay())));
                 partnerNodes.put(m.terms().partnerRef(), m.nodeRef());
                 if (m.terms().customRules() != null) {
-                    customRules.put(m.id(), dev.difme.exchange.rules.CustomRules.compile(m.terms().customRules(), "mandate_custom_" + m.id()));
+                    customRules.put(m.id(), dev.difme.exchange.rules.CustomRules.compile(m.terms().customRules(), "mandate_custom_" + m.id(), ruleNames(m.pack())));
                 }
                 nextPartnerNode.accumulateAndGet(m.nodeRef(), Math::max);
                 maxMandate = Math.max(maxMandate, m.id());
@@ -391,6 +393,52 @@ public class Exchange {
     }
 
     private final Map<Long, MandateState> mandates = new ConcurrentHashMap<>();
+    /**
+     * Order attributes per vertical (the operator's uploaded master list; the defaults until then). Custom rules may name
+     * these plus the built-ins; intents may carry values for them (type-checked).
+     */
+    private final Map<String, List<dev.difme.exchange.rules.CustomRules.Attribute>> attributeCatalogs = new ConcurrentHashMap<>();
+
+    public List<dev.difme.exchange.rules.CustomRules.Attribute> attributes(String pack) {
+        return attributeCatalogs.getOrDefault(pack, defaultAttributes());
+    }
+
+    private static List<dev.difme.exchange.rules.CustomRules.Attribute> defaultAttributes() {
+        List<dev.difme.exchange.rules.CustomRules.Attribute> out = new ArrayList<>();
+        dev.difme.exchange.rules.CustomRules.DEFAULT_ORDER_ATTRIBUTES.forEach((k, t) -> out.add(new dev.difme.exchange.rules.CustomRules.Attribute(k, t, null, null)));
+        return out;
+    }
+
+    /** name → type for rule validation: built-ins plus this vertical's attributes. */
+    public Map<String, String> ruleNames(String pack) {
+        Map<String, String> m = new LinkedHashMap<>();
+        for (var a : attributes(pack)) m.put(a.key(), a.type());
+        return dev.difme.exchange.rules.CustomRules.merged(m);
+    }
+
+    /**
+     * Replaces a vertical's master list. Refused (with the mandates named) when an active mandate's rules read an
+     * attribute the new list drops: those rules would silently see nothing.
+     */
+    public List<String> replaceAttributes(String pack, List<dev.difme.exchange.rules.CustomRules.Attribute> list) {
+        List<dev.difme.exchange.rules.CustomRules.Attribute> clean = new ArrayList<>();
+        for (var a : list) clean.add(new dev.difme.exchange.rules.CustomRules.Attribute(a.key().trim(), a.type().trim().toLowerCase(java.util.Locale.ROOT),
+                a.label() == null || a.label().isBlank() ? null : a.label().trim(), a.example() == null || a.example().isBlank() ? null : a.example().trim()));
+        java.util.Set<String> keep = new java.util.HashSet<>(dev.difme.exchange.rules.CustomRules.BUILT_IN.keySet());
+        clean.forEach(a -> keep.add(a.key()));
+        List<String> broken = new ArrayList<>();
+        mandates.forEach((id, m) -> {
+            if (!m.pack().equals(pack) || m.status().get() == MandateStatus.REVOKED || m.terms().customRules() == null) return;
+            for (String n : dev.difme.exchange.rules.CustomRules.namesUsed(m.terms().customRules())) {
+                if (!keep.contains(n)) broken.add("Mandate " + id + " uses “" + n + "”, which the new list drops.");
+            }
+        });
+        if (!broken.isEmpty()) return broken;
+        attributeCatalogs.put(pack, List.copyOf(clean));
+        store.put("attributes", pack, new AttributesRecord(pack, List.copyOf(clean)));
+        return List.of();
+    }
+
     /** Compiled custom rules per mandate (from the mandate's terms; recompiled on restore). */
     private final Map<Long, dev.difme.exchange.rules.CustomRules> customRules = new ConcurrentHashMap<>();
 
@@ -428,7 +476,7 @@ public class Exchange {
 
     public long registerMandate(String pack, ExchangeResource.Mandate m) {
         long id = mandateIds.incrementAndGet();
-        if (m.customRules() != null) customRules.put(id, dev.difme.exchange.rules.CustomRules.compile(m.customRules(), "mandate_custom_" + id));
+        if (m.customRules() != null) customRules.put(id, dev.difme.exchange.rules.CustomRules.compile(m.customRules(), "mandate_custom_" + id, ruleNames(pack)));
         mandates.put(id, new MandateState(pack, m, System.currentTimeMillis(), new AtomicLong(m.budgetTotalMinor()),
                 nodeRefOf(m.partnerRef()), new java.util.concurrent.atomic.AtomicInteger(), new AtomicLong(),
                 new java.util.concurrent.atomic.AtomicReference<>(MandateStatus.ACTIVE), new java.util.concurrent.ConcurrentSkipListMap<>()));

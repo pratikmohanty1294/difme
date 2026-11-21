@@ -38,14 +38,54 @@ public final class CustomRules {
     /** What the rules decided for one order; {@code rule} is 1-based, 0 for the default. */
     public record Outcome(Action action, String message, int rule) {}
 
-    /** Order attributes every auction provides (null when the intent didn't say). Mirrors the PWA's ORDER_FIELDS. */
-    public static final Map<String, String> ORDER_FIELDS = orderFields();
+    /** Computed by the exchange for every bid; always available, can't be redefined by an uploaded catalog. */
+    public static final Map<String, String> BUILT_IN = ordered(
+            "amount", "number", "listPrice", "number", "discountPct", "number", "yieldPct", "number",
+            "hour", "number", "weekday", "string", "buyerRiskScore", "number");
+    /** Order attributes a vertical starts with until the operator uploads its own master list. */
+    public static final Map<String, String> DEFAULT_ORDER_ATTRIBUTES = ordered(
+            "merchant", "string", "category", "string", "brand", "string", "mcc", "string",
+            "quantity", "number", "city", "string", "pincode", "string");
+    /** Built-ins plus the default order attributes (callers without a catalog). */
+    public static final Map<String, String> ORDER_FIELDS = merged(DEFAULT_ORDER_ATTRIBUTES);
 
-    private static Map<String, String> orderFields() {
+    private static Map<String, String> ordered(String... kv) {
         Map<String, String> m = new LinkedHashMap<>();
-        for (String n : List.of("amount", "listPrice", "discountPct", "yieldPct", "quantity", "hour", "buyerRiskScore")) m.put(n, "number");
-        for (String s : List.of("merchant", "category", "brand", "mcc", "city", "pincode", "weekday")) m.put(s, "string");
+        for (int i = 0; i < kv.length; i += 2) m.put(kv[i], kv[i + 1]);
         return java.util.Collections.unmodifiableMap(m);
+    }
+
+    /** Built-ins plus a vertical's order attributes (name → number/string/boolean). */
+    public static Map<String, String> merged(Map<String, String> orderAttributes) {
+        Map<String, String> m = new LinkedHashMap<>(BUILT_IN);
+        orderAttributes.forEach(m::putIfAbsent);
+        return java.util.Collections.unmodifiableMap(m);
+    }
+
+    /** One attribute of a vertical's master list (uploaded by the exchange operator). */
+    public record Attribute(String key, String type, String label, String example) {}
+
+    /** Checks an uploaded master list. Empty means it can replace the current one. */
+    public static List<String> checkAttributes(List<Attribute> list) {
+        List<String> p = new ArrayList<>();
+        if (list == null || list.isEmpty()) return List.of("The file has no attributes.");
+        if (list.size() > 200) p.add("At most 200 attributes.");
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < list.size(); i++) {
+            Attribute a = list.get(i);
+            String row = "Row " + (i + 1);
+            if (a == null) { p.add(row + ": empty."); continue; }
+            String k = a.key() == null ? "" : a.key().trim();
+            if (!KEY.matcher(k).matches()) p.add(row + ": “" + k + "” must start with a lower-case letter and use only letters, digits or _ (max 31).");
+            if (RESERVED.contains(k) || FEEL_WORDS.contains(k)) p.add(row + ": “" + k + "” is a reserved word.");
+            if (BUILT_IN.containsKey(k)) p.add(row + ": “" + k + "” is computed by the exchange and can't be redefined.");
+            if (!seen.add(k)) p.add(row + ": “" + k + "” appears twice.");
+            if (a.type() == null || !List.of("number", "string", "boolean").contains(a.type().trim().toLowerCase(java.util.Locale.ROOT))) {
+                p.add(row + ": type of “" + k + "” must be number, string or boolean.");
+            }
+            if (a.label() != null && a.label().length() > 80) p.add(row + ": label too long (max 80).");
+        }
+        return p;
     }
 
     private static final Pattern KEY = Pattern.compile("^[a-z][A-Za-z0-9_]{0,30}$");
@@ -73,10 +113,12 @@ public final class CustomRules {
 
     private final Table table;
     private final DmnDecision decision;
+    private final Set<String> names;
 
-    private CustomRules(Table table, DmnDecision decision) {
+    private CustomRules(Table table, DmnDecision decision, Set<String> names) {
         this.table = table;
         this.decision = decision;
+        this.names = names;
     }
 
     public Table table() {
@@ -85,11 +127,16 @@ public final class CustomRules {
 
     /** Validates and compiles; throws {@link IllegalArgumentException} with the problems in plain words. */
     public static CustomRules compile(Table t, String decisionId) {
-        List<String> problems = check(t);
+        return compile(t, decisionId, ORDER_FIELDS);
+    }
+
+    /** Validates against the given attributes (built-ins plus the vertical's catalog) and compiles. */
+    public static CustomRules compile(Table t, String decisionId, Map<String, String> attributes) {
+        List<String> problems = check(t, attributes);
         if (!problems.isEmpty()) throw new IllegalArgumentException(String.join(" ", problems));
         try {
             List<DmnDecision> ds = ENGINE.parseDecisions(new ByteArrayInputStream(dmn(t, decisionId).getBytes(StandardCharsets.UTF_8)));
-            return new CustomRules(t, ds.getFirst());
+            return new CustomRules(t, ds.getFirst(), Set.copyOf(attributes.keySet()));
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("The rules don't compile: " + rootMessage(e));
         }
@@ -97,6 +144,10 @@ public final class CustomRules {
 
     /** Structural and safety checks. Empty means the table can be compiled. */
     public static List<String> check(Table t) {
+        return check(t, ORDER_FIELDS);
+    }
+
+    public static List<String> check(Table t, Map<String, String> attributes) {
         List<String> p = new ArrayList<>();
         if (t == null || t.fields() == null || t.rules() == null) return List.of("Fields and rules are required.");
         if (t.fields().stream().anyMatch(java.util.Objects::isNull) || t.rules().stream().anyMatch(java.util.Objects::isNull)) return List.of("Fields and rules can't be empty entries.");
@@ -114,7 +165,7 @@ public final class CustomRules {
             String e = f.expr() == null ? "" : f.expr();
             if (e.isBlank()) p.add("Field “" + k + "” needs an expression, e.g. an order attribute like amount.");
             if (e.length() > 200) p.add("Field “" + k + "”: expression too long.");
-            p.addAll(unsafe("Field “" + k + "”", e, ORDER_FIELDS.keySet()));
+            p.addAll(unsafe("Field “" + k + "”", e, attributes.keySet()));
         }
         for (int i = 0; i < t.rules().size(); i++) {
             Rule r = t.rules().get(i);
@@ -133,6 +184,18 @@ public final class CustomRules {
         return p;
     }
 
+    /** Attribute names a field expression reads (outside string literals): to find rules an upload would break. */
+    public static Set<String> namesUsed(Table t) {
+        Set<String> out = new HashSet<>();
+        if (t == null || t.fields() == null) return out;
+        for (Field f : t.fields()) {
+            if (f == null || f.expr() == null) continue;
+            Matcher m = IDENT.matcher(STRINGS.matcher(f.expr()).replaceAll("\"\""));
+            while (m.find()) if (!FEEL_WORDS.contains(m.group())) out.add(m.group());
+        }
+        return out;
+    }
+
     private static List<String> unsafe(String where, String expr, Set<String> names) {
         List<String> p = new ArrayList<>();
         String bare = STRINGS.matcher(expr).replaceAll("\"\"");
@@ -148,7 +211,7 @@ public final class CustomRules {
     /** Runs the rules for one order. An evaluation error fails closed: the mandate doesn't bid (REJECT). */
     public Outcome evaluate(Map<String, Object> order) {
         Map<String, Object> vars = new java.util.HashMap<>();
-        for (String k : ORDER_FIELDS.keySet()) vars.put(k, order.get(k));
+        for (String k : names) vars.put(k, order.get(k));
         try {
             DmnDecisionTableResult res = ENGINE.evaluateDecisionTable(decision, vars);
             DmnDecisionRuleResult r = res.getFirstResult();

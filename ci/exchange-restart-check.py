@@ -23,7 +23,7 @@ def check(name, ok):
 
 
 def call(method, path, body=None):
-    data = json.dumps(body).encode() if body is not None else (b"" if method == "POST" else None)
+    data = json.dumps(body).encode() if body is not None else (b"" if method in ("POST", "PUT") else None)
     req = urllib.request.Request(BASE + path, data=data, method=method, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
@@ -83,6 +83,8 @@ before = {"mandate": call("GET", f"/fr01-buy/mandates/{mid}")[1], "result": call
           "evidence": call("GET", f"/auctions/{aid}/evidence")[1]}
 check("the half return took half the yield off the winning mandate (64000 -> 32000)", before["mandate"].get("yieldEarnedMinor") == 32000)
 check("the day-by-day history shows the same net yield", sum(before["mandate"].get("yieldByDay", {}).values()) == 32000)
+s, cat = call("PUT", "/fr01-buy/attributes", {"attributes": [{"key": "merchant", "type": "string"}, {"key": "warrantyYears", "type": "number", "label": "Warranty (years)"}]})
+check("attribute master list replaced", s == 200)
 call("POST", f"/fr01-buy/mandates/{mid}/status", {"status": "PAUSED"})
 out = stop(p)
 check("clean shutdown flushed everything", "records not written" not in out)
@@ -94,6 +96,8 @@ try:
     for k in ("budgetLeftMinor", "awards", "yieldEarnedMinor", "nodeRef", "partnerRef", "yieldByDay"):
         check(f"mandate {k} = {before['mandate'][k]}", mm.get(k) == before["mandate"][k])
     check("mandate status change made just before the stop is kept (PAUSED)", mm.get("status") == "PAUSED")
+    s, cat2 = call("GET", "/fr01-buy/attributes")
+    check("attribute master list survived the restart", [a["key"] for a in cat2.get("attributes", [])] == ["merchant", "warrantyYears"])
     s, rr = call("GET", f"/auctions/{aid}")
     check("auction result is back with the same award", s == 200 and rr.get("award") == before["result"]["award"])
     s, ev = call("GET", f"/auctions/{aid}/evidence")

@@ -7,6 +7,7 @@ import dev.difme.exchange.rules.PackRules;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.core.Response;
@@ -24,7 +25,7 @@ public class ExchangeResource {
      * Y_max = d·P − F − 1, so the buyer always pays less than list (vertical.yaml price_basis).
      */
     public record Intent(double riskScore, boolean offerSanctioned, long listMinor, int discountBps, long feeMinor,
-                         long maxPriceMinor, FraudScorer.Features fraudFeatures, Order order) {}
+                         long maxPriceMinor, FraudScorer.Features fraudFeatures, Order order, Map<String, Object> attributes) {}
 
     /** What the buyer's agent knows about the item, for buying partners' custom rules (all optional). */
     public record Order(String merchant, String category, String brand, String mcc, Integer quantity, String city, String pincode) {}
@@ -86,7 +87,7 @@ public class ExchangeResource {
             return Response.status(422).entity(Map.of("findings", findings, "depositRequiredMinor", depositRequired)).build();
         }
         if (m.customRules() != null) {
-            List<String> problems = dev.difme.exchange.rules.CustomRules.check(m.customRules());
+            List<String> problems = dev.difme.exchange.rules.CustomRules.check(m.customRules(), exchange.ruleNames(packId));
             if (!problems.isEmpty()) return Response.status(422).entity(Map.of("error", "custom rules not accepted", "problems", problems)).build();
         }
         long id;
@@ -138,6 +139,22 @@ public class ExchangeResource {
         evidence.put("feeMinor", in.feeMinor());
         evidence.put("maxPriceMinor", in.maxPriceMinor());
         evidence.put("findings", findings.stream().map(Finding::code).toList());
+        // Order attributes for custom rules: the fixed `order` block (older clients) plus `attributes`, checked against
+        // this vertical's master list (an unknown name or a wrong type is a client error, not silently ignored).
+        Map<String, Object> attrs = new java.util.HashMap<>();
+        if (in.attributes() != null) {
+            Map<String, String> types = new java.util.HashMap<>();
+            for (var a : exchange.attributes(packId)) types.put(a.key(), a.type());
+            for (var e : in.attributes().entrySet()) {
+                String t = types.get(e.getKey());
+                if (t == null) return Response.status(400).entity(Map.of("error", "unknown attribute " + e.getKey())).build();
+                Object v = e.getValue();
+                boolean ok = v == null || ("number".equals(t) && v instanceof Number) || ("string".equals(t) && v instanceof String)
+                        || ("boolean".equals(t) && v instanceof Boolean);
+                if (!ok) return Response.status(400).entity(Map.of("error", "attribute " + e.getKey() + " must be a " + t)).build();
+                attrs.put(e.getKey(), v);
+            }
+        }
         Map<String, Object> facts = new java.util.HashMap<>();     // the order as custom rules see it (major units)
         facts.put("listPrice", in.listMinor() / 100.0);
         facts.put("discountPct", in.discountBps() / 100.0);
@@ -153,6 +170,7 @@ public class ExchangeResource {
             facts.put("pincode", o.pincode());
             if (o.merchant() != null) evidence.put("merchant", o.merchant());
         }
+        attrs.forEach(facts::put);                                  // explicit attributes win over the order block
         long auction = exchange.open(packId, maxYield, new Exchange.Terms(in.listMinor(), in.discountBps(), in.feeMinor()), evidence, facts);
         if (auction < 0) return Response.status(503).entity(Map.of("error", "exchange busy, retry")).build();
         int standing = standingBids(auction);
@@ -185,22 +203,53 @@ public class ExchangeResource {
     }
 
     /** What a buying partner sees about one mandate: what is left, what it won and earned, and its tier. */
-    public record CustomCheck(dev.difme.exchange.rules.CustomRules.Table table, Map<String, Object> order) {}
+    public record CustomCheck(dev.difme.exchange.rules.CustomRules.Table table, Map<String, Object> order, String pack) {}
 
     /** Validates a custom rules table and, given a sample order, shows what it would decide (the factory's preview). */
     @POST
     @Path("/custom-rules/check")
     public Response checkCustom(CustomCheck c) {
         if (c == null || c.table() == null) return Response.status(400).entity(Map.of("error", "table is required")).build();
-        List<String> problems = dev.difme.exchange.rules.CustomRules.check(c.table());
+        String packId = c.pack() == null || c.pack().isBlank() ? "fr01-buy" : c.pack();
+        if (exchange.pack(packId) == null) return Response.status(404).entity(Map.of("error", "unknown vertical pack " + packId)).build();
+        Map<String, String> names = exchange.ruleNames(packId);
+        List<String> problems = dev.difme.exchange.rules.CustomRules.check(c.table(), names);
         if (!problems.isEmpty()) return Response.ok(Map.of("ok", false, "problems", problems)).build();
         try {
-            var rules = dev.difme.exchange.rules.CustomRules.compile(c.table(), "custom_check");
+            var rules = dev.difme.exchange.rules.CustomRules.compile(c.table(), "custom_check", names);
             if (c.order() == null) return Response.ok(Map.of("ok", true)).build();
             return Response.ok(Map.of("ok", true, "outcome", rules.evaluate(c.order()))).build();
         } catch (IllegalArgumentException e) {
             return Response.ok(Map.of("ok", false, "problems", List.of(e.getMessage()))).build();
         }
+    }
+
+    public record AttributeUpload(List<dev.difme.exchange.rules.CustomRules.Attribute> attributes) {}
+
+    /** A vertical's attribute catalog: the built-ins the exchange computes, and the order attributes (uploaded list). */
+    @GET
+    @Path("/{pack}/attributes")
+    public Response attributes(@PathParam("pack") String packId) {
+        if (exchange.pack(packId) == null) return Response.status(404).build();
+        List<Map<String, String>> builtIn = new java.util.ArrayList<>();
+        dev.difme.exchange.rules.CustomRules.BUILT_IN.forEach((k, t) -> builtIn.add(Map.of("key", k, "type", t)));
+        return Response.ok(Map.of("pack", packId, "builtIn", builtIn, "attributes", exchange.attributes(packId))).build();
+    }
+
+    /**
+     * Replaces the vertical's master list of order attributes (the operator's upload). 422 with the problems in plain
+     * words; 409 when active mandates' rules read attributes the new list drops.
+     */
+    @PUT
+    @Path("/{pack}/attributes")
+    public Response replaceAttributes(@PathParam("pack") String packId, AttributeUpload up) {
+        if (exchange.pack(packId) == null) return Response.status(404).build();
+        List<dev.difme.exchange.rules.CustomRules.Attribute> list = up == null ? null : up.attributes();
+        List<String> problems = dev.difme.exchange.rules.CustomRules.checkAttributes(list);
+        if (!problems.isEmpty()) return Response.status(422).entity(Map.of("error", "attribute list not accepted", "problems", problems)).build();
+        List<String> broken = exchange.replaceAttributes(packId, list);
+        if (!broken.isEmpty()) return Response.status(409).entity(Map.of("error", "the new list would break active mandates", "problems", broken)).build();
+        return attributes(packId);
     }
 
     public record MandateStatusChange(String status) {}

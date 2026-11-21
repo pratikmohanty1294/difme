@@ -27,6 +27,7 @@ const GROUPS: Group[] = [
       { route: 'exchange', label: 'Live auction', icon: Activity },
       { route: 'exchange/orderbook', label: 'Order book', icon: BookOpen },
       { route: 'exchange/config', label: 'Auction config', icon: SlidersHorizontal },
+      { route: 'exchange/attributes', label: 'Rule attributes', icon: SlidersHorizontal },
       { route: 'exchange/network', label: 'Network & nodes', icon: Network },
       { route: 'audit', label: 'Proof chain', icon: ShieldCheck },
       { route: 'audit/compliance', label: 'Regulator node', icon: Landmark },

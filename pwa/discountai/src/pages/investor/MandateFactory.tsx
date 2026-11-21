@@ -46,7 +46,7 @@ export default function MandateFactory() {
   const [draftId] = useState(() => `M-2026-${8830 + Math.floor(Math.random() * 160)}`);
   const [custom, setCustom] = useState<CustomTable>(DEFAULT_CUSTOM);
   const [useCustom, setUseCustom] = useState(true);
-  const [sample, setSample] = useState<Record<string, string | number>>(sampleOrder);
+  const [sample, setSample] = useState<Record<string, string | number | boolean>>(sampleOrder);
   const [customCheck, setCustomCheck] = useState<CustomResult>();
   const [deploy, setDeploy] = useState(0);
   const [mandate, setMandate] = useState<Mandate>();

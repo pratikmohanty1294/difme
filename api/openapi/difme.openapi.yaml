@@ -80,6 +80,37 @@ paths:
         "400": { $ref: "#/components/responses/ExchangeError" }
         "404": { $ref: "#/components/responses/ExchangeError" }
         "422": { $ref: "#/components/responses/ExchangeError" }
+  /v1/exchange/{pack}/attributes:
+    get:
+      operationId: getAttributes
+      summary: A vertical's attribute catalog for custom rules - the built-ins the exchange computes and the operator's order attributes
+      parameters: [{ name: pack, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: The catalog, content: { application/json: { schema: { type: object } } } }
+        "404": { description: Unknown vertical }
+    put:
+      operationId: replaceAttributes
+      summary: Replace the vertical's master list of order attributes (the operator's uploaded file, parsed to JSON)
+      description: "Each attribute is a name (lower-case first letter; letters, digits, _), a type (number, string, boolean), an optional label and example. Built-in names can't be redefined. Refused with 409 when an active mandate's custom rules read an attribute the new list drops."
+      security: [{ oauth2: [exchange:admin] }]
+      parameters: [{ name: pack, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attributes]
+              properties:
+                attributes:
+                  type: array
+                  maxItems: 200
+                  items: { type: object, required: [key, type], properties: { key: { type: string }, type: { type: string, enum: [number, string, boolean] }, label: { type: string }, example: { type: string } } }
+      responses:
+        "200": { description: The new catalog, content: { application/json: { schema: { type: object } } } }
+        "404": { description: Unknown vertical }
+        "409": { $ref: "#/components/responses/ExchangeError" }
+        "422": { $ref: "#/components/responses/ExchangeError" }
   /v1/exchange/custom-rules/check:
     post:
       operationId: checkCustomRules
@@ -88,7 +119,7 @@ paths:
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [table], properties: { table: { $ref: "#/components/schemas/CustomRules" }, order: { type: object } } } } }
+        content: { application/json: { schema: { type: object, required: [table], properties: { table: { $ref: "#/components/schemas/CustomRules" }, order: { type: object }, pack: { type: string } } } } }
       responses:
         "200": { description: "ok with the outcome, or the problems", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/ExchangeError" }
@@ -251,7 +282,7 @@ components:
   securitySchemes:
     oauth2:
       type: oauth2
-      flows: { clientCredentials: { tokenUrl: https://idp.difme.local/oauth2/token, scopes: { payments:write: create payments, payments:read: read payments, accounts:read: read accounts, exchange:write: open intents and mandates and bid and execute awards, exchange:read: read auctions and evidence } } }
+      flows: { clientCredentials: { tokenUrl: https://idp.difme.local/oauth2/token, scopes: { payments:write: create payments, payments:read: read payments, accounts:read: read accounts, exchange:write: open intents and mandates and bid and execute awards, exchange:read: read auctions and evidence, exchange:admin: operate the exchange (vertical attribute catalogs) } } }
   parameters:
     IdempotencyKey:
       name: Idempotency-Key
@@ -342,6 +373,10 @@ components:
         discountBps: { type: integer, minimum: 1, maximum: 9999 }
         feeMinor: { type: integer, format: int64, minimum: 0 }
         maxPriceMinor: { type: integer, format: int64, minimum: 1 }
+        attributes:
+          description: "Values for the vertical's order attributes (GET /v1/exchange/{pack}/attributes), type-checked; an unknown name or wrong type is a 400"
+          type: object
+          additionalProperties: true
         order:
           description: What the buyer's agent knows about the item, for buying partners' custom rules (all optional)
           type: object

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Cpu, FlaskConical, Loader2, Plus, Trash2 } from 'lucide-react';
-import { FIELD_KEY, ORDER_FIELDS, checkTable, type CustomAction, type CustomTable, type FieldType } from '../../sim/dmn-compile';
+import { FIELD_KEY, checkTable, type CustomAction, type CustomTable, type FieldType } from '../../sim/dmn-compile';
+import { useRuleAttributes } from '../../sim/attributes';
 import { evaluateCustom, type CustomResult } from '../../sim/rules';
 import { Badge, Callout, cx } from '../../components/ui';
 
@@ -14,8 +15,9 @@ const ACTION_LABEL: Record<CustomAction, string> = { APPROVE: 'Approve', REJECT:
  */
 export function CustomRulesEditor({ value, onChange, sample, onSample, mandateId }: {
   value: CustomTable; onChange: (t: CustomTable) => void;
-  sample: Record<string, string | number>; onSample: (s: Record<string, string | number>) => void; mandateId: string;
+  sample: Record<string, string | number | boolean>; onSample: (s: Record<string, string | number | boolean>) => void; mandateId: string;
 }) {
+  const { attrs } = useRuleAttributes();
   const [result, setResult] = useState<CustomResult>();
   const [testing, setTesting] = useState(false);
   const [showDmn, setShowDmn] = useState(false);
@@ -67,10 +69,15 @@ export function CustomRulesEditor({ value, onChange, sample, onSample, mandateId
               ))}
             </tbody>
           </table>
-          <datalist id="order-attrs">{ORDER_FIELDS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</datalist>
+          <datalist id="order-attrs">{attrs.map((o) => <option key={o.key} value={o.key}>{o.label} · {o.type}</option>)}</datalist>
         </div>
         <button className="btn-secondary mt-3" onClick={addField} disabled={value.fields.length >= 12}><Plus size={14} /> Add field</button>
-        <p className="mt-2 text-xs text-ink-500">Order attributes: {ORDER_FIELDS.map((o) => o.key).join(', ')}.</p>
+        <details className="mt-2 text-xs text-ink-600">
+          <summary className="cursor-pointer">Attributes you can use in expressions ({attrs.length})</summary>
+          <table className="mt-2 text-xs"><tbody>
+            {attrs.map((o) => <tr key={o.key}><td className="pr-3 font-mono">{o.key}</td><td className="pr-3">{o.type}</td><td className="pr-3 text-ink-500">{o.label}{o.builtIn ? ' · computed by the exchange' : ''}</td></tr>)}
+          </tbody></table>
+        </details>
       </section>
 
       <section>
@@ -112,11 +119,13 @@ export function CustomRulesEditor({ value, onChange, sample, onSample, mandateId
       <section className="rounded-xl border border-ink-200 p-4">
         <h4 className="font-medium text-ink-900 flex items-center gap-2"><FlaskConical size={16} /> Test against a sample order</h4>
         <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {ORDER_FIELDS.map((o) => (
+          {attrs.map((o) => (
             <label key={o.key} className="text-xs text-ink-600">
               <span className="font-mono">{o.key}</span>
-              <input className="input mt-1 py-1.5" inputMode={o.type === 'number' ? 'decimal' : 'text'} value={sample[o.key] ?? ''}
-                onChange={(e) => onSample({ ...sample, [o.key]: o.type === 'number' ? Number(e.target.value.replace(/[^\d.-]/g, '')) || 0 : e.target.value })} />
+              {o.type === 'boolean'
+                ? <select className="input mt-1 py-1.5" value={String(sample[o.key] ?? o.example)} onChange={(e) => onSample({ ...sample, [o.key]: e.target.value === 'true' })}><option>true</option><option>false</option></select>
+                : <input className="input mt-1 py-1.5" inputMode={o.type === 'number' ? 'decimal' : 'text'} value={String(sample[o.key] ?? o.example ?? '')}
+                    onChange={(e) => onSample({ ...sample, [o.key]: o.type === 'number' ? Number(e.target.value.replace(/[^\d.-]/g, '')) || 0 : e.target.value })} />}
             </label>
           ))}
         </div>

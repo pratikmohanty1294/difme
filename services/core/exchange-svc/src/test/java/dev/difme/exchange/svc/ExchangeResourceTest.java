@@ -385,6 +385,61 @@ class ExchangeResourceTest {
                 .body("ok", equalTo(true)).body("outcome.action", equalTo("REJECT"));
     }
 
+    /** The operator's master list of order attributes: what custom rules may name and what intents may carry. */
+    @Test
+    void uploadedAttributesBecomeUsableInRulesAndIntents() {
+        given().get("/v1/exchange/fr01-buy/attributes").then().statusCode(200)
+                .body("builtIn.key", hasItem("amount")).body("attributes.key", hasItem("merchant"));
+        given().contentType(ContentType.JSON).body("""
+                {"attributes": [{"key": "Bad Key", "type": "number"}, {"key": "amount", "type": "number"}, {"key": "x", "type": "date"}]}""")
+                .put("/v1/exchange/fr01-buy/attributes").then().statusCode(422)
+                .body("problems", hasItem(org.hamcrest.Matchers.containsString("must start with a lower-case letter")))
+                .body("problems", hasItem(org.hamcrest.Matchers.containsString("computed by the exchange")))
+                .body("problems", hasItem(org.hamcrest.Matchers.containsString("must be number, string or boolean")));
+        // The defaults stay (other tests use merchant), plus two new attributes.
+        String list = """
+                {"attributes": [{"key": "merchant", "type": "string"}, {"key": "category", "type": "string"}, {"key": "brand", "type": "string"},
+                  {"key": "mcc", "type": "string"}, {"key": "quantity", "type": "number"}, {"key": "city", "type": "string"},
+                  {"key": "pincode", "type": "string"},
+                  {"key": "warrantyYears", "type": "Number", "label": "Warranty (years)", "example": "2"},
+                  {"key": "giftWrap", "type": "boolean", "label": "Gift wrapped"}]}""";
+        given().contentType(ContentType.JSON).body(list).put("/v1/exchange/fr01-buy/attributes").then().statusCode(200)
+                .body("attributes.find { it.key == 'warrantyYears' }.type", equalTo("number"));
+        String rules = """
+                {"fields": [{"key": "warranty", "label": "Warranty", "type": "number", "expr": "warrantyYears"}],
+                 "rules": [{"tests": {"warranty": "< 1"}, "action": "REJECT", "message": "Needs a warranty."}],
+                 "defaultAction": "APPROVE"}""";
+        String m = mandate(1_440_000, 5).replace("\"cardJurisdiction\": \"IN_DOMESTIC_AFA\"}", "\"cardJurisdiction\": \"IN_DOMESTIC_AFA\", \"customRules\": " + rules + "}");
+        long mid = given().contentType(ContentType.JSON).body(m).post("/v1/exchange/fr01-buy/mandates").then().statusCode(201)
+                .extract().jsonPath().getLong("mandateId");
+        String intentWith = """
+                {"riskScore": 900, "offerSanctioned": true, "listMinor": 2000000, "discountBps": 2000, "feeMinor": 20000,
+                 "maxPriceMinor": 1900000, "attributes": %s}""";
+        String bidWith = bid(91, 64_000, 90, 5_000, 6_000_000).replace("\"validityDays\": 30}", "\"validityDays\": 30, \"mandateId\": " + mid + "}");
+        long none = given().contentType(ContentType.JSON).body(intentWith.formatted("{\"warrantyYears\": 0, \"giftWrap\": true}"))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body(bidWith).post("/v1/exchange/auctions/" + none + "/bids").then().statusCode(422)
+                .body("findings[0].message", equalTo("Needs a warranty."));
+        long two = given().contentType(ContentType.JSON).body(intentWith.formatted("{\"warrantyYears\": 2}"))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(202).extract().jsonPath().getLong("auctionId");
+        given().contentType(ContentType.JSON).body(bidWith).post("/v1/exchange/auctions/" + two + "/bids").then().statusCode(202);
+        given().contentType(ContentType.JSON).body(intentWith.formatted("{\"colour\": \"red\"}"))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(400).body("error", equalTo("unknown attribute colour"));
+        given().contentType(ContentType.JSON).body(intentWith.formatted("{\"warrantyYears\": \"two\"}"))
+                .post("/v1/exchange/fr01-buy/intents").then().statusCode(400).body("error", equalTo("attribute warrantyYears must be a number"));
+        // Dropping an attribute an active mandate's rules read is refused, naming the mandate.
+        given().contentType(ContentType.JSON).body("{\"attributes\": [{\"key\": \"merchant\", \"type\": \"string\"}]}")
+                .put("/v1/exchange/fr01-buy/attributes").then().statusCode(409)
+                .body("problems[0]", org.hamcrest.Matchers.containsString("uses “warrantyYears”"));
+        // Rules naming something outside the list are refused at registration.
+        String unknown = mandate(1_440_000, 5).replace("\"cardJurisdiction\": \"IN_DOMESTIC_AFA\"}", "\"cardJurisdiction\": \"IN_DOMESTIC_AFA\", \"customRules\": "
+                + rules.replace("warrantyYears", "insuranceTier") + "}");
+        given().contentType(ContentType.JSON).body(unknown).post("/v1/exchange/fr01-buy/mandates").then().statusCode(422)
+                .body("problems[0]", org.hamcrest.Matchers.containsString("unknown name “insuranceTier”"));
+        // Clean up: a standing mandate left active would bid in other tests' auctions.
+        given().contentType(ContentType.JSON).body("{\"status\":\"REVOKED\"}").post("/v1/exchange/fr01-buy/mandates/" + mid + "/status").then().statusCode(200);
+    }
+
     static java.util.Map<String, Object> proof(java.security.KeyPair merchant, java.security.KeyPair carrier, long auction,
                                               long amount, long deliveredAt) throws Exception {
         var invoice = new java.util.LinkedHashMap<String, Object>(java.util.Map.of("invoiceId", "inv-" + auction, "merchantId", "m-1",

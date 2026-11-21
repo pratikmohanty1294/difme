@@ -9,7 +9,7 @@ export class ExchangeError extends Error {
   constructor(readonly status: number, message: string, readonly body?: unknown) { super(message); }
 }
 
-async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown, timeoutMs = 8000): Promise<T> {
+async function call<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, timeoutMs = 8000): Promise<T> {
   let r: Response;
   try {
     r = await fetch(BASE + path, {
@@ -54,6 +54,8 @@ export interface MandateIn {
   /** The partner's own rules (same shape as sim/dmn-compile CustomTable); the exchange validates, compiles and runs them. */
   customRules?: import('../sim/dmn-compile').CustomTable;
 }
+export interface CatalogAttribute { key: string; type: 'number' | 'string' | 'boolean'; label?: string | null; example?: string | null }
+export interface AttributeCatalog { pack: string; builtIn: { key: string; type: string }[]; attributes: CatalogAttribute[] }
 export interface OrderInfo { merchant?: string; category?: string; brand?: string; mcc?: string; quantity?: number; city?: string; pincode?: string }
 export interface CustomCheck { ok: boolean; problems?: string[]; outcome?: { action: 'APPROVE' | 'REJECT' | 'FLAG'; message: string; rule: number } }
 export interface MandateRegistered { mandateId: number; depositRequiredMinor: number; findings: Finding[] }
@@ -66,7 +68,7 @@ export interface MandateState {
 }
 
 export const exchange = {
-  openIntent: (i: { riskScore: number; offerSanctioned: boolean; listMinor: number; discountBps: number; feeMinor: number; maxPriceMinor: number; order?: OrderInfo }) =>
+  openIntent: (i: { riskScore: number; offerSanctioned: boolean; listMinor: number; discountBps: number; feeMinor: number; maxPriceMinor: number; order?: OrderInfo; attributes?: Record<string, string | number | boolean> }) =>
     call<IntentOpened>('POST', `/${PACK}/intents`, i),
   auction: (id: number) => call<AuctionResult>('GET', `/auctions/${id}`),
   execute: (id: number, merchantId: string) => call<Execution>('POST', `/auctions/${id}/execute`, { merchantId }),
@@ -84,6 +86,11 @@ export const exchange = {
   setMandateStatus: (id: number, status: MandateState['status']) => call<MandateState>('POST', `/${PACK}/mandates/${id}/status`, { status }),
   /** What the exchange knows about a buying partner's node: tier, tracked reputation, verified deliveries. */
   partner: (nodeRef: number) => call<{ nodeRef: number; reputation: number | null; tracked: boolean; verifiedDeliveries: number; tier: string }>('GET', `/${PACK}/partners/${nodeRef}`),
+  /** The vertical's attribute catalog for custom rules: built-ins plus the operator's uploaded master list. */
+  attributes: () => call<AttributeCatalog>('GET', `/${PACK}/attributes`),
+  /** Replaces the master list (the operator's upload). 422/409 carry `problems`. */
+  replaceAttributes: (attributes: { key: string; type: string; label?: string; example?: string }[]) =>
+    call<AttributeCatalog>('PUT', `/${PACK}/attributes`, { attributes }),
   /** Cheap reachability probe (the public verification keys). */
   ping: () => call<Record<string, string>>('GET', '/keys', undefined, 3000).then(() => true, () => false),
 };

@@ -32,7 +32,7 @@ export const APPS: Record<RoleApp, AppInfo> = {
   },
   exchange: {
     id: 'exchange', name: 'Exchange OME', tagline: 'For the exchange operator', url: 'https://exchangeome.difme.example', home: 'exchange', tone: 'exchange',
-    routes: ['exchange', 'exchange/orderbook', 'exchange/config', 'exchange/network', 'audit', 'audit/compliance'],
+    routes: ['exchange', 'exchange/orderbook', 'exchange/config', 'exchange/attributes', 'exchange/network', 'audit', 'audit/compliance'],
     summary: 'The order matching engine. Buying partner agents bid in a 50 ms score-based batch auction, the best score wins, and every step is settled and logged in a signed proof chain.',
     features: ['Live auction and order book', 'Auction rules and network health', 'Proof chain and regulator view'],
   },
